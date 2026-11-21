@@ -12,7 +12,10 @@ import { allTasks, legacyAssignees, taskFilterCounts, taskViewCounts } from "@/l
 import { parseTaskSort } from "@/lib/tasks/list-sort";
 import { AllList } from "../all-list";
 import { TaskFilters } from "../filters";
+import { BulkBar } from "../bulk-bar";
 import { TaskListProvider } from "../task-list-context";
+import { TaskPicksProvider } from "../task-picks";
+import { TasksOrEmpty } from "../tasks-or-empty";
 import { TasksHeader } from "../tasks-header";
 import type { Metadata } from "next";
 
@@ -83,40 +86,44 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   const only = filters.property.length === 1 && filters.property[0] !== NONE ? filters.property[0] : null;
   const scopedProperty = only ? (properties.find((p) => p.id === only) ?? null) : null;
 
+  // With the people, each row's Assignee cell reassigns it in place (assignee-cell.tsx). The providers hold the
+  // header too, for bulk edit's Select all (docs/specs/bulk-edit.md); picked rows clear when the view, a filter or the
+  // search changes. The bar comes last, after Show more and outside the results that dim while a change loads.
   return (
-    <>
-      <TasksHeader />
-      <TaskFilters
-        data={{
-          users,
-          contractors,
-          others: legacy.others,
-          properties,
-          ownerCounts: Object.fromEntries(counts.owner),
-          propertyCounts: Object.fromEntries(counts.property),
-          meId: user.id,
-          viewCounts,
-          shown: total,
-          hidden: Math.max(0, counts.scope - total),
-          filtered,
-        }}
-      >
-        {tasks.length === 0 ? (
-          <div className="mt-4">
-            <EmptyState
-              action={
-                narrowed && (
-                  <ScopeButton clear>Clear filters</ScopeButton>
-                )
-              }
-            >
-              {searching ? `No tasks match “${filters.q}”.` : narrowed ? "No tasks match these filters." : "No tasks match."}
-            </EmptyState>
-          </div>
-        ) : (
-          <div className="mt-4">
-            {/* With the people, each row's Assignee cell reassigns it in place (assignee-cell.tsx). */}
-            <TaskListProvider tasks={tasks} today={todayYmdEastern()} people={{ users, contractors, meId: user.id, recent }}>
+    <TaskListProvider tasks={tasks} today={todayYmdEastern()} people={{ users, contractors, meId: user.id, recent }}>
+      <TaskPicksProvider scope={JSON.stringify([filters.status, filters.q, filters.owner, filters.property, filters.repeats])}>
+        <TasksHeader />
+        <TaskFilters
+          data={{
+            users,
+            contractors,
+            others: legacy.others,
+            properties,
+            ownerCounts: Object.fromEntries(counts.owner),
+            propertyCounts: Object.fromEntries(counts.property),
+            meId: user.id,
+            viewCounts,
+            shown: total,
+            hidden: Math.max(0, counts.scope - total),
+            filtered,
+          }}
+        >
+          <TasksOrEmpty
+            empty={
+              <div className="mt-4">
+                <EmptyState
+                  action={
+                    narrowed && (
+                      <ScopeButton clear>Clear filters</ScopeButton>
+                    )
+                  }
+                >
+                  {searching ? `No tasks match “${filters.q}”.` : narrowed ? "No tasks match these filters." : "No tasks match."}
+                </EmptyState>
+              </div>
+            }
+          >
+            <div className="mt-4">
               {scopedProperty ? (
                 <Section
                   title={<TextLink href={`/properties/${scopedProperty.id}`}>{shortAddress(scopedProperty.address)}</TextLink>}
@@ -126,12 +133,13 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
               ) : (
                 <AllList sort={sort} groups={groups} cadence={filters.repeats} />
               )}
-            </TaskListProvider>
-          </div>
-        )}
-        <ListFooter shown={take} total={total} ceiling={TASK_PAGE_MAX} />
-      </TaskFilters>
-    </>
+            </div>
+          </TasksOrEmpty>
+          <ListFooter shown={take} total={total} ceiling={TASK_PAGE_MAX} />
+        </TaskFilters>
+        <BulkBar properties={properties} />
+      </TaskPicksProvider>
+    </TaskListProvider>
   );
 }
 

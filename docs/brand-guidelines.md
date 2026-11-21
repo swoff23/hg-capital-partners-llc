@@ -111,7 +111,7 @@ Email can't read CSS variables, so it reads the hex mirror in `src/lib/brand-tok
 | `--foreground` | `#152133` | `#ece9e4` | Primary text, headings, figures, links | 16.19 / 15.22 background; floor 12.86 / 10.19 |
 
 - A "floor" is the lowest ratio across every ground in this table (canvas, background, popover, muted, accent, select). Light floors sit on `--accent`; dark floors sit on `--select`.
-- `--input` passes 3:1 on every ground but one: dark `--select` (2.70; light is 3.19). The only control on a selected row is its checked box, which reads by its `--primary` fill (10.19).
+- `--input` passes 3:1 on every ground but one: dark `--select` (2.70; light is 3.19). A bulk-selected row has no box: its 3:1 mark is the 2px `--primary` notch at its left edge (the Tasks list, docs/specs/bulk-edit.md D11).
 - Hover inside a raised layer (menu, listbox) uses `--accent` (1.14 vs dark popover); `--muted` there is invisible in dark (1.01).
 - Dark surfaces brighten as they rise. Nothing nests a darker well inside a lighter card (review VISUAL-023).
 
@@ -234,7 +234,7 @@ Two tokens are public-only.
 - Detail rails: a 112px label column, 96px on phones.
 - Controls 32px (sm) and 36px (md) with a mouse; 44px minimum on touch (`TOUCH_HEIGHT` on HG's own, the touch rules in `globals.css` on stock parts).
 
-**Borders.** All 1px. `--border` separates, `--line-strong` rules, `--input` identifies a control. A `border` with no color class draws `--border` (shadcn's base layer). The only 2px marks are focus, the tab underline and the nav notch. No colored rails on cards.
+**Borders.** All 1px. `--border` separates, `--line-strong` rules, `--input` identifies a control. A `border` with no color class draws `--border` (shadcn's base layer). The only 2px marks are focus, the tab underline, the nav notch and a bulk-selected row's notch. No colored rails on cards.
 
 **Elevation.** Flat in the page flow. Shadow color is ink, not black.
 

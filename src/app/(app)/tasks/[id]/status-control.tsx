@@ -169,15 +169,19 @@ export function WaitingReason({ taskId, waitingOn }: { taskId: string; waitingOn
   );
 }
 
-function WaitingForm({
+/** The question Waiting asks: what it's waiting on. Also the Tasks list's bulk Status (bulk-bar.tsx), with its own `submitLabel`. */
+export function WaitingForm({
   initial,
   already,
   onSave,
+  submitLabel,
   className,
 }: {
   initial: string;
   already: boolean;
   onSave: (reason: string) => void;
+  /** In place of "Set to Waiting" or "Save": "Set 3 to Waiting". */
+  submitLabel?: string;
   className?: string;
 }) {
   const [reason, setReason] = useState(initial);
@@ -204,7 +208,7 @@ function WaitingForm({
       />
       <div className="flex justify-end">
         <Button type="submit" disabled={!ok}>
-          {already ? "Save" : "Set to Waiting"}
+          {submitLabel ?? (already ? "Save" : "Set to Waiting")}
         </Button>
       </div>
     </form>

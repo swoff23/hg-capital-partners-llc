@@ -1,17 +1,7 @@
-import { Plus } from "lucide-react";
-import { LinkButton, PageHeader } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
+import { TasksHeaderActions } from "./select-all";
 
-/** The Tasks page's title and New task. Today is Home now, so there are no tabs. */
+/** The Tasks page's title, New task and, while rows are picked, bulk edit's Select all (select-all.tsx). Today is Home now, so there are no tabs. */
 export function TasksHeader() {
-  return (
-    <PageHeader
-      title="Tasks"
-      actions={
-        <LinkButton href="/tasks/new" variant="primary">
-          <Plus className="size-4 stroke-[1.5]" aria-hidden="true" />
-          New task
-        </LinkButton>
-      }
-    />
-  );
+  return <PageHeader title="Tasks" actions={<TasksHeaderActions />} />;
 }

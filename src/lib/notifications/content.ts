@@ -42,6 +42,8 @@ export interface OutboxItem {
    * notes. STATUS: the status. Absent on rows queued before Nov 15.
    */
   from?: string;
+  /** OFF ("took you off"): the job as they knew it then (jobKey), for offItems. Absent on lines queued before Nov 20. */
+  job?: string;
 }
 
 /** Lines that are the job's own news, with nobody's name in front: the 8 am emails. */
@@ -220,18 +222,45 @@ function withSendBackNote(item: OutboxItem, note: EventSnapshot | undefined): Ou
 }
 
 /**
+ * The job as a contractor knows it, in one string: its status, the date they
+ * see (its target) and a fingerprint of its notes. A "took you off" line
+ * carries it (core.ts notifyOff), so the send run can tell whether the job
+ * changed while it was someone else's.
+ */
+export function jobKey(job: { status: string; target: Ymd | null; notes: string | null | undefined }): string {
+  return `${job.status}|${job.target ?? ""}|${notesFingerprint(job.notes)}`;
+}
+
+/**
  * The off-the-job line (core.ts notifyOff) at send time. Taken off the job
  * (no access now): that line alone goes, and nothing else about a job that
  * isn't theirs. Still on it: a "took you off" undone by putting them back is
- * dropped, and "canceled" goes only while the job is still canceled.
+ * dropped, and so is the "assigned you" that put them back, when the job is
+ * as it was when they were taken off (`job`, against the line's `job`): it
+ * was theirs all along and nothing changed. A job that changed while it was
+ * someone else's keeps its "assigned you", the one line that tells them. A
+ * line queued before it carried `job` keeps it too. "canceled" goes only
+ * while the job is still canceled.
  */
-export function offItems(items: readonly OutboxItem[], now: { hasAccess: boolean; canceled: boolean }): OutboxItem[] {
+export function offItems(items: readonly OutboxItem[], now: { hasAccess: boolean; canceled: boolean; job?: string }): OutboxItem[] {
   // Handed the job and taken off it (or it canceled) inside this one bundle, before any email told them they had it
   // (a picker's Undo, a quick re-pick): there's nothing to tell them.
   const firstOff = items.findIndex((i) => i.kind === "OFF");
   if (firstOff >= 0 && (!now.hasAccess || now.canceled) && items.slice(0, firstOff).some((i) => i.kind === "ASSIGNED")) return [];
   if (!now.hasAccess) return items.filter((i) => i.kind === "OFF");
-  return items.filter((i) => i.kind !== "OFF" || (now.canceled && /^canceled /.test(oneLine(i.summary))));
+  // Taken off and given back inside this one bundle (an Undo of a reassignment, one job or many): they had it all along.
+  const firstAssigned = items.findIndex((i) => i.kind === "ASSIGNED");
+  const off = firstOff >= 0 ? items[firstOff] : null;
+  const hadItAllAlong =
+    !!off &&
+    /^took you off /.test(oneLine(off.summary)) &&
+    (firstAssigned < 0 || firstOff < firstAssigned) &&
+    off.job !== undefined &&
+    off.job === now.job;
+  return items.filter((i) => {
+    if (i.kind === "OFF") return now.canceled && /^canceled /.test(oneLine(i.summary));
+    return !(hadItAllAlong && i.kind === "ASSIGNED");
+  });
 }
 
 /**

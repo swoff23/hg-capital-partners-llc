@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { useLongPress } from "react-aria";
+import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { Avatar } from "@/components/avatar";
 import { DueDatePicker } from "@/components/due-date-picker";
 import { LinkPending } from "@/components/link-pending";
@@ -13,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { AssigneeCell, assigneeCellPull } from "./assignee-cell";
 import { TaskCheckbox } from "./task-checkbox";
 import { useTaskList } from "./task-list-context";
+import { usePicks } from "./task-picks";
 
 /**
  * Whether a row shows anything in the status column: a badge (any task past
@@ -63,6 +66,16 @@ export function hasStatusColumn(task: ListTask, { status = true, reason = false 
  * status (staff To dos) passes `statusColumn={false}` (see hasStatusColumn)
  * and its titles get the width back. Must sit inside a TaskListProvider and
  * an `@container` list.
+ *
+ * Under a TaskPicksProvider (the Tasks page) a row can be picked for bulk edit
+ * (docs/specs/bulk-edit.md), Asana's way, with no box: Cmd-click (Ctrl-click)
+ * picks or unpicks it, Shift-click picks every row from the last one toggled,
+ * and `x` does Cmd-click's job from the keyboard (Shift-x the range). A plain
+ * click still opens it; middle-click or the context menu opens a new tab. On
+ * touch a long-press picks it, and while anything is picked a tap anywhere on
+ * the row picks or unpicks it. A picked row sits on --select with a 2px
+ * --primary notch at its left edge on the title's line (brand principle 6),
+ * where its unread dot gives way.
  */
 export function TaskRow({
   task,
@@ -109,6 +122,22 @@ export function TaskRow({
   unread?: boolean;
 }) {
   const { today, reschedule, setDone, people } = useTaskList();
+  const picks = usePicks();
+  const picked = picks?.has(task.id) ?? false;
+  const picking = picks?.on ?? false;
+  // Touch only. Its keyboard and click handlers stay off the row's link, so Enter and a click open the task as
+  // before; the hook cancels the click that ends a long-press itself, and the context menu with it.
+  const coarse = useCoarsePointer();
+  const { longPressProps } = useLongPress({
+    isDisabled: !picks,
+    pointerType: "touch",
+    // What a screen reader hears on each row: the way to pick that this device has.
+    accessibilityDescription: coarse ? "Long-press to select" : "Press X to select",
+    onLongPress: () => picks?.toggle(task.id),
+  });
+  const longPress = Object.fromEntries(
+    Object.entries(longPressProps).filter(([name]) => name !== "onKeyDown" && name !== "onKeyUp" && name !== "onClick"),
+  ) as typeof longPressProps;
   const job = isContractorJob(task);
   // The person reassigns from the row where the list offers people (the Tasks page) and the row names them;
   // under a person's heading the heading names them and the cell stays empty.
@@ -183,13 +212,40 @@ export function TaskRow({
       )}
     >
       <Link
+        {...(picks ? longPress : {})}
         href={unread ? `/tasks/${task.id}#new` : `/tasks/${task.id}`}
         title={waitingOn ? `Waiting on ${waitingOn}` : undefined}
-        className={cn("absolute -inset-x-2 inset-y-0 rounded-md transition-colors group-hover/row:bg-muted", pendingRowFill)}
+        aria-keyshortcuts={picks ? "X Shift+X" : undefined}
+        onClick={(e) => {
+          // A pointer's click only: Cmd-Enter and Shift-Enter from the keyboard (detail 0) still open a new tab or
+          // window, and `x` is the keyboard's pick.
+          if (!picks || e.detail === 0) return;
+          // Cmd-click (Ctrl-click) picks or unpicks, Shift-click picks the range: not a new tab or window here.
+          if (e.metaKey || e.ctrlKey || e.shiftKey) {
+            e.preventDefault();
+            picks.toggle(task.id, { range: e.shiftKey && !e.metaKey && !e.ctrlKey });
+          }
+        }}
+        onKeyDown={(e) => {
+          // `x` picks the focused row and Shift-x the range, as in Gmail and Linear.
+          if (!picks || e.key.toLowerCase() !== "x" || e.metaKey || e.ctrlKey || e.altKey || e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          // A held key repeats: one pick per press.
+          if (e.repeat) return;
+          picks.toggle(task.id, { range: e.shiftKey });
+        }}
+        className={cn(
+          "absolute -inset-x-2 inset-y-0 rounded-md transition-colors group-hover/row:bg-muted",
+          pendingRowFill,
+          // A long-press picks: no iOS link preview, no text selection.
+          picks && "[-webkit-touch-callout:none] pointer-coarse:select-none",
+          picked && "bg-select group-hover/row:bg-select",
+        )}
       >
         <span className="sr-only">
           {task.title}
           {unread && ", new updates"}
+          {picked && ", selected"}
         </span>
         <LinkPending />
       </Link>
@@ -197,13 +253,37 @@ export function TaskRow({
       {unread && (
         // Outside the first column, so checkboxes and titles line up whether or not a row is
         // unread: centered 8px before it (12px to 4px), on the title's 28px line, and lower
-        // where a one-line touch row adds its padding.
+        // where a one-line touch row adds its padding. A picked row's notch takes its place.
         <span
           aria-hidden="true"
           className={cn(
             "pointer-events-none absolute -left-3 top-4 size-2 rounded-full bg-primary",
             !secondLine && (narrow ? "@min-[30rem]:pointer-coarse:top-5" : "pointer-coarse:top-5"),
+            picked && "hidden",
           )}
+        />
+      )}
+
+      {picked && (
+        // The picked mark: 2px by 16px of --primary at the fill's left edge, on the title's line, as the sidebar
+        // marks its current page (brand principle 6: a selection never rests on a pale fill alone).
+        <span
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute -left-2 top-3 h-4 w-0.5 bg-primary",
+            !secondLine && (narrow ? "@min-[30rem]:pointer-coarse:top-4" : "pointer-coarse:top-4"),
+          )}
+        />
+      )}
+
+      {picking && (
+        // On touch while picking, a tap anywhere on the row picks it, the date and the person included.
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-hidden="true"
+          onClick={() => picks?.toggle(task.id)}
+          className="absolute -inset-x-2 inset-y-0 z-10 hidden pointer-coarse:block"
         />
       )}
 
@@ -215,7 +295,11 @@ export function TaskRow({
           // Centered on the title's 28px line; a one-line row centers everything. A
           // canceled task's ring dims beside its slashed mark but stays tickable:
           // ticking moves it to Done, with Undo back to Canceled (list-actions.ts).
-          className={cn("relative -mt-2", oneLine && "lg:@min-[60rem]:-mt-3", task.status === "CANCELED" && "opacity-50")}
+          className={cn(
+            "relative -mt-2",
+            oneLine && "lg:@min-[60rem]:-mt-3",
+            task.status === "CANCELED" && "opacity-50",
+          )}
         />
       )}
 

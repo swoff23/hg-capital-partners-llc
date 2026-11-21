@@ -759,3 +759,20 @@ test("personRefs: the team and the contractors by their picker keys", () => {
     ],
   );
 });
+
+test("applyPatch: a bulk edit applies every one of its patches at once, a move keeping its unit", () => {
+  const a = task({ id: "a", place: "415 Crescent Ave.", propertyId: "p1", unitLabel: "Rear" });
+  const b = task({ id: "b" });
+  const c = task({ id: "c" });
+  const out = applyPatch([a, b, c], {
+    kind: "many",
+    patches: [
+      { kind: "place", id: "a", propertyId: "p2", place: "118 Congress St.", unitLabel: "Rear" },
+      { kind: "status", id: "b", status: "WAITING" },
+      { kind: "dates", changes: [{ id: "a", field: "dueDate", value: "2026-11-20" }] },
+    ],
+  });
+  assert.deepEqual([out[0].propertyId, out[0].place, out[0].unitLabel, out[0].due], ["p2", "118 Congress St.", "Rear", "2026-11-20"]);
+  assert.equal(out[1].status, "WAITING");
+  assert.equal(out[2], c, "an untouched row is the same object");
+});

@@ -62,6 +62,11 @@ interface TaskListApi {
   sendBack: (task: ListTask, note: string) => void;
   /** A Send back note that didn't go through, to start the sheet with next time. */
   sendBackDraft: (taskId: string) => string;
+  /**
+   * Any other edit the list makes (the bulk bar, bulk-bar.tsx): shows `optimistic` at once, runs the action,
+   * then `onDone` with its answer; a refusal toasts why and puts the rows back.
+   */
+  runEdit: <T>(optimistic: ListPatch, action: () => Promise<ActionResult<T>>, onDone?: (data: T) => void, onFailed?: () => void) => void;
 }
 
 const TaskListContext = createContext<TaskListApi | null>(null);
@@ -73,7 +78,7 @@ export function useTaskList(): TaskListApi {
 }
 
 /** The row's assignee for a pick, from the people on offer; null for nobody, or someone no longer offered. */
-function listAssigneeOf(v: AssigneeValue, people: TaskPeople): ListAssignee | null {
+export function listAssigneeOf(v: AssigneeValue, people: TaskPeople): ListAssignee | null {
   if (!v) return null;
   if ("userId" in v) {
     const u = people.users.find((x) => x.id === v.userId);
@@ -243,6 +248,7 @@ export function TaskListProvider({
       );
     },
     sendBackDraft: (taskId) => drafts[taskId] ?? "",
+    runEdit: run,
   };
 
   return <TaskListContext value={api}>{children}</TaskListContext>;

@@ -28,6 +28,11 @@ export type ActionBarProps = {
   /** The primary Button: Save, Next, "Create 39 tasks", "Mark done". */
   primary?: ReactNode;
   /**
+   * A row of the caller's own in place of `status`, `secondary` and `primary`, laid out by the caller: the Tasks
+   * list's bulk bar (a count, five edits and Clear). It fills the row; its buttons keep the bar's 48px on touch.
+   */
+  actions?: ReactNode;
+  /**
    * One line under the buttons: a disabled primary's reason, a refusal in
    * `--destructive`, or a save conflict. The caller gives it its tone and keeps
    * it to one line. The toast moves up to clear it.
@@ -146,6 +151,7 @@ export function ActionBar({
   status,
   secondary,
   primary,
+  actions,
   error,
   placement = "page",
   onPrimary,
@@ -234,6 +240,7 @@ export function ActionBar({
         >
           <div className={cn("flex items-center gap-3 lg:justify-end", rowClassName)}>
             {status && <p className="min-w-0 flex-1 truncate text-body text-foreground">{status}</p>}
+            {actions}
             {secondary}
             {primary}
           </div>

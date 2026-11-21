@@ -9,6 +9,7 @@ import {
   jobWhere,
   liveReminders,
   notesFingerprint,
+  jobKey,
   offItems,
   previewText,
   whatsNew,
@@ -775,6 +776,26 @@ test("handed the job and taken off it inside one bundle: nothing goes", () => {
   assert.deepEqual(offItems([assigned, canceled], { hasAccess: true, canceled: true }), []);
   // Told earlier, in another email: the off line still goes.
   assert.deepEqual(offItems([tookOff], { hasAccess: false, canceled: false }), [tookOff]);
+});
+
+test("taken off and given back inside one bundle (an Undo of a reassignment): nothing goes, unless the job changed meanwhile", () => {
+  const job = jobKey({ status: "SCHEDULED", target: "2026-11-23", notes: "Side door" });
+  const assigned = item("ASSIGNED", `assigned you "${TITLE}"`);
+  const tookOff = { ...item("OFF", `took you off "${TITLE}"`), job };
+  const comment = item("COMMENT", '"Doors"');
+  // Jose had it, Connor gave it to Zack, then Undo gave it back, the job as Jose knew it: he had it all along.
+  assert.deepEqual(offItems([tookOff, assigned], { hasAccess: true, canceled: false, job }), []);
+  assert.deepEqual(offItems([comment, tookOff, assigned], { hasAccess: true, canceled: false, job }), [comment]);
+  // The visit moved while it was Zack's: the "assigned you" is the one line that tells Jose.
+  const moved = jobKey({ status: "SCHEDULED", target: "2026-11-24", notes: "Side door" });
+  assert.deepEqual(offItems([tookOff, assigned], { hasAccess: true, canceled: false, job: moved }), [assigned]);
+  // The notes changed, or it was started: the same.
+  assert.deepEqual(offItems([tookOff, assigned], { hasAccess: true, canceled: false, job: jobKey({ status: "SCHEDULED", target: "2026-11-23", notes: "Back door" }) }), [assigned]);
+  assert.deepEqual(offItems([tookOff, assigned], { hasAccess: true, canceled: false, job: jobKey({ status: "IN_PROGRESS", target: "2026-11-23", notes: "Side door" }) }), [assigned]);
+  // A line queued before it carried the job: as before Nov 20, the "assigned you" goes.
+  assert.deepEqual(offItems([item("OFF", `took you off "${TITLE}"`), assigned], { hasAccess: true, canceled: false, job }), [assigned]);
+  // New to the job, taken off and given it again: they still hear they have it.
+  assert.deepEqual(offItems([assigned, tookOff, assigned], { hasAccess: true, canceled: false, job }), [assigned, assigned]);
 });
 
 test("8 am lines go only while still true when they send", () => {

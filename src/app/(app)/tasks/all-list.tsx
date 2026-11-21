@@ -7,6 +7,7 @@ import { DEFAULT_TASK_SORT, NO_GROUP, groupKeyOf, personName, type TaskSort } fr
 import { describeRepeat } from "@/lib/tasks/repeat";
 import { cn } from "@/lib/utils";
 import { useTaskList } from "./task-list-context";
+import { usePicks } from "./task-picks";
 import { TaskRow, hasStatusColumn } from "./task-row";
 import { TaskSection } from "./task-section";
 
@@ -38,6 +39,7 @@ export function AllList({
   groups: Record<string, number>;
 }) {
   const { tasks } = useTaskList();
+  const picks = usePicks();
   const statusColumn = tasks.some((t) => hasStatusColumn(t));
   const field = scoped && sort.field === "property" ? null : sort.field === "due" ? null : sort.field;
 
@@ -63,13 +65,26 @@ export function AllList({
           {runs(tasks, field).map(({ key, rows }) => {
             const first = rows[0];
             const name = field === "assignee" ? personName(first.assignee) : null;
+            const title = key === NO_GROUP ? (field === "property" ? "No property" : "Unassigned") : field === "property" ? (first.place ?? "") : (name ?? "");
+            const ids = rows.map((t) => t.id);
+            const state = picks?.stateOf(ids);
             return (
               <TaskSection
                 key={key}
                 as={scoped ? "h3" : "h2"}
-                title={key === NO_GROUP ? (field === "property" ? "No property" : "Unassigned") : field === "property" ? (first.place ?? "") : (name ?? "")}
+                title={title}
                 count={groups[key] ?? rows.length}
                 icon={name ? <Avatar name={name} size={24} outline={isContractorJob(first)} /> : undefined}
+                pick={
+                  picks && state
+                    ? {
+                        state,
+                        name: groupPickName(field, key === NO_GROUP ? null : title),
+                        onToggle: () => picks.setMany(ids, state !== "all"),
+                        picking: picks.on,
+                      }
+                    : undefined
+                }
               >
                 {rows.map(row)}
               </TaskSection>
@@ -81,16 +96,27 @@ export function AllList({
   );
 }
 
-/** The rows split where their heading changes. The server keeps each group together, so each key runs once. */
+/** What a heading's Select or Deselect picks, said after "Select all": "at 767 Prospect Avenue", "for Zack". */
+function groupPickName(field: "property" | "assignee", title: string | null): string {
+  if (field === "property") return title ? `at ${title}` : "with no property";
+  return title ? `for ${title}` : "unassigned";
+}
+
+/**
+ * The rows by heading, in the order each heading first appears. The server
+ * keeps each group together; while a bulk edit's move or reassign is saving,
+ * a changed row sits in its old place with its new key, and it joins its new
+ * group here instead of splitting a group in two (two sections with one key).
+ */
 function runs(tasks: readonly ListTask[], field: "property" | "assignee"): { key: string; rows: ListTask[] }[] {
-  const out: { key: string; rows: ListTask[] }[] = [];
+  const byKey = new Map<string, ListTask[]>();
   for (const t of tasks) {
     const key = groupKeyOf(t, field) ?? NO_GROUP;
-    const last = out.at(-1);
-    if (last?.key === key) last.rows.push(t);
-    else out.push({ key, rows: [t] });
+    const rows = byKey.get(key);
+    if (rows) rows.push(t);
+    else byKey.set(key, [t]);
   }
-  return out;
+  return [...byKey].map(([key, rows]) => ({ key, rows }));
 }
 
 /**

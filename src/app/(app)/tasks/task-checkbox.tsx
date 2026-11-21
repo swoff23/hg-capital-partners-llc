@@ -5,7 +5,10 @@ import { cn } from "@/lib/utils";
 /**
  * The round Done checkbox on task rows: the status ring family at 18px
  * inside a 44px hit area (negative margins keep the row compact). To do's
- * empty ring in --muted-foreground, --foreground on hover with a mouse; ticked, Done's filled
+ * empty ring in --muted-foreground. With a mouse on it, or a keyboard's focus,
+ * a faint check shows what a click does, as Asana's circles do
+ * (docs/specs/bulk-edit.md D10): the ring and check in --ok on the --ok-tint
+ * fill. Touch has no hover, so nothing shows there. Ticked, Done's filled
  * ring in --ok, with the check spring (docs/brand-guidelines.md, sections 6
  * and 7). The caller owns the state, so a tap shows at once while the save
  * runs.
@@ -43,11 +46,25 @@ export function TaskCheckbox({
       >
         <StatusMark
           status="OPEN"
-          className={cn(
-            "col-start-1 row-start-1 size-4.5 transition-colors pointer-coarse:size-4.5",
-            checked ? "opacity-0" : "group-hover/check:text-foreground",
-          )}
+          className={cn("col-start-1 row-start-1 size-4.5 transition-colors pointer-coarse:size-4.5", checked && "opacity-0")}
         />
+        {/* The faint check: the ring's own shape and stroke, on the Done badge's ground. Hover is mouse-only. */}
+        <svg
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={cn(
+            "col-start-1 row-start-1 size-4.5 text-ok opacity-0 transition-opacity [&_*]:[vector-effect:non-scaling-stroke]",
+            !checked && "group-hover/check:opacity-100 group-focus-visible/check:opacity-100",
+          )}
+        >
+          <circle cx="12" cy="12" r="9" className="fill-ok-tint" />
+          <path d="m8.5 12.25 2.5 2.5 4.5-5" />
+        </svg>
         {/* Scale 0.9 to 1 on the spring; reduced motion makes it an instant change. */}
         <StatusMark
           status="DONE"

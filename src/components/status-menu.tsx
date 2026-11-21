@@ -1,4 +1,5 @@
 "use client";
+import type { ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { Button as AriaButton, type Key } from "react-aria-components";
 import type { TaskStatus } from "@prisma/client";
@@ -31,6 +32,13 @@ import { cn } from "@/lib/utils";
 
 type Common = {
   isDisabled?: boolean;
+  /**
+   * A button of the caller's in place of the ring-and-word trigger (a react-aria-components Button): the Tasks
+   * list's bulk bar opens the menu from its Status button.
+   */
+  trigger?: ReactNode;
+  /** The phone sheet's title, in place of "Status": "Status · 3 tasks". */
+  title?: string;
   /** "always" shows the chevron; "hover" only with a mouse over the control or over a `group/row` row it sits in (a table cell). */
   chevron?: "always" | "hover";
   className?: string;
@@ -39,7 +47,8 @@ type Common = {
 export type StatusMenuProps =
   | (Common & {
       kind: "task";
-      value: TaskStatus;
+      /** null: several tasks with different statuses, so no row is checked (needs `trigger`). */
+      value: TaskStatus | null;
       onChange: (to: TaskStatus) => void;
       hidden?: readonly TaskStatus[];
       followUp?: (to: TaskStatus) => MenuFollowUp | null;
@@ -58,7 +67,7 @@ const TASK_KEYS: readonly string[] = STATUS_ORDER;
 const STAGE_KEYS: readonly string[] = DEAL_STATUSES;
 
 export function StatusMenu(props: StatusMenuProps) {
-  const { kind, value, isDisabled, chevron = "always", className } = props;
+  const { kind, value, isDisabled, chevron = "always", className, trigger, title } = props;
   const task = kind === "task";
   const keys = task ? TASK_KEYS : STAGE_KEYS;
   const hidden = new Set<string>(props.hidden ?? []);
@@ -66,7 +75,7 @@ export function StatusMenu(props: StatusMenuProps) {
   const wordOf = (k: string) => (task ? STATUS_LABEL[k as TaskStatus] : dealStageLabel(k));
 
   // A stage the list doesn't have (the legacy "Active") still shows on the trigger and in the list, as stored.
-  const listed = keys.includes(value) ? keys : [value, ...keys];
+  const listed = value === null || keys.includes(value) ? keys : [value, ...keys];
 
   function act(key: Key) {
     const to = String(key);
@@ -83,23 +92,25 @@ export function StatusMenu(props: StatusMenuProps) {
 
   return (
     <MenuTrigger>
+      {trigger ?? (
       <AriaButton
         isDisabled={isDisabled}
-        aria-label={`${noun}: ${wordOf(value)}. Change ${noun.toLowerCase()}`}
+        aria-label={`${noun}: ${value === null ? "mixed" : wordOf(value)}. Change ${noun.toLowerCase()}`}
         className={cn(buttonClass({ variant: "ghost", size: "sm" }), "group/status min-w-0 text-meta data-pressed:bg-muted", className)}
       >
-        {task ? <StatusBadge status={value as TaskStatus} /> : <DealStage stage={value} label={dealStageLabel(value)} className="text-meta" />}
+        {task ? value && <StatusBadge status={value as TaskStatus} /> : value && <DealStage stage={value} label={dealStageLabel(value)} className="text-meta" />}
         <ChevronDown
           aria-hidden="true"
           className={cn("size-3.5 shrink-0 text-muted-foreground", chevron === "hover" && "opacity-0 group-hover/row:opacity-100 group-hover/status:opacity-100 group-data-pressed/status:opacity-100 pointer-coarse:opacity-100")}
         />
       </AriaButton>
+      )}
       <Menu
-        placement="bottom start"
+        placement={trigger ? "top start" : "bottom start"}
         selectionMode="single"
-        selectedKeys={[value]}
+        selectedKeys={value === null ? [] : [value]}
         numberKeys={keys}
-        sheetTitle={noun}
+        sheetTitle={title ?? noun}
         onAction={act}
         followUp={props.followUp ? followUp : undefined}
         aria-label={`Set ${noun.toLowerCase()}`}

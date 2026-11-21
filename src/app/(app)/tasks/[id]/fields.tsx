@@ -15,7 +15,7 @@ import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { telHref, textHref } from "@/lib/contacts";
 import { useRun } from "@/components/use-run";
 import type { Ymd } from "@/lib/dates";
-import { offersUnits, unitDisplay, type PropertyOption } from "@/lib/picker-options-shape";
+import { offersUnits, unitAfterMove, unitDisplay, type PropertyOption } from "@/lib/picker-options-shape";
 import { fmtShortDay } from "@/lib/tasks/activity";
 import { describeRepeat, repeatDue, type RepeatRule } from "@/lib/tasks/repeat";
 import { cn } from "@/lib/utils";
@@ -151,7 +151,7 @@ export function TaskFields({
 
   function changeProperty(propertyId: string | null) {
     const next = properties.find((p) => p.id === propertyId);
-    const keepUnit = !!v.unitLabel && !!next?.units.includes(v.unitLabel);
+    const keepUnit = !!v.unitLabel && unitAfterMove(v.unitLabel, next?.units ?? []) !== null;
     const dropsUnit = !!v.unitLabel && !keepUnit;
     save(
       { propertyId, ...(keepUnit ? {} : { unitLabel: null }) },
