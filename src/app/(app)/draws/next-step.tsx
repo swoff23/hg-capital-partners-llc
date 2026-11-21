@@ -23,7 +23,19 @@ export type NextStepDraw = {
  * one tap; Inspection asks the approved amount and Approved what landed, each in a small sheet. Every move toasts
  * what happened with Undo, which puts the draw back as it was. Renders nothing for a draw with no next stage.
  */
-export function NextStep({ draw, className }: { draw: NextStepDraw; className?: string }) {
+export function NextStep({
+  draw,
+  short = false,
+  className,
+}: {
+  draw: NextStepDraw;
+  /**
+   * Inside an `@container` under 20rem (a 320 phone's Draws row), the button reads only the stage it moves to
+   * ("Approved"), so the draw's amount beside it is never cut off. Its accessible name keeps the full label.
+   */
+  short?: boolean;
+  className?: string;
+}) {
   const label = NEXT_STEP_LABEL[draw.stage];
   const next = NEXT_STAGE[draw.stage];
   const run = useRun();
@@ -57,8 +69,15 @@ export function NextStep({ draw, className }: { draw: NextStepDraw; className?: 
 
   return (
     <>
-      <Button variant="secondary" size="sm" pending={run.pending} onClick={tap} className={className}>
-        {label}
+      <Button variant="secondary" size="sm" pending={run.pending} onClick={tap} className={className} aria-label={short ? label : undefined}>
+        {short ? (
+          <>
+            <span className="@max-[20rem]:hidden">{label}</span>
+            <span className="@min-[20rem]:hidden">{STAGE_LABEL[next]}</span>
+          </>
+        ) : (
+          label
+        )}
       </Button>
       {asking && <AmountSheet draw={draw} onOpenChange={setAsking} onMoved={moved} />}
     </>
