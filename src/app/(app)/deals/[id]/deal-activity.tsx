@@ -2,7 +2,6 @@ import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { Section } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
-import { todayYmdEastern } from "@/lib/dates";
 import { buildDealLog } from "@/lib/deals/record-log";
 import { DealLog } from "./deal-log";
 
@@ -40,7 +39,6 @@ export async function DealActivity({ dealId }: { dealId: string }) {
         viewerId={user.id}
         viewerName={user.name || user.email.split("@")[0]}
         now={now.toISOString()}
-        today={todayYmdEastern(now)}
       />
     </Section>
   );

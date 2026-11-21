@@ -228,12 +228,6 @@ export function clockTime(at: Date | string | number): string {
   return `${get("hour")}:${get("minute")} ${get("dayPeriod").toUpperCase()}`;
 }
 
-/** "Oct 3": a day's month and date, never its year (the month heading over it has that). */
-function monthDay(day: Ymd): string {
-  const p = parts(day)!;
-  return new Date(Date.UTC(p.y, p.m - 1, p.d)).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
-}
-
 /** "Tue": a day's short weekday. */
 function weekdayOf(day: Ymd): string {
   const p = parts(day)!;
@@ -241,22 +235,22 @@ function weekdayOf(day: Ymd): string {
 }
 
 /**
- * An entry's time slot. Under a day heading: "now" under a minute, "5m"
- * earlier today under an hour, "2h" earlier today, then the clock time
- * ("2:14 PM") on an earlier day, whose heading has the date. Under a month
- * heading (`month`): the day, "Oct 3". "Earlier today" is Buffalo's today. A
- * time ahead of `now` (a clock a little fast) reads "now". "" for an invalid
- * instant.
+ * An entry's time slot (docs/specs/activity-collapse.md 3.5): "now" under a
+ * minute, "5m" earlier today under an hour, "2h" earlier today, then the day
+ * as historyDay says it: "Yesterday", a weekday within six days back ("Tue"),
+ * then "Oct 20" ("Oct 20, 2025" in another year). Timelines have no day
+ * headings, so the slot carries the day. "Today" is Buffalo's. A time ahead
+ * of `now` (a clock a little fast) reads "now". "" for an invalid instant.
  */
-export function activityTime(at: Date | string | number, now: Date | string | number, opts: { month?: boolean } = {}): string {
+export function activityTime(at: Date | string | number, now: Date | string | number): string {
   const a = instant(at);
   const n = instant(now);
   if (!a || !n) return "";
   const day = todayYmdEastern(a);
-  if (opts.month) return monthDay(day);
+  const today = todayYmdEastern(n);
   const sec = (n.getTime() - a.getTime()) / 1000;
   if (sec < 60) return "now";
-  if (day !== todayYmdEastern(n)) return clockTime(a);
+  if (day !== today) return historyDay(day, today);
   if (sec < 3600) return `${Math.floor(sec / 60)}m`;
   return `${Math.floor(sec / 3600)}h`;
 }

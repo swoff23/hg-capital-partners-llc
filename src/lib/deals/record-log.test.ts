@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BURST_MS, buildDealLog, groupLog, type LogSourceRow } from "./record-log";
+import { collapseStretches } from "@/lib/tasks/activity";
+import { BURST_MS, buildDealLog, type LogSourceRow } from "./record-log";
 
 let n = 0;
 function row(over: Partial<LogSourceRow> & { at?: string }): LogSourceRow {
@@ -229,44 +230,46 @@ test("an imported note has a day and no time; an undated one sits last, under no
   assert.deepEqual([u.day, u.at], [null, null]);
 });
 
-test("groups: a heading per day, month headings past 60 days, Undated last", () => {
-  const entries = buildDealLog([
-    row({ source: "manual", body: "today", at: "2026-10-26T15:00:00Z" }),
-    row({ source: "manual", body: "also today", at: "2026-10-26T13:00:00Z" }),
-    row({ source: "manual", body: "last week", at: "2026-10-19T15:00:00Z" }),
-    row({ source: "migration", body: "august", noteDate: new Date("2026-08-14T00:00:00Z"), authorUserId: null, authorName: null }),
-    row({ source: "migration", body: "august again", noteDate: new Date("2026-08-02T00:00:00Z"), authorUserId: null, authorName: null }),
-    row({ source: "migration", body: "undated", noteDate: null, authorUserId: null, authorName: null }),
+test("notes, stage changes, archive and the property link stay in view; other changes and task lines don't", () => {
+  const log = buildDealLog([
+    row({ source: "manual", body: "Walked it", at: "2026-10-20T15:00:00Z" }),
+    edit("2026-10-21T15:00:00Z", "theirPrice", "$425,000", "$410,000"),
+    edit("2026-10-22T15:00:00Z", "status", "2 - Medium", "1 - High"),
+    row({ at: "2026-10-23T15:00:00Z", body: "Task added: Replace porch light", authorUserId: null, authorName: null }),
+    row({ at: "2026-10-24T15:00:00Z", body: "Deal archived", data: { event: "archived" } }),
+    row({ at: "2026-10-25T15:00:00Z", body: "Linked to 118 Congress St." }),
   ]);
-  const groups = groupLog(entries, "2026-10-26");
   assert.deepEqual(
-    groups.map((g) => [g.kind, g.key, g.entries.length]),
+    log.map((e) => [e.type, e.anchor, e.kinds]),
     [
-      ["day", "2026-10-26", 2],
-      ["day", "2026-10-19", 1],
-      ["month", "2026-08", 2],
-      ["undated", "undated", 1],
+      ["line", true, []],
+      ["line", true, []],
+      ["line", false, ["tasks"]],
+      ["change", true, ["stage"]],
+      ["change", false, ["asking price"]],
+      ["note", true, []],
     ],
   );
 });
 
-test("the newest rows keep their days; months are for the opened log", () => {
-  const entries = buildDealLog([
-    row({ source: "manual", body: "today", at: "2026-10-26T15:00:00Z" }),
-    row({ source: "migration", body: "august", noteDate: new Date("2026-08-14T00:00:00Z"), authorUserId: null, authorName: null }),
+test("newest first, a stretch of deal changes keeps its newest 2 on top", () => {
+  const log = buildDealLog([
+    row({ source: "manual", body: "Older note", at: "2026-10-20T15:00:00Z" }),
+    ...[1, 2, 3, 4, 5].map((d) => edit(`2026-10-2${d}T15:00:00Z`, "units", String(d), String(d + 1))),
+    row({ source: "manual", body: "Newer note", at: "2026-10-27T15:00:00Z" }),
   ]);
+  const out = collapseStretches(log, { isAnchor: (e) => e.anchor, idOf: (e) => e.id, newestFirst: true });
   assert.deepEqual(
-    groupLog(entries, "2026-10-26", { months: false }).map((g) => [g.kind, g.key]),
-    [
-      ["day", "2026-10-26"],
-      ["day", "2026-08-14"],
-    ],
+    out.map((x) => (x.type === "row" ? x.row.type : `collapsed:${x.rows.length}`)),
+    ["note", "change", "change", "collapsed:3", "note"],
   );
-});
-
-test("a day exactly 60 days back is still a day heading", () => {
-  const entries = buildDealLog([row({ source: "manual", body: "x", at: "2026-08-27T15:00:00Z" })]);
-  assert.equal(groupLog(entries, "2026-10-26")[0].kind, "day");
+  const collapsed = out[3];
+  assert.ok(collapsed.type === "collapsed");
+  assert.deepEqual(
+    collapsed.rows.map((e) => e.day),
+    ["2026-10-23", "2026-10-22", "2026-10-21"],
+    "still newest first",
+  );
 });
 
 test("archive and restore read with the person first, and close a burst of edits", () => {

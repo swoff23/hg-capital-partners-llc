@@ -40,7 +40,6 @@ Three things only Connor can do. Each one unblocks a build.
 | Tenant contact on jobs | Spec ready | M | Dec 1 to Dec 31 | Design calls | docs/specs/tenant-contact.md |
 | Check photos on file (new) | Needs a spec | S | Nov 23 to Dec 15 | | Connor, Nov 19 |
 | Task recorder (new) | Needs a spec | M | Nov 23 to Dec 15 | | Connor, Nov 19 |
-| Shorter activity, comments in line (new) | Needs a spec | S | Nov 23 to Nov 30 | | Connor, Nov 19; docs/specs/activity-comments.md |
 
 - **Prove email end to end.** Job emails, reply by email and the 8 am Due today run are live, but no real one has gone out yet. One test with the test contractor's login proves all three.
 - **Error alerts.** Nothing tells anyone when the app breaks. Sentry catches server and browser errors, and Better Stack watches the site, the email job and the QuickBooks sync. The spec puts it in before contractors are invited.
@@ -53,7 +52,6 @@ Three things only Connor can do. Each one unblocks a build.
 - **Tenant contact on jobs.** Each unit holds its tenant's name and phone, and each job shares the tenant, the lockbox code or both. It's the first step toward real tenancies. Three of its calls were reopened on Nov 14 and need Connor's answer.
 - **Check photos on file.** Pieter snaps each check he writes from his phone, adds who it's to, the amount, the date and the property, and it files itself. Connor's high priority (Nov 19). Connor can find any check later by payee, property, amount or check number, and each one opens the photo. When contractor invoices land, a check photo attaches to the invoice it paid. Reuses: the private blob store and the attachment upload, file route and safe headers behind task and property files.
 - **Task recorder.** Pieter records one long voice memo, say on a drive between properties, and the app turns it into tasks: a title, the property, who it's for and a due date for each. He reviews the draft list and adds them in one tap, so nothing lands half-read. The recording stays on file with the tasks it made. Connor's high priority (Nov 19). Reuses: New task and the Task model, the property and contact matching behind search, and the private blob store for the audio.
-- **Shorter activity, comments in line.** A long task's Activity is a wall of one-line changes. Like Linear, a run of changes between two comments collapses into one line that says what's inside ("Show 5 updates: assignee, due date, unit") and opens in place. Comments stay as cards in time order between the runs, never folded, so a conversation reads top to bottom with the changes around it. Connor's ask for the week of Nov 23. Reuses: `TaskActivity`, `ActivityRun` and the folding in `src/lib/tasks/activity.ts`; it revisits the folding rules and top fold in docs/specs/activity-comments.md 2.3.
 
 ## Next: Dec 16 to Jan 31. Money and the tax calendar
 
@@ -65,7 +63,7 @@ Three things only Connor can do. Each one unblocks a build.
 | Contractor onboarding in the portal | Spec ready | M | Dec 16 to Jan 15 | Contractor page | docs/specs/contractor-onboarding.md (branch `claude/contractor-form-integration-55b2b4`) |
 | Year-end pack for the CPA (new) | Needs a spec | M | Jan 16 to Feb 28 | QuickBooks | |
 | Leases on every unit | Needs a spec | L | Jan 16 to Feb 28 | Tenant contact | docs/property-page-plan.md section 2 |
-| Rehab draw tracker (new) | Needs a spec | M | Dec 16 to Jan 31 | | Connor, Nov 20 |
+| Rehab draw tracker (new) | Spec ready | M | Dec 16 to Jan 31 | | docs/specs/rehab-draws.md |
 
 - **Contractor invoices.** Every invoice in one place, tied to its jobs: from the portal, an `invoices@` inbox or by hand. To review, To pay and Paid, plus a list of finished jobs with no invoice. Money still moves in Baselane. Needs Connor's OK on its 11 defaults.
 - **1099 list for January.** One page lists each contractor's 2026 payments beside their W-9 and address, so whoever files has every number in one place. Reuses: QuickBooks vendor lines (`QboVendor`, `LedgerLine`) and the contractor page's W-9 files.
@@ -73,7 +71,7 @@ Three things only Connor can do. Each one unblocks a build.
 - **Contractor onboarding.** New contractors set themselves up from an invite or one sign-up link: details, trades, W-9 and insurance. It retires the Google Form, whose sheet holds every contractor's bank numbers in plain text.
 - **Year-end pack for the CPA.** For each property and LLC: the 2026 P&L from QuickBooks, the CapEx finished this year and the loan facts, in one export. Ready by mid-February, ahead of the Mar 15 return deadline. Reuses: the QuickBooks queries behind Financials and the property CapEx model.
 - **Leases on every unit.** Rent, lease end and deposit live in task text today. A lease per unit (tenant, dates, rent, deposit) puts renewals in Needs you 90 days out and marks each unit occupied, turning over or vacant.
-- **Rehab draw tracker.** Each rehab loan starts with a draw schedule the lender approves, then HG Capital draws on it as work gets done. Today nobody can see where a loan stands. Each property with a rehab loan holds its approved budget by line, every draw requested, funded or pending, and what's left. Finished work that hasn't been drawn yet shows as ready to pull, across every open rehab, so the next draw request is a list, not a hunt. Connor's ask (Nov 20). Reuses: the property's loan and lender fields (`lender`, `loanNumber`, `rehabAmount`), tasks and jobs marked done for what's finished, and property documents for the approved schedule and draw reports.
+- **Rehab draw tracker.** Each rehab loan holds back a budget that HG Capital draws on as work gets done, and today nobody but Pieter can see where a draw stands. A Draws page shows ready to draw, at the lender, funded and left across every open rehab. Each rehab follows its loan (765 and 767 Prospect share one), keeps the lender's budget line by line, and starts from Vontive's uploaded worksheet. The next draw stays open as a draft Pieter fills in, then moves through Sent, Inspection, Approved and Funded, and Needs you flags a draw waiting on us or stuck 10 days. Planned with Connor on Nov 20 as a lightweight MVP; layouts get their own round before "build it". Costs, tasks on lines and forwarded lender emails come after.
 
 ## Then: Feb 1 to Mar 31. Tenancies and residents
 
@@ -138,3 +136,7 @@ Three things only Connor can do. Each one unblocks a build.
 ## Keeping this current
 
 Update a row's status when it changes, and move finished items to a short "Done" list at the bottom. When an item gets a spec, link it in the Source column. When the order changes, republish the artifact by its URL so the link stays the same.
+
+## Done
+
+- **Shorter activity** (Nov 20, `bc996d0`). Older changes between comments collapse Linear style ("Show 5 updates: assignee, due date and Asana move"), the newest 2 stay in view, and day headings are gone, on the task page, the contractor's job page and the deal log. Spec: docs/specs/activity-collapse.md.

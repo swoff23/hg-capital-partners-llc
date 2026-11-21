@@ -184,7 +184,7 @@ export function TaskPageView(p: TaskPageViewProps) {
             />
 
             <Section title="Activity">
-              <TaskActivity taskId={task.id} notes={task.description} rows={p.rows} now={p.now} today={p.today} newSince={p.newSince} />
+              <TaskActivity taskId={task.id} notes={task.description} rows={p.rows} now={p.now} newSince={p.newSince} />
             </Section>
 
             {/* Without a login the composer says the contractor needs one ("Zack needs a login to see this"): no reply reaches them yet. */}

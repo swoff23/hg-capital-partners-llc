@@ -6,6 +6,7 @@ import type { RecentKind, TaskStatus } from "@prisma/client";
 import { PORTAL_COOKIE_HTTP, PORTAL_COOKIE_HTTPS } from "@/lib/portal/cookie";
 import { newToken } from "@/lib/portal/tokens";
 import { readSessionToken, signSessionToken } from "@/lib/session-token";
+import { lineHasProbe, propertyLines, type KeyedProperty, type KeyProbe } from "@/lib/search-keys";
 import {
   answerRecent,
   MAX_QUERY,
@@ -73,6 +74,16 @@ function fakeDb(data: Data = {}) {
     deal: table(data.deals ?? [], log, "deal"),
     contact: table(data.contacts ?? [], log, "contact"),
     tenant: table(data.tenants ?? [], log, "tenant"),
+    // The SQL in propertyKeyHits, read with its JS twin (lib/search-keys.ts lineHasProbe); search-keys.test.ts
+    // and the database check hold the two together. The values are the probes' terms, kinds and texts.
+    async $queryRaw(_sql: TemplateStringsArray, terms: number[], kinds: KeyProbe["kind"][], texts: string[]) {
+      log.push("property.$queryRaw");
+      return (data.properties ?? []).flatMap((p) => {
+        if (p.archivedAt) return [];
+        const lines = propertyLines(p as unknown as KeyedProperty);
+        return texts.flatMap((text, k) => (lines.some((l) => lineHasProbe(l, { kind: kinds[k], text })) ? [{ id: p.id, term: terms[k] }] : []));
+      });
+    },
   } as unknown as SearchDb;
   return { db, log };
 }
@@ -410,7 +421,9 @@ test("the query is bounded: a pasted page of text costs what a title does", asyn
       return value;
     });
   const recording = { findMany: async (args: unknown) => (record(args), []), count: async (args: unknown) => (record(args), 0) };
-  const db = { property: recording, task: recording, deal: recording, contact: recording, tenant: recording } as unknown as SearchDb;
+  // The hidden-field probes go to the SQL as values, and count too.
+  const $queryRaw = async (_sql: TemplateStringsArray, _terms: number[], _kinds: string[], texts: string[]) => (seen.push(...texts), []);
+  const db = { property: recording, task: recording, deal: recording, contact: recording, tenant: recording, $queryRaw } as unknown as SearchDb;
   await runSearch(db, { q: "y".repeat(5000) });
   assert.ok(seen.length > 0);
   assert.ok(seen.every((s) => s.length <= MAX_QUERY), `longest spelling ${Math.max(...seen.map((s) => s.length))}`);
@@ -593,4 +606,154 @@ test("Tenants come right after Properties", async () => {
     contacts: [contact("c1", "Ana Prospect")],
   });
   assert.deepEqual((await search(db, "prospect")).groups.map((g) => g.type), ["property", "tenant", "task", "contractor"]);
+});
+
+// ---------------------------------------------------------------------------
+// Hidden fields (docs/specs/search-deeper-fields.md)
+// ---------------------------------------------------------------------------
+
+const prospect = (extra: Row = {}) =>
+  property("p1", "767 Prospect Ave, Buffalo, NY 14213", {
+    units: [
+      {
+        id: "u1",
+        label: "Upper",
+        lockboxCode: "4521",
+        utilities: { nationalGridAcct: "1607524355", nationalFuelAcct: "9258618-10", waterAcct: "Meter - 05179975", nationalGridAutopay: "TENANT" },
+        equipment: [
+          { type: "Water Heater", model: "RG240S6N" },
+          { type: "Refrigerator", model: "WRT518S7FM04" },
+        ],
+      },
+      {
+        label: "Lower",
+        utilities: { nationalFuelAcct: "9291272-09\n(Meter #740347)" },
+        equipment: [
+          { type: "Refrigerator", model: "253.64722406" },
+          { type: "Oven", model: "" },
+        ],
+      },
+    ],
+    ...extra,
+  });
+
+const propertyRows = async (db: SearchDb, q: string) => group((await search(db, q)).groups, "property")?.rows ?? [];
+
+test("a property is found by an equipment model number, and the row names the unit and lands on the line", async () => {
+  const { db } = fakeDb({ properties: [prospect(), property("p2", "118 Congress St")] });
+  const [row, ...rest] = await propertyRows(db, "rg240");
+  assert.equal(rest.length, 0);
+  assert.deepEqual(row, {
+    type: "property",
+    id: "p1",
+    href: "/properties/p1?find=u1.equipment.0",
+    title: "767 Prospect Ave",
+    units: 2,
+    owner: "HG Buffalo Holding 1 LLC",
+    photoUrl: null,
+    matched: { unit: "Upper", label: "Water Heater", value: "RG240S6N", code: true, more: 0 },
+  });
+});
+
+test("utility account numbers match with or without their dashes, spaces and leading zeros", async () => {
+  const { db } = fakeDb({ properties: [prospect()] });
+  for (const q of ["9258618-10", "925861810", "9258618 10", "1607524355", "05179975", "5179975"]) {
+    assert.deepEqual((await propertyRows(db, q)).map((r) => r.id), ["p1"], q);
+  }
+  const fuel = (await propertyRows(db, "925861810"))[0] as { matched?: unknown; href: string };
+  assert.deepEqual(fuel.matched, { unit: "Upper", label: "National Fuel", value: "9258618-10", code: true, more: 0 });
+  assert.equal(fuel.href, "/properties/p1?find=u1.utilities.nationalFuelAcct");
+
+  // A note inside the field finds the unit too, and the row shows the line that matched. A unit saved before ids
+  // existed lands by its place in the list.
+  const meter = (await propertyRows(db, "740347"))[0] as { matched?: { unit: string; value: string }; href: string };
+  assert.deepEqual([meter.matched?.unit, meter.matched?.value], ["Lower", "(Meter #740347)"]);
+  assert.equal(meter.href, "/properties/p1?find=unit-at-1.utilities.nationalFuelAcct");
+});
+
+test("a short number, a word without a digit, a lockbox code and the autopay fields never match", async () => {
+  const { db } = fakeDb({ properties: [prospect()] });
+  for (const q of ["160", "tenant", "4521"]) assert.deepEqual(await propertyRows(db, q), [], q);
+});
+
+test("a number split by dots or spaces is read whole: Kenmore's 253.64722406", async () => {
+  const { db } = fakeDb({ properties: [prospect()] });
+  const [row] = (await propertyRows(db, "253.64722406")) as { matched?: { unit: string; value: string } }[];
+  assert.deepEqual([row?.matched?.unit, row?.matched?.value], ["Lower", "253.64722406"]);
+});
+
+test("equipment type words and everyday names find the building, with the model in the row", async () => {
+  const { db } = fakeDb({ properties: [prospect(), property("p2", "118 Congress St")] });
+  const [fridge] = (await propertyRows(db, "prospect fridge")) as { matched?: unknown; href: string }[];
+  assert.deepEqual(fridge.matched, { unit: "Upper", label: "Refrigerator", value: "WRT518S7FM04", code: true, more: 1 });
+  assert.equal(fridge.href, "/properties/p1?find=u1.equipment.1");
+
+  const [heater] = (await propertyRows(db, "hot water tank")) as { matched?: { label: string } }[];
+  assert.equal(heater.matched?.label, "Water Heater");
+  const [stove] = (await propertyRows(db, "stove")) as { matched?: unknown }[];
+  assert.deepEqual(stove.matched, { unit: "Lower", label: "Oven", value: "", code: false, more: 0 });
+  assert.deepEqual(await propertyRows(db, "ov"), [], "two letters are too few for a type");
+});
+
+test("loan and policy numbers, the lender, servicer and insurer find the property and land on their section", async () => {
+  const { db } = fakeDb({
+    properties: [prospect({ loanNumber: "0012-345678", lender: "Vontive", loanServicer: "Fay Servicing", insurancePolicyNo: "88-1203", insuranceCarrier: "Erie" })],
+  });
+  const one = async (q: string) => (await propertyRows(db, q))[0] as { matched?: unknown; href: string } | undefined;
+  assert.deepEqual((await one("12345678"))?.matched, { unit: null, label: "Loan", value: "0012-345678", code: true, more: 0 });
+  assert.equal((await one("12345678"))?.href, "/properties/p1?find=loanNumber");
+  assert.deepEqual((await one("881203"))?.matched, { unit: null, label: "Policy", value: "88-1203", code: true, more: 0 });
+  assert.deepEqual((await one("vontive"))?.matched, { unit: null, label: "Lender", value: "Vontive", code: false, more: 0 });
+  assert.equal((await one("fay servicing"))?.href, "/properties/p1?find=loanServicer");
+  assert.deepEqual((await one("erie"))?.matched, { unit: null, label: "Insurer", value: "Erie", code: false, more: 0 });
+});
+
+test("a word in the address leaves the row as it was", async () => {
+  const { db } = fakeDb({ properties: [prospect()] });
+  const [row] = await propertyRows(db, "767 prospect");
+  assert.equal(row.href, "/properties/p1");
+  assert.equal("matched" in row, false);
+});
+
+test("an archived property is never found by its hidden fields", async () => {
+  const { db } = fakeDb({ properties: [prospect({ archivedAt: day(2) })] });
+  assert.deepEqual(await propertyRows(db, "rg240"), []);
+});
+
+test("a type with no match counts a property found by a model number among the others", async () => {
+  const { db } = fakeDb({ properties: [prospect()] });
+  const { groups } = await search(db, "rg240", { type: "deal" });
+  assert.deepEqual(groups.map((g) => [g.type, g.total, g.rows.length]), [["property", 1, 0]]);
+});
+
+test("a contractor is found by phone, typed any way, or by email, and the row says which", async () => {
+  const { db } = fakeDb({
+    contacts: [
+      contact("c1", "Luis Ortiz", { phone: "716-555-0142", phoneE164: "+17165550142", email: "luis@ortizplumbing.com", tradeLinks: [{ trade: { id: "t", name: "Plumbing" } }] }),
+      contact("c2", "Ana Prospect", { phone: "716-555-0199", phoneE164: "+17165550199" }),
+      // Imported before phoneE164 was written: the shown phone alone.
+      contact("c3", "Jose Alvarez", { phone: "716-853-9547", phoneE164: null }),
+    ],
+  });
+  const rows = async (q: string) => group((await search(db, q)).groups, "contractor")?.rows ?? [];
+  for (const q of ["(716) 555-0142", "716-555-0142", "7165550142", "555-0142"]) {
+    const found = (await rows(q)) as { id: string; matched?: unknown }[];
+    assert.deepEqual(found.map((r) => r.id), ["c1"], q);
+    assert.deepEqual(found[0].matched, { unit: null, label: "Phone", value: "716-555-0142", code: true, more: 0 }, q);
+  }
+  for (const q of ["(716) 853-9547", "716 853 9547", "7168539547", "8539547"]) {
+    assert.deepEqual((await rows(q)).map((r) => r.id), ["c3"], q);
+  }
+  const [email] = (await rows("ortizplumbing")) as { matched?: unknown }[];
+  assert.deepEqual(email.matched, { unit: null, label: "Email", value: "luis@ortizplumbing.com", code: false, more: 0 });
+  const [byName] = await rows("luis plumbing");
+  assert.equal("matched" in byName, false, "the name and trade are on the row already");
+});
+
+test("a tenant's phone typed with parentheses finds them", async () => {
+  const { db } = fakeDb({
+    tenants: [tenant("t1", "Dana Lee", [onLease({ id: "l1" })], { phone: "716-555-1234", phoneE164: "+17165551234" })],
+  });
+  const found = group((await search(db, "(716) 555-1234")).groups, "tenant");
+  assert.deepEqual(ids(found), ["t1"]);
 });

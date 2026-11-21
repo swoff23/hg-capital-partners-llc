@@ -2,7 +2,8 @@
 import { RailFold } from "@/components/rail-fold";
 import { Section } from "@/components/ui";
 import { shortAddress } from "@/lib/normalize";
-import { onPropertyFieldRequest, openPropertyField } from "./edit-field-event";
+import { findElementId } from "@/lib/find-target";
+import { onPropertyFieldRequest, onPropertyFieldReveal, openPropertyField } from "./edit-field-event";
 import { MissingTitle, useMissingFields } from "./missing-context";
 import { ChangeCodeMenu, PropertyFact, PropertyKeyDate, isBlank } from "./property-fact";
 
@@ -39,6 +40,7 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
         missing={missing}
         listen={onPropertyFieldRequest}
         reopen={openPropertyField}
+        reveal={onPropertyFieldReveal}
         rows={[
           {
             key: "insuranceRenewalDate",
@@ -60,7 +62,7 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
             key: "insuranceCarrier",
             empty: isBlank(p.insuranceCarrier),
             fold: true,
-            node: <PropertyFact {...common} field="insuranceCarrier" label="Carrier" kind="text" value={p.insuranceCarrier} empty="Add carrier" />,
+            node: <PropertyFact {...common} field="insuranceCarrier" anchor={findElementId("insuranceCarrier")} label="Carrier" kind="text" value={p.insuranceCarrier} empty="Add carrier" />,
           },
           {
             key: "insurancePolicyNo",
@@ -70,6 +72,7 @@ export function PropertyInsuranceSection({ insurance: p }: { insurance: Editable
               <PropertyFact
                 {...common}
                 field="insurancePolicyNo"
+                anchor={findElementId("insurancePolicyNo")}
                 label="Policy #"
                 name="Policy number"
                 kind="text"

@@ -164,16 +164,17 @@ test("clockTime: Buffalo's clock with a plain space, wherever it runs", () => {
   assert.equal(clockTime("garbage"), "");
 });
 
-test("activityTime: now, minutes and hours earlier today, then the clock time", () => {
+test("activityTime: now, minutes and hours earlier today, then the day", () => {
   assert.equal(activityTime(new Date("2026-10-26T17:59:30Z"), NOW), "now");
   assert.equal(activityTime(new Date("2026-10-26T17:55:00Z"), NOW), "5m");
   assert.equal(activityTime(new Date("2026-10-26T17:00:30Z"), NOW), "59m");
   assert.equal(activityTime(new Date("2026-10-26T16:00:00Z"), NOW), "2h");
   // 9:30 AM this morning is still today: hours, not a clock time.
   assert.equal(activityTime(new Date("2026-10-26T13:30:00Z"), NOW), "4h");
-  // Yesterday evening, under its own heading: the clock time, even inside 24 hours.
-  assert.equal(activityTime(new Date("2026-10-26T01:14:00Z"), NOW), "9:14 PM");
-  assert.equal(activityTime(new Date("2026-10-20T18:14:00Z"), NOW), "2:14 PM");
+  // Yesterday evening is Yesterday, even inside 24 hours; then a weekday within six days back, then the date.
+  assert.equal(activityTime(new Date("2026-10-26T01:14:00Z"), NOW), "Yesterday");
+  assert.equal(activityTime(new Date("2026-10-20T18:14:00Z"), NOW), "Tue");
+  assert.equal(activityTime(new Date("2026-10-19T18:14:00Z"), NOW), "Oct 19");
   // A clock running a little fast never reads as the future.
   assert.equal(activityTime(new Date("2026-10-26T18:00:20Z"), NOW), "now");
   // ISO strings, as they cross from a server component.
@@ -181,17 +182,17 @@ test("activityTime: now, minutes and hours earlier today, then the clock time", 
   assert.equal(activityTime("garbage", NOW), "");
 });
 
-test("activityTime: just after Buffalo midnight, a late entry is yesterday's clock time", () => {
+test("activityTime: just after Buffalo midnight, a late entry is Yesterday", () => {
   const justAfter = new Date("2026-10-26T04:10:00Z"); // 12:10 AM
-  assert.equal(activityTime(new Date("2026-10-26T03:50:00Z"), justAfter), "11:50 PM");
+  assert.equal(activityTime(new Date("2026-10-26T03:50:00Z"), justAfter), "Yesterday");
   assert.equal(activityTime(new Date("2026-10-26T04:05:00Z"), justAfter), "5m");
 });
 
-test("activityTime: under a month heading, the day without its year", () => {
-  assert.equal(activityTime(new Date("2026-08-03T18:14:00Z"), NOW, { month: true }), "Aug 3");
-  assert.equal(activityTime(new Date("2025-08-03T18:14:00Z"), NOW, { month: true }), "Aug 3");
+test("activityTime: older history reads its date, with the year when it isn't this one", () => {
+  assert.equal(activityTime(new Date("2026-08-03T18:14:00Z"), NOW), "Aug 3");
+  assert.equal(activityTime(new Date("2025-08-03T18:14:00Z"), NOW), "Aug 3, 2025");
   // Read on Buffalo's calendar: 11 PM on Aug 3 is Aug 3, not the UTC Aug 4.
-  assert.equal(activityTime(new Date("2026-08-04T03:00:00Z"), NOW, { month: true }), "Aug 3");
+  assert.equal(activityTime(new Date("2026-08-04T03:00:00Z"), NOW), "Aug 3");
 });
 
 test("fullStamp: weekday, date and clock time, the year only when it isn't this year", () => {

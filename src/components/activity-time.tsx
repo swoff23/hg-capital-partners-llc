@@ -2,7 +2,7 @@
 import { createContext, useContext, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Tooltip } from "@/components/tooltip";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
-import { activityTime, fullStamp } from "@/lib/dates";
+import { activityTime, fmtDay, fullStamp, historyDay, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 /*
@@ -82,22 +82,23 @@ export function useActivityNow(now?: Date | string | number): number {
 }
 
 /**
- * An entry's time (activity 2.4): "now", "5m", "2h" earlier today, "2:14 PM"
- * on an earlier day under its day heading, "Oct 3" under a month heading. A
- * `<time dateTime>`. With a mouse it sits inside the Tooltip, which gives the
- * full stamp ("Thu, Oct 30 at 2:14 PM"). On touch it is plain text: the
- * heading and the clock time already say when, a comment's menu header has
- * the full stamp, and a tap target per line would overlap its neighbors.
+ * An entry's time (docs/specs/activity-collapse.md 3.5): "now", "5m", "2h"
+ * earlier today, then the day ("Yesterday", "Tue", "Oct 20"), since the
+ * timeline has no day headings. A `<time dateTime>`. With a mouse it sits
+ * inside the Tooltip, which gives the full stamp ("Thu, Oct 30 at 2:14 PM").
+ * On touch it is plain text: a comment's menu header has the full stamp, and
+ * a tap target per line would overlap its neighbors. A row known only by its
+ * day (a line from the deals sheet) passes `day` and no `at`.
  */
 export function ActivityTime({
   at,
-  month = false,
+  day,
   now,
   className,
 }: {
-  at: Date | string;
-  /** Under a month heading: the day ("Oct 3") instead of the time. */
-  month?: boolean;
+  at?: Date | string | null;
+  /** The day, for a row with no time of its own. Ignored when `at` is set. */
+  day?: Ymd | null;
   /** The page's now, when no ActivityNow (or ActivityTimeline `now`) is above it. */
   now?: Date | string | number;
   className?: string;
@@ -105,10 +106,19 @@ export function ActivityTime({
   const current = useActivityNow(now);
   const coarse = useCoarsePointer();
   const ms = toMs(at);
-  if (ms == null) return null;
+  if (ms == null) {
+    if (!day) return null;
+    const today = todayYmdEastern(new Date(current));
+    const label = (
+      <time dateTime={day} className={cn("whitespace-nowrap", className)}>
+        {historyDay(day, today)}
+      </time>
+    );
+    return coarse ? label : <Tooltip label={fmtDay(day, { weekday: true, year: "auto", now: today })}>{label}</Tooltip>;
+  }
   const time = (
     <time dateTime={new Date(ms).toISOString()} className={cn("whitespace-nowrap", className)}>
-      {activityTime(ms, current, { month })}
+      {activityTime(ms, current)}
     </time>
   );
   if (coarse) return time;

@@ -243,7 +243,7 @@ Candidates are up to 40 per type ordered by `updatedAt` (tasks: up to 30 active 
 
 **Requests.** 180ms debounce on the client. An `AbortController` cancels the previous request. The previous rows stay until the new response lands.
 
-**Searched later** (phase 5, IA-I03): lender, loan servicer, insurance carrier and policy number, loan number, LLC owner, unit labels (the `label` in the units JSON only), listings (their title, landing on the property), contractor phone (`phoneE164` digits) and email, task descriptions, deal notes, document filenames and playbooks. Lockbox codes are never searchable: unit search reads `label`, never `lockboxCode`.
+**Searched later** (phase 5, IA-I03): lender, loan servicer, insurance carrier and policy number, loan number, LLC owner, unit labels (the `label` in the units JSON only), listings (their title, landing on the property), contractor phone (`phoneE164` digits) and email, task descriptions, deal notes, document filenames and playbooks. Lockbox codes are never searchable: unit search reads `label`, never `lockboxCode`. Equipment, utility accounts, loan and insurance fields, and contractor phone and email are specced in [search-deeper-fields.md](search-deeper-fields.md) (Nov 17).
 - Accents stored in the data ("José") need Postgres `unaccent` or a folded column (**new**, a migration). AssigneePicker already ignores accents on the client; after this the server agrees with it.
 - A typo fallback ('No exact matches for "Tamarak". Close matches:', as Klarna does) needs `pg_trgm` (**new**, a migration).
 

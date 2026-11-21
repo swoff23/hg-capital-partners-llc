@@ -36,6 +36,7 @@ import { PropertyMoreMenu } from "./property-more-menu";
 import { PropertyPhoto } from "./property-photo";
 import { PropertyTasksSection, type PropertyTask } from "./property-tasks";
 import { FillOnArrival, PropertyMissingLine } from "./missing-line";
+import { FindOnArrival } from "./find-on-arrival";
 import { PropertyMissingProvider } from "./missing-context";
 import { ofPriority, sectionCounts } from "@/lib/missing/checks";
 import { handedOff, loadMissingInfo } from "@/lib/missing/queries";
@@ -291,6 +292,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           </div>
         </div>
         <FillOnArrival />
+        <FindOnArrival />
       </div>
     </PropertyMissingProvider>
   );

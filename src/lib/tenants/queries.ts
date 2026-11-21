@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { toYmd, type Ymd } from "@/lib/dates";
 import { compareStreet, shortAddress } from "@/lib/normalize";
 import { parseUnits } from "@/lib/property-types";
+import { phoneHasWord } from "@/lib/search-keys";
 import { rentableUnits } from "./core";
 import { homeLabel, leaseEndsLabel, leaseStatus, livingLease, nextLease, termToday, type LeaseStatus } from "./status";
 
@@ -45,14 +46,17 @@ export type TenantRow = {
 /**
  * One row per person per lease. Current holds current and upcoming leases (the
  * households HG Capital has now or has signed); Past holds those who moved
- * out. A search matches the name, phone, email, address and unit.
+ * out. A search matches the name, phone, email, address and unit; a phone
+ * also by its digits, typed with any dashes, spaces or parentheses, as the
+ * palette reads it (lib/search-keys.ts).
  */
 export async function tenantRows(opts: { view: TenantView; propertyIds?: readonly string[]; q?: string }, today: Ymd): Promise<TenantRow[]> {
   const leases = await prisma.lease.findMany({
     where: opts.propertyIds?.length ? { propertyId: { in: [...opts.propertyIds] } } : {},
     include: leaseInclude,
   });
-  const words = (opts.q ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+  const q = (opts.q ?? "").trim();
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   const rows: TenantRow[] = [];
   for (const l of leases) {
     const status = leaseStatus(l, today);
@@ -64,7 +68,9 @@ export async function tenantRows(opts: { view: TenantView; propertyIds?: readonl
     const ends = leaseEndsLabel(l, l.terms, today);
     for (const t of l.tenants) {
       const hay = [t.tenant.fullName, t.tenant.phone, t.tenant.email, l.property.address, l.unitLabel].join(" ").toLowerCase();
-      if (words.some((w) => !hay.includes(w))) continue;
+      const phone = t.tenant.phoneE164 ?? t.tenant.phone;
+      const wordsMatch = words.every((w) => hay.includes(w) || phoneHasWord(phone, w));
+      if (!wordsMatch && !(words.length > 1 && phoneHasWord(phone, q))) continue;
       rows.push({
         tenantId: t.tenantId,
         leaseId: l.id,

@@ -2,19 +2,21 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { TaskEventKind } from "@prisma/client";
 import {
+  anchorsStretch,
   buildActivity,
+  collapseStretches,
   countsAsUnread,
+  entryKinds,
   entryIsFresh,
   eventLine,
   firstNewIndex,
   foldStart,
   fmtShortDay,
-  groupByDay,
-  groupHeadings,
   lastWordBy,
   linkedUpdateId,
   reviewMoveText,
   splitEarlier,
+  stretchSummary,
   type ActivityEntry,
   type ActivityEvent,
 } from "./activity";
@@ -509,37 +511,107 @@ test("the fold never hides the New divider or an anchored update", () => {
   assert.equal(foldStart(30, { firstNew: -1, anchored: undefined }), 15);
 });
 
-test("groupByDay starts a new group whenever the day changes", () => {
-  const groups = groupByDay(["2026-10-20", "2026-10-20", "2026-10-22", "2026-10-23"], (d) => d);
+/** Collapse built entries as the task page does. */
+const collapse = (entries: ActivityEntry[], keepFrom?: number) => collapseStretches(entries, { isAnchor: anchorsStretch, idOf: (e) => e.id, keepFrom });
+const shape = (out: ReturnType<typeof collapse>) => out.map((x) => (x.type === "row" ? x.row.type : `collapsed:${x.rows.length}`));
+
+test("Connor's task: older changes collapse across people and days, the newest 2 stay", () => {
+  const day = (d: number, h: number, m = 0) => ({ createdAt: new Date(Date.UTC(2026, 10, d, h, m)) });
+  const events = [
+    ev("CREATED", {}, day(3, 14, 59)),
+    ev("ASSIGNED", { to: { userId: "u-pieter", contactId: null } }, day(3, 15)),
+    ev("DUE", { from: null, to: "2026-11-05" }, day(3, 15)),
+    ev("DUE", { from: "2026-11-05", to: "2026-11-16" }, { ...PIETER, ...day(10, 16, 31) }),
+    ev("ASSIGNED", { to: { userId: null, contactId: "c-zack" } }, day(15, 14, 30)),
+    ev("DUE", { from: "2026-11-16", to: "2026-11-19" }, day(17, 2, 10)),
+    ev("PROPERTY", { unitFrom: null, unitTo: "Unit 2" }, day(17, 2, 10)),
+  ];
+  const entries = build(events);
+  const out = collapse(entries);
+  assert.deepEqual(shape(out), ["line", "collapsed:4", "line", "line"]);
+  const hidden = out[1].type === "collapsed" ? out[1].rows : [];
+  assert.deepEqual(stretchSummary(hidden.length, hidden.flatMap(entryKinds)), {
+    show: "Show 4 updates",
+    hide: "Hide 4 updates",
+    kinds: "assignee and due date\u2026",
+  });
+  assert.equal(out[1].type === "collapsed" && out[1].id, `collapsed-${hidden[0].id}`);
+});
+
+test("a stretch of 3 stays as it is, and comments end a stretch", () => {
+  const three = build([ev("CREATED"), ev("DUE", { to: "2026-10-30" }), ev("TITLE", { from: "A", to: "B" }, PIETER), ev("DUE", { to: "2026-10-31" })]);
+  assert.deepEqual(shape(collapse(three)), ["line", "line", "line", "line"]);
+
+  const split = build([
+    ev("DUE", { to: "2026-10-30" }),
+    ev("TITLE", { from: "A", to: "B" }, PIETER),
+    ev("DUE", { to: "2026-10-31" }),
+    ev("COMMENT", {}, { body: "Hi" }),
+    ev("DUE", { to: "2026-11-01" }, PIETER),
+    ev("TITLE", { from: "B", to: "C" }),
+    ev("DUE", { to: "2026-11-02" }, PIETER),
+    ev("TITLE", { from: "C", to: "D" }),
+  ]);
+  assert.deepEqual(shape(collapse(split)), ["line", "line", "line", "comment", "collapsed:2", "line", "line"]);
+});
+
+test("decisions and what never folds stay in view; a contractor's Start is one", () => {
+  const out = collapse(
+    build([
+      ev("DUE", { to: "2026-10-30" }),
+      ev("TITLE", { from: "A", to: "B" }, PIETER),
+      ev("DUE", { to: "2026-10-31" }),
+      ev("TITLE", { from: "B", to: "C" }, PIETER),
+      ev("STATUS", { from: "OPEN", to: "IN_PROGRESS" }, ZACK),
+      ev("ACCESS", { action: "granted" }),
+    ]),
+  );
+  assert.deepEqual(shape(out), ["collapsed:2", "line", "line", "line", "line"]);
+});
+
+test("a collapse never covers the first new row or anything after it", () => {
+  const entries = build(Array.from({ length: 8 }, (_, i) => ev("DUE", { to: `2026-11-${String(10 + i).padStart(2, "0")}` }, i % 2 ? PIETER : {})));
+  assert.equal(entries.length, 8);
+  assert.deepEqual(shape(collapse(entries)), ["collapsed:6", "line", "line"]);
+  assert.deepEqual(shape(collapse(entries, 4)), ["collapsed:4", "line", "line", "line", "line"], "stops above the New row");
+  assert.deepEqual(shape(collapse(entries, 1)), ["line", "line", "line", "line", "line", "line", "line", "line"], "one older row is not worth a line");
+  assert.deepEqual(shape(collapse(entries, -1)), ["collapsed:6", "line", "line"]);
+});
+
+test("newest first, a stretch keeps its newest 2 on top and collapses what's under them", () => {
+  const rows = ["n1", "c1", "c2", "c3", "c4", "c5", "n0"];
+  const out = collapseStretches(rows, { isAnchor: (r) => r.startsWith("n"), idOf: (r) => r, newestFirst: true });
   assert.deepEqual(
-    groups.map((g) => [g.day, g.entries.length]),
-    [
-      ["2026-10-20", 2],
-      ["2026-10-22", 1],
-      ["2026-10-23", 1],
-    ],
+    out.map((x) => (x.type === "row" ? x.row : x.rows.join("+"))),
+    ["n1", "c1", "c2", "c3+c4+c5", "n0"],
+  );
+  const collapsed = out.find((x) => x.type === "collapsed");
+  assert.equal(collapsed?.type === "collapsed" && collapsed.id, "collapsed-c5", "named for its oldest row");
+  // A New row stays, with everything above it (newer); only what's under it collapses.
+  assert.deepEqual(
+    collapseStretches(rows, { isAnchor: (r) => r.startsWith("n"), idOf: (r) => r, newestFirst: true, keepFrom: 3 }).map((x) => (x.type === "row" ? x.row : x.rows.join("+"))),
+    ["n1", "c1", "c2", "c3", "c4+c5", "n0"],
   );
 });
 
-test("rows more than 60 days back sit under month headings, newer ones under days", () => {
-  const days = ["2026-07-30", "2026-08-02", "2026-08-09", "2026-08-30", "2026-10-02", "2026-10-02", "2026-10-23"];
-  const groups = groupHeadings(days, (d) => d, "2026-10-23");
-  assert.deepEqual(
-    groups.map((g) => [g.month, g.month ? g.day.slice(0, 7) : g.day, g.entries.length]),
-    [
-      [true, "2026-07", 1],
-      [true, "2026-08", 2],
-      [false, "2026-08-30", 1],
-      [false, "2026-10-02", 2],
-      [false, "2026-10-23", 1],
-    ],
-  );
-  // Sixty days exactly is still a day; 61 is a month.
-  assert.equal(groupHeadings(["2026-08-24"], (d) => d, "2026-10-23")[0].month, false);
-  assert.equal(groupHeadings(["2026-08-23"], (d) => d, "2026-10-23")[0].month, true);
-  // A month heading never swallows a different month or year.
-  const years = groupHeadings(["2025-08-30", "2026-08-30"], (d) => d, "2026-10-23");
-  assert.equal(years.length, 2);
+test("a collapsed line names up to three kinds and ends in an ellipsis, as Linear's does", () => {
+  assert.equal(stretchSummary(2, ["due date", "due date"]).kinds, "due date\u2026");
+  assert.equal(stretchSummary(5, ["assignee", "due date", "Asana move"]).kinds, "assignee, due date and Asana move\u2026");
+  assert.equal(stretchSummary(6, ["assignee", "due date", "unit", "title"]).kinds, "assignee, due date, unit\u2026");
+  assert.equal(stretchSummary(3, []).kinds, null);
+  assert.equal(stretchSummary(1, ["title"]).show, "Show 1 update");
+});
+
+test("a run of three kinds or more keeps a sentence per kind for an opened stretch", () => {
+  const [run] = build([
+    ev("ASSIGNED", { to: { userId: null, contactId: "c-zack" } }),
+    ev("DUE", { to: "2026-10-30" }),
+    ev("TITLE", { from: "A", to: "B" }),
+  ]);
+  assert.equal(run.type, "run");
+  assert.equal(run.type === "run" && run.text, "Connor assigned Zack Reading and made 2 more changes");
+  assert.deepEqual(run.type === "run" && run.sentences, ["Connor assigned Zack Reading", "Connor set the due date to Fri, Oct 30", 'Connor renamed this from “A”']);
+  assert.deepEqual(entryKinds(run), ["assignee", "due date", "title"]);
 });
 
 test("short dates", () => {

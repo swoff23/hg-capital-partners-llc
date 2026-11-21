@@ -1,6 +1,6 @@
 import { archiveLogText, readArchiveEvent } from "@/lib/archive";
 import { DEAL_FIELD_LABEL } from "@/lib/config";
-import { daysUntil, todayYmdEastern, toYmd, type Ymd } from "@/lib/dates";
+import { todayYmdEastern, toYmd, type Ymd } from "@/lib/dates";
 import { parseAmount } from "@/lib/money";
 import { firstName } from "@/lib/names";
 import {
@@ -31,6 +31,11 @@ import { parseNoteAuthor } from "./note-author";
  *
  * Next action left the deal on Nov 15, 2026 (Connor), and its history went
  * with it: its edits are left out, without ending the burst around them.
+ *
+ * Each entry says whether it stays in view and ends a stretch of changes
+ * (`anchor`: a note, a stage change, archive and restore, the link to a
+ * property) and what kinds of change it holds, for the collapsed lines of
+ * docs/specs/activity-collapse.md.
  */
 
 /** Fields a deal no longer has, whose old edits the log leaves out. */
@@ -38,9 +43,6 @@ const GONE_FIELDS: ReadonlySet<DealChangeField> = new Set(["nextAction"]);
 
 /** A burst ends 30 minutes after its first edit (activity 2.3). */
 export const BURST_MS = 30 * 60_000;
-
-/** Rows older than this many days group by month once the log is opened (activity 2.3, rule 8). */
-export const MONTH_AFTER_DAYS = 60;
 
 /** The newest rows the log shows before "Show N older updates". */
 export const LOG_SHOWN = 15;
@@ -78,6 +80,10 @@ interface Base {
   day: Ymd | null;
   /** The instant, for the time slot; null for an imported line, which has only a day. */
   at: string | null;
+  /** It stays in view and ends a stretch (activity-collapse 3.1). */
+  anchor: boolean;
+  /** The kinds of change it holds ("asking price", "tasks"), for a collapsed line's words. */
+  kinds: string[];
 }
 
 export interface NoteEntry extends Base {
@@ -113,6 +119,9 @@ export interface LineEntry extends Base {
 export type LogEntry = NoteEntry | ChangeEntry | LineEntry;
 
 const isMigration = (r: LogSourceRow) => r.source === "migration";
+
+/** The line property-link.ts writes when the deal is linked to the property it became. */
+const isLinkLine = (data: unknown) => !!data && typeof data === "object" && (data as Record<string, unknown>).event === "linked";
 
 /** The `clientId` a note was sent with, when its data holds one. */
 function clientIdOf(data: unknown): string | null {
@@ -179,6 +188,9 @@ function changeEntry(burst: Burst, changes: DealChange[]): ChangeEntry {
     id: burst.last.id,
     day,
     at,
+    // A stage change is the deal's Mark done: it stays in view.
+    anchor: changes.some((c) => c.field === "status"),
+    kinds: changes.map((c) => DEAL_FIELD_LABEL[c.field].toLowerCase()),
     by: burst.by,
     sentence: `${burst.by ?? "Someone"} ${changesPhrase(changes)}`,
     fields: changes.map(fieldRow),
@@ -218,6 +230,8 @@ export function buildDealLog(rows: readonly LogSourceRow[]): LogEntry[] {
           id: r.id,
           day,
           at,
+          anchor: true,
+          kinds: [],
           author: r.authorName ?? parsed.name ?? parsed.initials,
           authorUserId: r.authorUserId,
           text,
@@ -240,7 +254,7 @@ export function buildDealLog(rows: readonly LogSourceRow[]): LogEntry[] {
       out.push({
         ms: sortMs(r),
         created: r.createdAt.getTime(),
-        entry: { type: "line", id: r.id, day, at, by: null, text: archiveLogText(namePart(r.authorName), archive) },
+        entry: { type: "line", id: r.id, day, at, anchor: true, kinds: [], by: null, text: archiveLogText(namePart(r.authorName), archive) },
       });
       continue;
     }
@@ -253,7 +267,17 @@ export function buildDealLog(rows: readonly LogSourceRow[]): LogEntry[] {
       out.push({
         ms: sortMs(r),
         created: r.createdAt.getTime(),
-        entry: { type: "line", id: r.id, day, at, by: namePart(r.authorName) ?? namePart(parsed.name), text: parsed.text },
+        entry: {
+          type: "line",
+          id: r.id,
+          day,
+          at,
+          // "Linked to 118 Congress St.": the deal became a property (property-link.ts writes `event: "linked"`).
+          anchor: isLinkLine(r.data) || parsed.text.startsWith("Linked to "),
+          kinds: parsed.text.startsWith("Task ") ? ["tasks"] : [],
+          by: namePart(r.authorName) ?? namePart(parsed.name),
+          text: parsed.text,
+        },
       });
       continue;
     }
@@ -268,42 +292,4 @@ export function buildDealLog(rows: readonly LogSourceRow[]): LogEntry[] {
   flush();
 
   return out.sort((a, b) => cmp(b.ms, a.ms) || cmp(b.created, a.created)).map((o) => o.entry);
-}
-
-/** A heading's worth of entries. */
-export interface LogGroup {
-  /** Stable across renders: the day, the month, or "undated". */
-  key: string;
-  kind: "day" | "month" | "undated";
-  /** The day (or any day of the month) it heads; null for undated. */
-  day: Ymd | null;
-  entries: LogEntry[];
-}
-
-/**
- * Groups entries (already newest first) under day headings, and undated
- * imported lines last under "Undated". With `months` (the log opened past its
- * newest 15), rows older than 60 days sit under month headings instead, and
- * their time slot reads the day, so `kind` tells the caller which to draw.
- */
-export function groupLog(entries: readonly LogEntry[], today: Ymd, opts: { months?: boolean } = {}): LogGroup[] {
-  const months = opts.months ?? true;
-  const groups: LogGroup[] = [];
-  for (const entry of entries) {
-    let kind: LogGroup["kind"] = "day";
-    let key = entry.day ?? "undated";
-    if (entry.day === null) {
-      kind = "undated";
-    } else if (months && (daysUntil(entry.day, today) ?? 0) < -MONTH_AFTER_DAYS) {
-      kind = "month";
-      key = entry.day.slice(0, 7);
-    }
-    const last = groups.at(-1);
-    if (last && last.kind === kind && last.key === key) {
-      last.entries.push(entry);
-    } else {
-      groups.push({ key, kind, day: entry.day, entries: [entry] });
-    }
-  }
-  return groups;
 }

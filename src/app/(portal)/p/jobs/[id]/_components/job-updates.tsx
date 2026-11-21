@@ -1,14 +1,14 @@
 "use client";
-import { Fragment, useState, type ReactNode } from "react";
-import { ActivityDay, ActivityDivider, ActivityItem, ActivityTimeline } from "@/components/activity-timeline";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ActivityDivider, ActivityFold, ActivityItem, ActivityTimeline } from "@/components/activity-timeline";
 import { ActivityTime } from "@/components/activity-time";
 import { CommentBody, CommentCard, DeliveryLine } from "@/components/comment-card";
 import { FilesList, type FileLink } from "@/components/files-list";
 import { MediaGrid } from "@/components/media-grid";
 import { taskFileUrl } from "@/lib/attachments/media";
-import { todayYmdEastern } from "@/lib/dates";
 import type { BodyPart } from "@/lib/portal/access-code";
 import type { JobDelivery, JobFile, JobUpdate } from "@/lib/portal/queries";
+import { collapseStretches, linkedUpdateId, stretchSummary } from "@/lib/tasks/activity";
 import { bodySegments } from "@/lib/tasks/body-links";
 import { cn } from "@/lib/utils";
 
@@ -16,8 +16,13 @@ import { cn } from "@/lib/utils";
  * The contractor's Updates on the shared timeline (docs/specs/activity-
  * comments.md 3.4 A): the rail with each person's avatar (the contractor's
  * square), comment cards, a quiet line with the new status's mark for a
- * status change or a file post, a heading per day, the New divider and the
- * delivery line under their own newest update. The same pieces as the staff
+ * status change or a file post, the New divider and the delivery line under
+ * their own newest update. No day headings: each time slot carries its day.
+ * Between two comments, a stretch of 4 or more status lines and file posts
+ * keeps its newest 2 in view and collapses the rest into "Show 4 updates:
+ * status and files" (docs/specs/activity-collapse.md); a decision, Mark
+ * done, Approve, their own Start and the line the delivery sits under never
+ * collapse, and neither does anything from the New divider on. The same pieces as the staff
  * task page, so a fix lands for partners and contractors at once.
  *
  * A status change and the note written with it (a send back's reason, a Mark
@@ -52,34 +57,80 @@ export function JobUpdates({
 }) {
   // The first reading wins for the whole visit.
   const [since] = useState(() => Date.parse(newSince));
-  if (updates.length === 0) return <p className="text-body text-muted-foreground">No updates yet.</p>;
+  const [anchor, setAnchor] = useState<string | null>(null);
+  // A job email's `#update-<id>` into a collapsed stretch opens it, then takes the row into view.
+  useEffect(() => {
+    const read = () => setAnchor(linkedUpdateId(window.location.hash));
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, []);
 
-  const entries = pairDecisions(updates);
-  const firstNew = entries.find(({ update: u }) => !u.you && u.kind !== "removed" && u.createdAt.getTime() > since)?.update.id;
-  const groups: { day: string; entries: Entry[] }[] = [];
-  for (const e of entries) {
-    const day = todayYmdEastern(e.update.createdAt);
-    const last = groups.at(-1);
-    if (last?.day === day) last.entries.push(e);
-    else groups.push({ day, entries: [e] });
-  }
+  const entries = useMemo(() => pairDecisions(updates), [updates]);
+  const firstNewIndex = entries.findIndex(({ update: u }) => !u.you && u.kind !== "removed" && u.createdAt.getTime() > since);
+  const firstNew = firstNewIndex >= 0 ? entries[firstNewIndex].update.id : null;
+  const items = useMemo(
+    () => collapseStretches(entries, { isAnchor: (e) => staysInView(e, delivery), idOf: (e) => e.update.id, keepFrom: firstNewIndex }),
+    [entries, delivery, firstNewIndex],
+  );
+  const holds = (e: Entry, id: string) => e.update.id === id || e.note?.id === id;
+  useEffect(() => {
+    if (anchor && items.some((x) => x.type === "collapsed" && x.rows.some((e) => holds(e, anchor)))) {
+      document.getElementById(`update-${anchor}`)?.scrollIntoView({ block: "start" });
+    }
+  }, [anchor, items]);
+
+  if (updates.length === 0) return <p className="text-body text-muted-foreground">No updates yet.</p>;
 
   return (
     <ActivityTimeline now={now}>
-      {groups.map((g) => (
-        <Fragment key={`${g.day}:${g.entries[0].update.id}`}>
-          <ActivityDay day={g.day} />
-          {g.entries.map((e) => (
-            <Fragment key={e.update.id}>
-              {e.update.id === firstNew && <ActivityDivider unread>New</ActivityDivider>}
-              <EntryView entry={e} delivery={delivery} viewerName={viewerName} />
+      {items.map((x) => {
+        if (x.type === "row") {
+          return (
+            <Fragment key={x.row.update.id}>
+              {x.row.update.id === firstNew && <ActivityDivider unread>New</ActivityDivider>}
+              <EntryView entry={x.row} delivery={delivery} viewerName={viewerName} />
             </Fragment>
-          ))}
-        </Fragment>
-      ))}
+          );
+        }
+        const open = anchor !== null && x.rows.some((e) => holds(e, anchor));
+        const words = stretchSummary(x.rows.length, x.rows.map(kindOf));
+        return (
+          <ActivityFold
+            key={`${x.id}:${open ? "open" : "closed"}`}
+            defaultOpen={open}
+            summary={
+              <>
+                {words.show}
+                {words.kinds && <span className="max-sm:hidden">: {words.kinds}</span>}
+              </>
+            }
+            openSummary={words.hide}
+          >
+            {x.rows.map((e) => (
+              <EntryView key={e.update.id} entry={e} delivery={delivery} viewerName={viewerName} />
+            ))}
+          </ActivityFold>
+        );
+      })}
     </ActivityTimeline>
   );
 }
+
+/**
+ * Whether an entry stays in view and ends a stretch (activity-collapse 3.1): a comment or its trace, a decision with
+ * its note, Mark done and Approve (into Review or Done), a contractor's own status change (Start), and the update the
+ * delivery line sits under.
+ */
+function staysInView({ update: u, note }: Entry, delivery: JobDelivery | null): boolean {
+  if (u.kind === "comment" || u.kind === "removed" || note) return true;
+  if (delivery && delivery.eventId === u.id) return true;
+  if (u.kind === "status") return u.contractor || u.statusTo === "REVIEW" || u.statusTo === "DONE";
+  return false;
+}
+
+/** A collapsed line's word for an entry. */
+const kindOf = ({ update: u }: Entry) => (u.kind === "attachment" ? "files" : "status");
 
 /** One row of Updates: an update, or a status change with the note written with it. */
 type Entry = { update: JobUpdate; note: JobUpdate | null };

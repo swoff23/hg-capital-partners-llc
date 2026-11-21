@@ -9,7 +9,7 @@ import { Tooltip } from "@/components/tooltip";
 import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { Button, TextLink, buttonClass, textLinkClass } from "@/components/ui";
 import { callAction, type ActionResult } from "@/lib/action-result";
-import { fmtDay, fullStamp, seenTime, todayYmdEastern } from "@/lib/dates";
+import { fmtDay, fullStamp, seenTime, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { joinNames } from "@/lib/portal/job-view";
 import type { BodySegment } from "@/lib/tasks/body-links";
@@ -38,8 +38,8 @@ export interface CommentCardProps {
   noun?: "comment" | "note";
   /** When it was posted. */
   at: Date | string;
-  /** Under a month heading: the time slot reads the day ("Oct 3"). */
-  month?: boolean;
+  /** The day, for a card with no time of its own (a line from the deals sheet): the time slot reads it. */
+  day?: Ymd | null;
   /** When it was last edited; `true` for an imported comment Asana marked edited, with no time. */
   edited?: Date | string | true | null;
   /** Staff only: the --muted card with Lock and "Internal". */
@@ -94,7 +94,7 @@ export function CommentCard({
   author,
   noun = "comment",
   at,
-  month = false,
+  day = null,
   edited,
   internal = false,
   onItem,
@@ -115,8 +115,9 @@ export function CommentCard({
   const shown = author ? (author.you ? "You" : firstName(author.name) || author.name) : null;
   const editedAt = edited && edited !== true ? edited : null;
   const timed = at !== "" && at != null;
+  const dated = timed || !!day;
   // Nothing to say in the header (a line from the sheet: no name, no time): the row is dropped and the menu's button sits in the corner.
-  const headerless = !shown && !sending && !timed && !edited && !internal;
+  const headerless = !shown && !sending && !dated && !edited && !internal;
   const cardRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   // Closing the editor removes the field that had focus: put it back on the card's menu button, or the card itself.
@@ -181,7 +182,7 @@ export function CommentCard({
               {author?.contractor && !author.you && <span className="sr-only">, contractor</span>}
             </span>
           )}
-          {sending ? <SendingLabel /> : timed ? <ActivityTime at={at} month={month} className="shrink-0 text-meta text-muted-foreground" /> : null}
+          {sending ? <SendingLabel /> : dated ? <ActivityTime at={timed ? at : null} day={day} className="shrink-0 text-meta text-muted-foreground" /> : null}
           {edited && (editedAt && !coarse ? <Tooltip label={`Edited ${fullStamp(editedAt, now)}`}>{editedWord}</Tooltip> : editedWord)}
           {internal && (
             <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-meta font-medium text-fg-2">

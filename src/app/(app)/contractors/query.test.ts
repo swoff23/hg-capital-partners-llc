@@ -53,7 +53,7 @@ const CONTACTS: Row[] = [
   { id: "zack", fullName: "Zack Reading", company: "Reading Plumbing", tradeLinks: links(TRADES.plumbing, TRADES.hvac), w9Url: "https://x/w9.pdf", comments: null, portalAccount: { status: "ACTIVE" } },
   { id: "luis", fullName: "Luis Ortega", company: null, tradeLinks: links(TRADES.electric), w9Url: null, comments: "W-9 on file: ortega-w9.pdf", portalAccount: null },
   { id: "dana", fullName: "Dana Fox", company: "Fox Electrical", tradeLinks: links(TRADES.electrical), w9Url: null, comments: "Prefers texts", portalAccount: { status: "INVITED" } },
-  { id: "pat", fullName: "Pat Lee", company: null, tradeLinks: [], w9Url: null, comments: null, portalAccount: { status: "ACTIVE" } },
+  { id: "pat", fullName: "Pat Lee", company: null, tradeLinks: [], w9Url: null, comments: null, portalAccount: { status: "ACTIVE" }, phoneE164: "+17165550142", email: "pat@leeroofing.com" },
   // Uploaded a W-9 in setup: no link and no note, but on file.
   { id: "uma", fullName: "Uma Cole", company: null, tradeLinks: [], w9Url: null, comments: null, portalAccount: null, documents: [{ kind: "W9" }] },
   // An insurance upload alone is not a W-9.
@@ -98,6 +98,12 @@ test("the search reads the name, the company and the trades, in any word order",
   assert.deepEqual(found({ q: "hvac" }), ["zack"], "a trade");
   assert.deepEqual(found({ q: "fox electrical" }), ["dana"]);
   assert.deepEqual(found({ q: "zzzz" }), []);
+});
+
+test("the search reads the phone's digits, typed any way, and the email, as the palette does", () => {
+  for (const q of ["(716) 555-0142", "716-555-0142", "555-0142"]) assert.deepEqual(found({ q }), ["pat"], q);
+  assert.deepEqual(found({ q: "leeroofing" }), ["pat"]);
+  assert.deepEqual(found({ q: "716" }), [], "three digits are too few to read as a phone");
 });
 
 test("Has login is an active portal account", () => {

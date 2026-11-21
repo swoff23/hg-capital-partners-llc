@@ -64,12 +64,18 @@ export type TextMatch = { contains: string; mode: "insensitive" };
  * A Prisma where clause that needs every term to match at least one field.
  * `fields` turns one spelling's filter into the field conditions to try,
  * e.g. `(t) => [{ title: t }, { property: { address: t } }]`. The spellings
- * are matched as typed (`containsText`).
+ * are matched as typed (`containsText`). `more` adds conditions read from the
+ * whole word and its place, for fields that don't take a spelling as typed:
+ * a phone's digits, the ids a number matched (lib/search-keys.ts).
  */
-export function everyTermMatches<W>(terms: string[][], fields: (text: TextMatch) => W[]): { AND: { OR: W[] }[] } {
+export function everyTermMatches<W>(
+  terms: string[][],
+  fields: (text: TextMatch) => W[],
+  more?: (spellings: string[], index: number) => W[],
+): { AND: { OR: W[] }[] } {
   return {
-    AND: terms.map((spellings) => ({
-      OR: spellings.flatMap((s) => fields(containsText(s))),
+    AND: terms.map((spellings, i) => ({
+      OR: [...spellings.flatMap((s) => fields(containsText(s))), ...(more?.(spellings, i) ?? [])],
     })),
   };
 }

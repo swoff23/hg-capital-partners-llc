@@ -293,8 +293,11 @@ export function composePanel(input: PanelInput): PanelView {
     ],
   }));
 
-  // An address that isn't a property or a deal yet can become one.
-  const knownAddress = found.some((g) => g.type === "property" || g.type === "deal");
+  // An address that isn't a property or a deal yet can become one. A property found only by a hidden field
+  // ("58 Water St" finding a Water Heater, docs/specs/search-deeper-fields.md) doesn't make the address known.
+  const knownAddress = found.some(
+    (g) => g.type === "deal" || (g.type === "property" && g.rows.some((r) => r.type === "property" && r.matched === undefined)),
+  );
   const add: PanelGroup[] =
     looksLikeAddress(q) && !knownAddress
       ? [{ id: "add", entries: [{ kind: "add", key: "add-deal", address: q, href: addDealHref(q) }] }]

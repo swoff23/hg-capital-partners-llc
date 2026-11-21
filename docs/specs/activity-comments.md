@@ -4,6 +4,8 @@ Spec for Connor's approval, Oct 25, 2026. Nothing here gets built until Connor s
 
 It covers every place a record shows its history or takes a comment: the staff task page, Today's Needs review rows, the contractor's job page and My jobs, the deal page and Deals list, the property and contractor records, and the job emails. Visual rules come from `docs/brand-guidelines.md` (Ink and Limestone). Anything those guidelines don't cover is marked **new**. Code state is the `claude/app-uiux-review-mobbin-e2e22f` worktree at `2a07648` (brand slices merged), with uncommitted edits to `task-row.tsx` and `property-tasks.tsx`. Revised the same day after a review against the brand guidelines, CLAUDE.md, the earlier review's decisions and a sample of the references (section 7).
 
+**Amended Nov 20.** [activity-collapse.md](activity-collapse.md) replaces the top fold's counting, the month headings and the day headings (2.3 rules 7 and 8, 2.4, 2.9) with Linear-style collapsing and a day in each time slot, on the task page, the job page and the deal log.
+
 **Changes since approval.** Connor approved these on Oct 27, to match what chunk 7 built: the date form in sentences (2.2 b, 2.3), a contractor's photo take-back (2.5), the portal's first-visit New divider (2.6), the portal composer (2.7), email timing, Approve's Undo and the Send back sheet (2.8), and the job-page notice (3.4).
 
 ## 1. Summary
