@@ -1,5 +1,5 @@
 import { FILE_KINDS, PREVIEW_RULE, UPLOAD_RULES, contentTypeForName, nameExtension, type FileKind, type UploadRule } from "./content-types";
-import { requestedUploadRole } from "./paths";
+import { requestedResidentUploadRole, requestedUploadRole } from "./paths";
 
 /**
  * What one task upload may be: the token limits the token route mints before
@@ -29,6 +29,25 @@ export function uploadLimits(taskId: string, pathname: string, fileKind: unknown
   if (!isFileKind(fileKind)) return "fileKind must be image, video or file.";
   // The kind's own table (upload-kinds.ts UPLOAD_KIND_ALLOWED): a contractor's photos and videos can't be a document.
   if (allowed && !allowed.includes(fileKind)) return "Only photos and videos can be added here.";
+  let rule: UploadRule = UPLOAD_RULES[fileKind];
+  if (role !== "orig") {
+    if (fileKind !== "image") return "Thumbnails and posters must be images.";
+    rule = PREVIEW_RULE;
+  }
+  const name = pathname.slice(pathname.lastIndexOf("/") + 1);
+  if (nameExtension(name) !== null) {
+    const type = contentTypeForName(name);
+    if (!type || !rule.contentTypes.includes(type)) return "That file name doesn't match its type.";
+  }
+  return { maximumSizeInBytes: rule.maxBytes, allowedContentTypes: [...rule.contentTypes] };
+}
+
+/** A resident's photo or video (docs/specs/maintenance-requests.md, section 6): their link's folder, photos and videos only. */
+export function residentUploadLimits(linkId: string, pathname: string, fileKind: unknown): TokenLimits | string {
+  const role = requestedResidentUploadRole(pathname, linkId);
+  if (!role) return "That upload path isn't allowed.";
+  if (!isFileKind(fileKind)) return "fileKind must be image, video or file.";
+  if (fileKind === "file") return "Only photos and videos can be added here.";
   let rule: UploadRule = UPLOAD_RULES[fileKind];
   if (role !== "orig") {
     if (fileKind !== "image") return "Thumbnails and posters must be images.";

@@ -7,7 +7,8 @@ import { fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
 import { isActiveStatus } from "@/lib/task-scope";
-import { targetDate } from "@/lib/tasks/rules";
+import { queueNoticeNow } from "@/lib/notifications/reminders";
+import { scheduledDay } from "@/lib/tasks/rules";
 import * as core from "@/lib/tasks/core";
 import { recordPortalAttachment } from "@/lib/tasks/service";
 import { CODE_MASK, lockboxMasker, readJobAccess } from "./access-code";
@@ -181,12 +182,15 @@ export async function crewTextFor(taskId: string): Promise<string> {
   // The link opens the job as this contractor, so it offers the lockbox only when their job shows it.
   const [mask, access] = await Promise.all([lockboxMasker(prisma, task.propertyId), readJobAccess(prisma, task)]);
   const notes = task.description?.trim() ? mask(task.description).map((part) => ("text" in part ? part.text : CODE_MASK)).join("") : null;
-  const due = toYmd(targetDate(task));
+  const due = toYmd(task.dueDate);
+  const scheduled = toYmd(scheduledDay(task));
+  const day = (d: string) => fmtDay(d, { weekday: true, year: "auto", now: todayYmdEastern() });
   const token = await mintJobLink(prisma, { taskId, kind: "CREW", contactId: p.contactId });
   return crewText({
     title: task.title,
     where: addressLine(task.property?.address ?? null, task.unitLabel),
-    due: due ? fmtDay(due, { weekday: true, year: "auto", now: todayYmdEastern() }) : null,
+    due: due ? day(due) : null,
+    scheduled: scheduled ? day(scheduled) : null,
     notes,
     todo: task.checklist.map((c) => c.title),
     hasAccess: !!access.lockbox,
@@ -195,11 +199,17 @@ export async function crewTextFor(taskId: string): Promise<string> {
 }
 
 /**
- * Change date (docs/specs/contractor-job-emails.md, section 7): the day the contractor agreed with the tenant becomes
- * the job's due date, and both partners hear of it (core.ts setDateByContractor has the rules).
+ * The contractor sets or moves their scheduled day (docs/specs/contractor-scheduled-date.md): never the due date,
+ * which is HG Capital's. Both partners hear of it (core.ts scheduleByContractor has the rules).
  */
 export async function setJobDate(taskId: string, date: string): Promise<void> {
   const p = await requirePortalPrincipal();
-  await refreshOnRefusal(taskId, () => prisma.$transaction((tx) => core.setDateByContractor(tx, taskId, date, taskPrincipal(p))));
+  await refreshOnRefusal(taskId, () =>
+    prisma.$transaction(async (tx) => {
+      const task = await core.scheduleByContractor(tx, taskId, date, taskPrincipal(p));
+      // Today or tomorrow at a home that needs notice: the heads-up goes now (Q7).
+      await queueNoticeNow(tx, task);
+    }),
+  );
   revalidateJob(taskId);
 }

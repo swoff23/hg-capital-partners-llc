@@ -2,11 +2,12 @@ import { MailWarning } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { PageHeader, chromeIconClass } from "@/components/ui";
 import { todayYmdEastern } from "@/lib/dates";
+import { withDraftsItem } from "@/lib/home/needs-you";
 import { needsYou } from "@/lib/home/queries";
 import { cn } from "@/lib/utils";
 import { greetingLine, summaryLine } from "@/lib/home/summary";
 import { groupMine } from "@/lib/tasks/list";
-import { emailCapReached, todayTasks } from "@/lib/tasks/queries";
+import { emailCapReached, myDraftCount, todayTasks } from "@/lib/tasks/queries";
 import { NeedsYou } from "../needs-you";
 import { TaskListProvider } from "../tasks/task-list-context";
 import { TodayView } from "../tasks/today-view";
@@ -29,12 +30,15 @@ export default async function HomePage() {
   const today = todayYmdEastern(now);
   // The reads that don't need the viewer start beside the session check; all of it is awaited together.
   const userP = requireUser();
-  const [user, tasks, capped, items] = await Promise.all([
+  const [user, tasks, capped, baseItems, drafts] = await Promise.all([
     userP,
     userP.then((u) => todayTasks(u.id)),
     emailCapReached(today),
     needsYou(today, now),
+    // Your own drafts from Claude, for the one Needs you row that opens them.
+    userP.then((u) => myDraftCount(u.id)),
   ]);
+  const items = withDraftsItem(baseItems, drafts);
   // The Overdue section of the partner's own Mine column.
   const late = groupMine(tasks, user.id, today).overdue.length;
 

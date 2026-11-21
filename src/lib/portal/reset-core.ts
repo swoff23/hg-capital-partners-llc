@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { endConnectionsForPasswordReset } from "@/lib/claude/connections-core";
 import type { EmailMessage } from "@/lib/email/resend";
 import type { SendResult } from "@/lib/email/send";
 import { logSecurityEvent } from "./accounts-core";
@@ -97,11 +98,15 @@ export class ResetTokenTaken extends Error {}
 /**
  * Save a staff reset inside the caller's transaction: use up the link (only
  * one of two racing submissions gets count 1), set the new password and
- * passwordChangedAt, end the user's other open links, and log it. Setting
- * passwordChangedAt is what signs the partner out everywhere: src/lib/auth.ts
- * turns away any session cookie issued before it. Throws ResetTokenTaken, so
- * the transaction rolls back, when the link was already used or the User no
- * longer has a password.
+ * passwordChangedAt, end the user's Claude connection, end their other open
+ * links, and log it. Setting passwordChangedAt is what signs the partner out
+ * everywhere: src/lib/auth.ts turns away any session cookie issued before it.
+ * Their Claude ends with those sessions, here and not only by that date: the
+ * connection is marked ended and its tokens deleted in this same transaction
+ * (docs/specs/tasks-from-claude.md 7.3). Their connector address is kept, so
+ * Claude only has to sign in again. Throws ResetTokenTaken, so the transaction
+ * rolls back, when the link was already used or the User no longer has a
+ * password.
  */
 export async function saveStaffReset(
   tx: Tx,
@@ -117,6 +122,9 @@ export async function saveStaffReset(
     data: { passwordHash: r.passwordHash, passwordChangedAt: r.now },
   });
   if (changed.count !== 1) throw new ResetTokenTaken();
+  // After the User row is written: that write holds the row every Allow, code swap and refresh for this partner
+  // waits on, so none of them can slip a connection past the reset.
+  await endConnectionsForPasswordReset(tx, r.userId, r.now);
   await tx.passwordResetToken.updateMany({ where: { userId: r.userId, usedAt: null }, data: { usedAt: r.now } });
   await logSecurityEvent(tx, { kind: "PASSWORD_RESET", userId: r.userId, data: { by: "email-link" } });
 }

@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="640" viewBox="0 0 1000 640" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Question 3b: the form's letting-us-in part. A (recommended): two rows, each saying what the choice means, Yes first; Yes shows Any pets inside. B: Yes and No buttons, with the cost shown only after No.</title>
+<rect width="1000" height="640" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Question 3b: how does "Can we let ourselves in?" read?</text>
+<text x="32" y="56" font-size="11" fill="#424e61">The bottom of the one-screen form, after a tap on each choice. Yes brings up the pets question.</text>
+
+<!-- A -->
+<g transform="translate(32 76)">
+<rect x="0" y="0" width="456" height="420" rx="10" fill="none" stroke="#c9a96a" stroke-width="1.5"/>
+<text x="16" y="30" font-size="13" font-weight="600" fill="#152133">A. Each choice says what it means</text>
+<rect x="246" y="16" width="92" height="20" rx="10" fill="#f6efe1"/>
+<text x="292" y="30" font-size="10" font-weight="500" fill="#8a6d2f" text-anchor="middle">Recommended</text>
+
+<!-- A: Yes -->
+<g transform="translate(16 48)">
+<rect x="0" y="0" width="206" height="276" rx="14" fill="#ffffff" stroke="#152133"/>
+<text x="12" y="22" font-size="9" fill="#8f99a8">After a tap on Yes</text>
+<text x="12" y="46" font-size="10" font-weight="500" fill="#424e61">Can we let ourselves in?</text>
+<rect x="12" y="54" width="182" height="46" rx="8" fill="#ffffff" stroke="#152133" stroke-width="1.5"/>
+<circle cx="28" cy="77" r="6" fill="#ffffff" stroke="#152133"/><circle cx="28" cy="77" r="3" fill="#152133"/>
+<text x="42" y="73" font-size="10" font-weight="500" fill="#152133">Yes, let yourselves in</text>
+<text x="42" y="88" font-size="9" fill="#424e61">Fastest. You'll see the day.</text>
+<rect x="12" y="108" width="182" height="46" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<circle cx="28" cy="131" r="6" fill="#ffffff" stroke="#8f99a8"/>
+<text x="42" y="127" font-size="10" font-weight="500" fill="#152133">No, set a time with me</text>
+<text x="42" y="142" font-size="9" fill="#424e61">Can take longer to fix.</text>
+<text x="12" y="180" font-size="10" font-weight="500" fill="#424e61">Any pets inside?</text>
+<rect x="12" y="188" width="88" height="28" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="56" y="206" font-size="10" fill="#152133" text-anchor="middle">No</text>
+<rect x="106" y="188" width="88" height="28" rx="6" fill="#ffffff" stroke="#152133" stroke-width="1.5"/>
+<text x="150" y="206" font-size="10" fill="#152133" text-anchor="middle">Yes</text>
+<rect x="12" y="224" width="182" height="28" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="22" y="242" font-size="9.5" fill="#8f99a8">What pets? (optional)</text>
+</g>
+
+<!-- A: No -->
+<g transform="translate(234 48)">
+<rect x="0" y="0" width="206" height="276" rx="14" fill="#ffffff" stroke="#152133"/>
+<text x="12" y="22" font-size="9" fill="#8f99a8">After a tap on No</text>
+<text x="12" y="46" font-size="10" font-weight="500" fill="#424e61">Can we let ourselves in?</text>
+<rect x="12" y="54" width="182" height="46" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<circle cx="28" cy="77" r="6" fill="#ffffff" stroke="#8f99a8"/>
+<text x="42" y="73" font-size="10" font-weight="500" fill="#152133">Yes, let yourselves in</text>
+<text x="42" y="88" font-size="9" fill="#424e61">Fastest. You'll see the day.</text>
+<rect x="12" y="108" width="182" height="46" rx="8" fill="#ffffff" stroke="#152133" stroke-width="1.5"/>
+<circle cx="28" cy="131" r="6" fill="#ffffff" stroke="#152133"/><circle cx="28" cy="131" r="3" fill="#152133"/>
+<text x="42" y="127" font-size="10" font-weight="500" fill="#152133">No, set a time with me</text>
+<text x="42" y="142" font-size="9" fill="#424e61">Can take longer to fix.</text>
+<text x="12" y="180" font-size="9.5" fill="#424e61">That's fine. We'll call you to set a time.</text>
+</g>
+
+<text x="16" y="352" font-size="10.5" fill="#152133">• The cost of No is on screen before they choose, and Yes is first.</text>
+<text x="16" y="372" font-size="10.5" fill="#152133">• Neither is picked for them: Send waits until they choose.</text>
+<text x="16" y="392" font-size="10.5" fill="#152133">• Taller than two buttons, about 50 more pixels on a phone.</text>
+</g>
+
+<!-- B -->
+<g transform="translate(512 76)">
+<rect x="0" y="0" width="456" height="420" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="16" y="30" font-size="13" font-weight="600" fill="#152133">B. Yes or No, the cost shown after No</text>
+
+<!-- B: Yes -->
+<g transform="translate(16 48)">
+<rect x="0" y="0" width="206" height="276" rx="14" fill="#ffffff" stroke="#152133"/>
+<text x="12" y="22" font-size="9" fill="#8f99a8">After a tap on Yes</text>
+<text x="12" y="46" font-size="10" font-weight="500" fill="#424e61">Can we let ourselves in?</text>
+<rect x="12" y="54" width="88" height="30" rx="6" fill="#ffffff" stroke="#152133" stroke-width="1.5"/>
+<text x="56" y="73" font-size="10" fill="#152133" text-anchor="middle">Yes</text>
+<rect x="106" y="54" width="88" height="30" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="150" y="73" font-size="10" fill="#152133" text-anchor="middle">No</text>
+<text x="12" y="112" font-size="10" font-weight="500" fill="#424e61">Any pets inside?</text>
+<rect x="12" y="120" width="88" height="28" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="56" y="138" font-size="10" fill="#152133" text-anchor="middle">No</text>
+<rect x="106" y="120" width="88" height="28" rx="6" fill="#ffffff" stroke="#152133" stroke-width="1.5"/>
+<text x="150" y="138" font-size="10" fill="#152133" text-anchor="middle">Yes</text>
+<rect x="12" y="156" width="182" height="28" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="22" y="174" font-size="9.5" fill="#8f99a8">What pets? (optional)</text>
+</g>
+
+<!-- B: No -->
+<g transform="translate(234 48)">
+<rect x="0" y="0" width="206" height="276" rx="14" fill="#ffffff" stroke="#152133"/>
+<text x="12" y="22" font-size="9" fill="#8f99a8">After a tap on No</text>
+<text x="12" y="46" font-size="10" font-weight="500" fill="#424e61">Can we let ourselves in?</text>
+<rect x="12" y="54" width="88" height="30" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="56" y="73" font-size="10" fill="#152133" text-anchor="middle">Yes</text>
+<rect x="106" y="54" width="88" height="30" rx="6" fill="#ffffff" stroke="#152133" stroke-width="1.5"/>
+<text x="150" y="73" font-size="10" fill="#152133" text-anchor="middle">No</text>
+<text x="12" y="108" font-size="9.5" fill="#424e61">That's fine. It can take longer to fix,</text>
+<text x="12" y="122" font-size="9.5" fill="#424e61">since we'll set a time with you.</text>
+</g>
+
+<text x="16" y="352" font-size="10.5" fill="#152133">• Shorter and quicker to read.</text>
+<text x="16" y="372" font-size="10.5" fill="#152133">• They only learn No is slower after picking it, so it nudges less.</text>
+<text x="16" y="392" font-size="10.5" fill="#152133">• Neither is picked for them: Send waits until they choose.</text>
+</g>
+
+<text x="32" y="530" font-size="11" fill="#424e61">Either way: "Yes" turns on Permission to enter for the job. A pets answer shows on the contractor's job page beside Access</text>
+<text x="32" y="546" font-size="11" fill="#424e61">("Pets inside. Keep doors shut."), with their note if they wrote one, and it's filled in for them on their next request.</text>
+<text x="32" y="568" font-size="11" fill="#424e61">Letting us in is asked fresh on every request and never filled in, since permission stays with one job (your Nov 14 call).</text>
+<text x="32" y="590" font-size="11" fill="#424e61">Not drawn: Yes picked for them by default. Entry should be their own yes, not one they forgot to change.</text>
+<text x="32" y="612" font-size="11" fill="#424e61">Sizes: the same on every screen. Nothing wraps at 320; tablet and laptop keep the centered 480 column.</text>
+</svg>

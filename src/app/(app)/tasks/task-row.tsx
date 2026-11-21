@@ -9,7 +9,10 @@ import { LinkPending } from "@/components/link-pending";
 import { pendingRowFill } from "@/components/ui";
 import { StatusBadge, StatusMark } from "@/components/status-badge";
 import { isActiveStatus } from "@/lib/task-scope";
-import { isContractorJob, isOverdue, isTargetLate, targetField, targetOf, type ListTask } from "@/lib/tasks/list";
+import { AfterDueMark } from "@/components/after-due-mark";
+import { fmtShortDay } from "@/lib/tasks/activity";
+import { isContractorJob, isOverdue, scheduledAfterDue, scheduledOf, type ListTask } from "@/lib/tasks/list";
+import { dueLabel } from "@/lib/dates";
 import { personName, shortName } from "@/lib/tasks/list-sort";
 import { cn } from "@/lib/utils";
 import { AssigneeCell, assigneeCellPull } from "./assignee-cell";
@@ -27,6 +30,13 @@ export function hasStatusColumn(task: ListTask, { status = true, reason = false 
   if (task.status === "WAITING" && task.waitingOn && (status || reason)) return true;
   return status && task.status !== "OPEN";
 }
+
+/** Whether a row has a scheduled day for the Tasks page's Scheduled column (scheduledOf): a list keeps the column when any row does. */
+export function hasScheduledColumn(task: ListTask): boolean {
+  return scheduledOf(task) != null;
+}
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
  * One task in a list (Today, All). The whole row opens the task; the
@@ -59,9 +69,13 @@ export function hasStatusColumn(task: ListTask, { status = true, reason = false 
  * the overdue date's alone. A canceled title is struck through in --muted-foreground,
  * like a done one.
  *
- * A row shows its status once it's past To do (task-list-sort.md 3.5). A
- * contractor's job shows its Target (D7: the visit date while Scheduled,
- * otherwise Due); a staff task its Due date. The status column is the same width
+ * A row shows its status once it's past To do (task-list-sort.md 3.5). The
+ * date chip is always Due, contractor jobs included, so red always means late.
+ * A Scheduled job's day rides with its status ("Scheduled Sat, Nov 21", then
+ * the AfterDueMark when the day is past Due), in the status column from 480
+ * up and leading the second line below; on the Tasks page's one-line layout
+ * the Scheduled column (`scheduledColumn`) carries the day and the status
+ * reads "Scheduled". The status column is the same width
  * on every row of a list, so its marks line up; a list where no row shows a
  * status (staff To dos) passes `statusColumn={false}` (see hasStatusColumn)
  * and its titles get the width back. Must sit inside a TaskListProvider and
@@ -85,9 +99,12 @@ export function TaskRow({
   reason = false,
   status = true,
   statusColumn: listHasStatus = true,
+  scheduledColumn = false,
+  wideStatus = false,
   street = true,
   cadence,
   actions,
+  actionsAtEnd = false,
   // The list queries mark it (lib/tasks/queries.ts); a caller can still say.
   unread = task.unread ?? false,
 }: {
@@ -103,6 +120,10 @@ export function TaskRow({
   status?: boolean;
   /** False when no row in the list shows a status, so the empty column drops (hasStatusColumn). */
   statusColumn?: boolean;
+  /** True when some row in the list has a scheduled day (hasScheduledColumn): the one-line layout adds its Scheduled column, and the status reads just "Scheduled" there. */
+  scheduledColumn?: boolean;
+  /** Some row in the list shows a scheduled day with its status ("Scheduled Tue, Nov 24" and the mark): the status column takes 208px so it fits. */
+  wideStatus?: boolean;
   /** False under a heading that names the building: the place is the unit alone, and a one-line row's Property cell stays empty. */
   street?: boolean;
   /**
@@ -114,6 +135,13 @@ export function TaskRow({
   /** Buttons at the row's end, e.g. Approve and Send back. */
   actions?: ReactNode;
   /**
+   * With `actions`: the buttons sit at the row's end from 60rem, and below it at the end of the details line under
+   * the title, instead of on a line of their own (a draft from Claude, docs/specs/tasks-from-claude.md 9). The row
+   * is one line from 60rem and two below it. Its person and date aren't edited from the row: a draft's fields
+   * change on its page.
+   */
+  actionsAtEnd?: boolean;
+  /**
    * Something new since you last opened it (docs/specs/activity-comments.md
    * 2.6, choice 3.5 A): the 8px --primary unread dot hangs in the leading gutter,
    * centered 8px before the row's first column on the title's line, and the
@@ -122,7 +150,9 @@ export function TaskRow({
   unread?: boolean;
 }) {
   const { today, reschedule, setDone, people } = useTaskList();
-  const picks = usePicks();
+  // A draft from Claude is never picked: bulk edit is for real tasks (docs/specs/tasks-from-claude.md 6.2).
+  const listPicks = usePicks();
+  const picks = task.status === "DRAFT" ? null : listPicks;
   const picked = picks?.has(task.id) ?? false;
   const picking = picks?.on ?? false;
   // Touch only. Its keyboard and click handlers stay off the row's link, so Enter and a click open the task as
@@ -141,15 +171,20 @@ export function TaskRow({
   const job = isContractorJob(task);
   // The person reassigns from the row where the list offers people (the Tasks page) and the row names them;
   // under a person's heading the heading names them and the cell stays empty.
-  const assignable = Boolean(people) && avatar && person;
-  const date = job ? targetOf(task) : task.due;
-  const late = job ? isTargetLate(task, today) : isOverdue(task, today);
-  const visit = job && targetField(task) === "scheduledFor";
+  const assignable = Boolean(people) && avatar && person && !(actions && actionsAtEnd);
+  const date = task.due;
+  const late = isOverdue(task, today);
+  const scheduled = scheduledOf(task);
+  const afterDue = scheduledAfterDue(task);
   const who = avatar && person ? personName(task.assignee) : null;
   const first = shortName(who);
   const property = street ? task.place : null;
   const place = [property, task.unitLabel].filter(Boolean).join(" · ");
-  const oneLine = !actions;
+  const oneLine = !actions || actionsAtEnd;
+  // A draft's row (actions at its end): below the one-line layout its title has a line to itself, and the details are
+  // words on the line under it with the buttons at that line's right (docs/specs/tasks-from-claude.md 9).
+  const endRow = Boolean(actions) && actionsAtEnd;
+  const dateText = date ? capitalize(dueLabel(date, today)) : "No date";
   const struck = task.checked || task.status === "CANCELED";
   // Waiting with a reason: the pause ring and the reason in --muted-foreground, so amber
   // stays a partner's decision. Under the Waiting heading the reason alone
@@ -171,9 +206,19 @@ export function TaskRow({
     </span>
   );
   const reasonOnly = waitingOn && reason ? waiting(waitingOn, `Waiting on ${waitingOn}`) : null;
+  // A Scheduled job: the badge, then its day and the warning when the day is past Due. The day is the
+  // text only, so the place drops before it at 320 (the second line truncates the place first).
+  const withDay = badge && scheduled && status ? (
+    <span className="flex min-w-0 items-center gap-1.5">
+      {badge}
+      <span className="truncate text-meta text-muted-foreground">{fmtShortDay(scheduled, today)}</span>
+      {afterDue && task.due && <AfterDueMark due={task.due} today={today} />}
+    </span>
+  ) : null;
   // The status column, from a 480px list up; and the second line's lead below that.
-  const wide = reasonOnly ?? (waitingOn && status ? waiting(`Waiting on ${waitingOn}`) : badge);
-  const narrow = reasonOnly ?? badge;
+  // On a one-line row with the Scheduled column the day moves there and the status is its word alone.
+  const wide = reasonOnly ?? (waitingOn && status ? waiting(`Waiting on ${waitingOn}`) : (withDay ?? badge));
+  const narrow = reasonOnly ?? (withDay ?? badge);
 
   // The place line: the status lead below a 480px list, the place, the avatar.
   // With none of them the row is the title and its date alone.
@@ -182,18 +227,23 @@ export function TaskRow({
   const secondLine = Boolean(place || who || cadence);
 
   // Top right on the title's line, on every row; a one-line row puts it last.
-  const dateChip = (
+  const dateChip = endRow ? (
+    // A draft's date isn't edited from its row (its page does that), so it is text, not a control, and only on the one-line row.
+    <span className="hidden shrink-0 text-meta text-foreground lg:@min-[60rem]:order-last lg:@min-[60rem]:flex lg:@min-[60rem]:w-30 lg:@min-[60rem]:justify-end">
+      <span className={cn("truncate", !date && "text-muted-foreground")}>{dateText}</span>
+    </span>
+  ) : (
     // 120px on a one-line row: the widest date, "May 20, 2025", with its padding.
     <span className={cn("pointer-events-auto flex shrink-0", oneLine && "lg:@min-[60rem]:order-last lg:@min-[60rem]:w-30 lg:@min-[60rem]:justify-end")}>
       <DueDatePicker
         value={date}
         today={today}
         overdue={late}
-        label={visit ? "Visit date" : "Due date"}
+        label="Due date"
         // Named with the task, so a screen reader hears which one: "Due date for Fix the sink: Apr 19" (TASKS-V02).
         subject={task.title}
         isDisabled={!isActiveStatus(task.status)}
-        onChange={(to) => reschedule(task, to, job ? "target" : "due")}
+        onChange={(to) => reschedule(task, to, "due")}
       />
     </span>
   );
@@ -205,10 +255,13 @@ export function TaskRow({
     // the place line under it is 20. A row's actions wrap to a line of their own under both.
     <li
       className={cn(
-        "group/row relative flex items-start gap-3 py-1.5 pointer-coarse:min-h-12",
-        !secondLine && (narrow ? "@min-[30rem]:pointer-coarse:py-2.5" : "pointer-coarse:py-2.5"),
+        "group/row relative py-1.5 pointer-coarse:min-h-12",
+        // A draft below 60rem: the title over the details and buttons, in a grid; from 60rem the same one line as every row.
+        endRow ? "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0 lg:@min-[60rem]:flex" : "flex items-start gap-3",
+        !secondLine && !endRow && (narrow ? "@min-[30rem]:pointer-coarse:py-2.5" : "pointer-coarse:py-2.5"),
         oneLine && "lg:@min-[60rem]:items-center",
-        actions && "flex-wrap",
+        endRow && "lg:@min-[60rem]:gap-3",
+        actions && !actionsAtEnd && "flex-wrap",
       )}
     >
       <Link
@@ -306,11 +359,13 @@ export function TaskRow({
       <div
         className={cn(
           "pointer-events-none relative min-w-0 flex-1",
+          // The grid's rows below 60rem (a draft row).
+          endRow && "contents",
           oneLine && "lg:@min-[60rem]:flex lg:@min-[60rem]:items-center lg:@min-[60rem]:gap-3",
         )}
       >
         {/* The title's line. On a one-line row its pieces join the row, and the date goes last. */}
-        <div className={cn("flex min-w-0 items-center gap-3", oneLine && "lg:@min-[60rem]:contents")}>
+        <div className={cn("flex min-w-0 items-center gap-3", endRow && "relative col-span-2", oneLine && "lg:@min-[60rem]:contents")}>
           <div className="min-w-0 flex-1">
             <p className={cn("truncate text-body", struck ? "text-muted-foreground line-through" : "text-foreground")}>{task.title}</p>
             {cadence && oneLine && (
@@ -322,7 +377,16 @@ export function TaskRow({
               To do. 144px, so "Waiting on" keeps a word of its reason, and 176 on a wide
               one-line list. */}
           {statusColumn && (
-            <span className={cn("hidden w-36 shrink-0 @min-[30rem]:flex", oneLine && "lg:@min-[60rem]:w-44")}>{wide}</span>
+            <span className={cn("hidden w-36 shrink-0 @min-[30rem]:flex", (scheduledColumn || wideStatus) && "w-52", oneLine && "lg:@min-[60rem]:w-44")}>
+              {oneLine && scheduledColumn && withDay ? (
+                <>
+                  <span className="flex min-w-0 lg:@min-[60rem]:hidden">{wide}</span>
+                  <span className="hidden lg:@min-[60rem]:flex">{badge}</span>
+                </>
+              ) : (
+                wide
+              )}
+            </span>
           )}
           {oneLine && (
             // The one-line row's own columns, between the status and the date (task-list-sort.md 3.1):
@@ -351,11 +415,38 @@ export function TaskRow({
                   )}
                 </span>
               )}
+              {scheduledColumn && (
+                // The Scheduled column (128px, TaskColumnHeads): the day as a chip like Due's, the warning after it.
+                // 128 holds the widest weekday chip ("Wednesday") and the mark. Empty for a row with no scheduled
+                // day, so the Due column stays lined up.
+                <span className="pointer-events-auto flex w-32 flex-none items-center gap-1">
+                  {scheduled && (
+                    <>
+                      <DueDatePicker
+                        value={scheduled}
+                        today={today}
+                        label="Scheduled day"
+                        subject={task.title}
+                        allowNone={false}
+                        isDisabled={!isActiveStatus(task.status)}
+                        onChange={(to) => reschedule(task, to, "scheduled")}
+                      />
+                      {afterDue && task.due && <AfterDueMark due={task.due} today={today} />}
+                    </>
+                  )}
+                </span>
+              )}
             </div>
           )}
           {dateChip}
         </div>
-        {/* 20px tall with or without the avatar, so every two-line row is the same height. */}
+        {endRow ? (
+          // A draft's details as words, so the title keeps its line; the buttons sit at this line's right.
+          <p className="relative min-w-0 truncate text-meta text-muted-foreground lg:@min-[60rem]:hidden">
+            {[first, dateText, place].filter(Boolean).join(" · ")}
+          </p>
+        ) : (
+        /* 20px tall with or without the avatar, so every two-line row is the same height. */
         <div className={cn("mt-0.5 flex min-w-0 items-center gap-2", secondLine && "min-h-5", !placeLine && "hidden", oneLine && "lg:@min-[60rem]:hidden")}>
           {narrow && (
             <span className={cn("flex items-center gap-2 @min-[30rem]:hidden", reasonOnly ? "min-w-0 shrink" : "shrink-0")}>
@@ -406,11 +497,13 @@ export function TaskRow({
             </span>
           )}
         </div>
+        )}
       </div>
 
       {actions && (
-        // A full-width line under the two, ending at the right edge the date and the avatar share.
-        <div className="relative flex w-full shrink-0 items-center justify-end gap-1.5">{actions}</div>
+        // A full-width line under the two, ending at the right edge the date and the avatar share; with
+        // `actionsAtEnd`, just the buttons, at the row's end.
+        <div className={cn("relative flex shrink-0 items-center gap-1.5", actionsAtEnd ? "col-start-2" : "w-full justify-end")}>{actions}</div>
       )}
     </li>
   );

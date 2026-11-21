@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="810" viewBox="0 0 1040 810" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Structure for the resident emails, shown on the Scheduled email in a phone's mail app. A (recommended): the contractor email's layout, What's new, a button, then Your request as labeled rows. B: A plus the three steps from their request page. C: a lighter version, headline, three labeled lines and the button.</title>
+<rect width="1040" height="810" fill="#f4f2ee"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Resident emails with structure, like the contractor's</text>
+<text x="32" y="56" font-size="11" fill="#424e61">The Scheduled email in a phone's mail app. The same layout carries every resident email (section notes at the bottom).</text>
+
+<!-- A -->
+<g transform="translate(32 76)">
+<text x="0" y="12" font-size="13" font-weight="600" fill="#152133">A. The contractor email's layout</text>
+<rect x="222" y="0" width="92" height="20" rx="10" fill="#f6efe1"/>
+<text x="268" y="14" font-size="10" font-weight="500" fill="#8a6d2f" text-anchor="middle">Recommended</text>
+<rect x="0" y="28" width="314" height="520" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<rect x="18" y="46" width="22" height="22" rx="5" fill="#101824"/><text x="29" y="61" font-size="9" font-weight="600" fill="#c9a96a" text-anchor="middle">HG</text>
+<text x="48" y="62" font-size="12" font-weight="600" fill="#152133">HG Capital</text>
+<line x1="18" y1="80" x2="296" y2="80" stroke="#c9a96a"/>
+<text x="18" y="102" font-size="10" fill="#5d6878">What's new</text>
+<text x="18" y="124" font-size="16" font-weight="600" fill="#152133">Scheduled for Wed, Nov 25</text>
+<text x="18" y="146" font-size="12" fill="#2c3747">We'll let the contractor in,</text>
+<text x="18" y="162" font-size="12" fill="#2c3747">since you said that's okay.</text>
+<rect x="18" y="178" width="278" height="38" rx="6" fill="#152133"/>
+<text x="157" y="202" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">See your request</text>
+<line x1="18" y1="238" x2="296" y2="238" stroke="#e3e0da"/>
+<text x="18" y="260" font-size="10" fill="#5d6878">Your request</text>
+<text x="18" y="282" font-size="14" font-weight="600" fill="#152133">Kitchen sink leaks</text>
+<text x="18" y="298" font-size="11" fill="#5d6878">56 Tamarack St · Upper</text>
+<line x1="18" y1="312" x2="296" y2="312" stroke="#e3e0da"/>
+<text x="18" y="332" font-size="11" fill="#5d6878">Status</text><text x="100" y="332" font-size="12" fill="#152133">Scheduled · Wed, Nov 25</text>
+<line x1="18" y1="344" x2="296" y2="344" stroke="#e3e0da"/>
+<text x="18" y="364" font-size="11" fill="#5d6878">Entry</text><text x="100" y="364" font-size="12" fill="#152133">You can come in</text>
+<line x1="18" y1="376" x2="296" y2="376" stroke="#e3e0da"/>
+<text x="18" y="396" font-size="11" fill="#5d6878">Pets</text><text x="100" y="396" font-size="12" fill="#152133">A cat</text>
+<line x1="18" y1="408" x2="296" y2="408" stroke="#e3e0da"/>
+<text x="18" y="428" font-size="11" fill="#5d6878">Comments</text><text x="100" y="428" font-size="12" fill="#152133">Water under the sink when</text>
+<text x="100" y="444" font-size="12" fill="#152133">the dishwasher runs.</text>
+<line x1="18" y1="456" x2="296" y2="456" stroke="#e3e0da"/>
+<text x="18" y="476" font-size="11" fill="#5d6878">Sent</text><text x="100" y="476" font-size="12" fill="#152133">Sat, Nov 21</text>
+<text x="18" y="514" font-size="10" fill="#5d6878">Questions? Text us in our group chat.</text>
+<text x="0" y="574" font-size="10.5" fill="#152133">• The same sections as the contractor's</text>
+<text x="8" y="588" font-size="10.5" fill="#152133">email: What's new, the button, then the</text>
+<text x="8" y="602" font-size="10.5" fill="#152133">request as labeled rows.</text>
+<text x="0" y="622" font-size="10.5" fill="#152133">• One line of what's new, never a block.</text>
+</g>
+
+<!-- B -->
+<g transform="translate(362 76)">
+<text x="0" y="12" font-size="13" font-weight="600" fill="#152133">B. A, plus their three steps</text>
+<rect x="0" y="28" width="314" height="520" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<rect x="18" y="46" width="22" height="22" rx="5" fill="#101824"/><text x="29" y="61" font-size="9" font-weight="600" fill="#c9a96a" text-anchor="middle">HG</text>
+<text x="48" y="62" font-size="12" font-weight="600" fill="#152133">HG Capital</text>
+<line x1="18" y1="80" x2="296" y2="80" stroke="#c9a96a"/>
+<text x="18" y="102" font-size="10" fill="#5d6878">What's new</text>
+<text x="18" y="124" font-size="16" font-weight="600" fill="#152133">Scheduled for Wed, Nov 25</text>
+<circle cx="26" cy="148" r="5" fill="#152133"/><text x="36" y="152" font-size="11" fill="#152133">Received</text>
+<line x1="86" y1="148" x2="112" y2="148" stroke="#152133"/>
+<circle cx="120" cy="148" r="5" fill="#152133"/><text x="130" y="152" font-size="11" font-weight="600" fill="#152133">Scheduled</text>
+<line x1="190" y1="148" x2="216" y2="148" stroke="#d9dde3"/>
+<circle cx="224" cy="148" r="5" fill="#ffffff" stroke="#8f99a8"/><text x="234" y="152" font-size="11" fill="#8f99a8">Done</text>
+<text x="18" y="178" font-size="12" fill="#2c3747">We'll let the contractor in,</text>
+<text x="18" y="194" font-size="12" fill="#2c3747">since you said that's okay.</text>
+<rect x="18" y="210" width="278" height="38" rx="6" fill="#152133"/>
+<text x="157" y="234" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">See your request</text>
+<line x1="18" y1="270" x2="296" y2="270" stroke="#e3e0da"/>
+<text x="18" y="292" font-size="10" fill="#5d6878">Your request</text>
+<text x="18" y="314" font-size="14" font-weight="600" fill="#152133">Kitchen sink leaks</text>
+<text x="18" y="330" font-size="11" fill="#5d6878">56 Tamarack St · Upper</text>
+<line x1="18" y1="344" x2="296" y2="344" stroke="#e3e0da"/>
+<text x="18" y="364" font-size="11" fill="#5d6878">Entry</text><text x="100" y="364" font-size="12" fill="#152133">You can come in</text>
+<line x1="18" y1="376" x2="296" y2="376" stroke="#e3e0da"/>
+<text x="18" y="396" font-size="11" fill="#5d6878">Pets</text><text x="100" y="396" font-size="12" fill="#152133">A cat</text>
+<line x1="18" y1="408" x2="296" y2="408" stroke="#e3e0da"/>
+<text x="18" y="428" font-size="11" fill="#5d6878">Comments</text><text x="100" y="428" font-size="12" fill="#152133">Water under the sink when</text>
+<text x="100" y="444" font-size="12" fill="#152133">the dishwasher runs.</text>
+<text x="18" y="514" font-size="10" fill="#5d6878">Questions? Text us in our group chat.</text>
+<text x="0" y="574" font-size="10.5" fill="#152133">• The steps match their request page,</text>
+<text x="8" y="588" font-size="10.5" fill="#152133">so where it stands reads at a glance.</text>
+<text x="0" y="608" font-size="10.5" fill="#152133">• A row of dots some mail apps squeeze;</text>
+<text x="8" y="622" font-size="10.5" fill="#152133">one more part to build and keep right.</text>
+</g>
+
+<!-- C -->
+<g transform="translate(692 76)">
+<text x="0" y="12" font-size="13" font-weight="600" fill="#152133">C. Lighter: a few labeled lines</text>
+<rect x="0" y="28" width="314" height="520" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<rect x="18" y="46" width="22" height="22" rx="5" fill="#101824"/><text x="29" y="61" font-size="9" font-weight="600" fill="#c9a96a" text-anchor="middle">HG</text>
+<text x="48" y="62" font-size="12" font-weight="600" fill="#152133">HG Capital</text>
+<line x1="18" y1="80" x2="296" y2="80" stroke="#c9a96a"/>
+<text x="18" y="110" font-size="16" font-weight="600" fill="#152133">Scheduled for Wed, Nov 25</text>
+<text x="18" y="140" font-size="11" fill="#5d6878">Request</text><text x="80" y="140" font-size="12" fill="#152133">Kitchen sink leaks</text>
+<text x="18" y="162" font-size="11" fill="#5d6878">Home</text><text x="80" y="162" font-size="12" fill="#152133">56 Tamarack St · Upper</text>
+<text x="18" y="184" font-size="11" fill="#5d6878">Entry</text><text x="80" y="184" font-size="12" fill="#152133">We'll let the contractor in</text>
+<rect x="18" y="204" width="278" height="38" rx="6" fill="#152133"/>
+<text x="157" y="228" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">See your request</text>
+<text x="18" y="276" font-size="10" fill="#5d6878">Questions? Text us in our group chat.</text>
+<text x="0" y="574" font-size="10.5" fill="#152133">• Shortest: the news, three facts, the</text>
+<text x="8" y="588" font-size="10.5" fill="#152133">button.</text>
+<text x="0" y="608" font-size="10.5" fill="#152133">• Their comments and pets live on the</text>
+<text x="8" y="622" font-size="10.5" fill="#152133">request page, not in the email.</text>
+</g>
+
+<text x="32" y="730" font-size="11" fill="#424e61">Every resident email in the same frame: What's new carries the change (We got your request · Scheduled · Moved to · Done · Closed, with your note as its line),</text>
+<text x="32" y="748" font-size="11" fill="#424e61">then the button, then the request. The link email: "Your maintenance request link", the home, and Report a problem, with the group chat line at the foot.</text>
+<text x="32" y="770" font-size="11" fill="#424e61">Sizes: one 480 column on a laptop, full width on a phone, like the contractor's email. Rows keep their 88px label column.</text>
+</svg>

@@ -326,6 +326,7 @@ function LineText({
   return (
     <p className="text-meta text-muted-foreground">
       {line.href ? <TextLink href={line.href}>{line.text}</TextLink> : line.text}
+      {line.viaClaude && <span>{" via Claude"}</span>}
       <span aria-hidden="true">{" · "}</span>
       <ActivityTime at={at} />
       {line.viaAsana && <span>{" · via Asana"}</span>}

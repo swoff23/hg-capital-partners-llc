@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import type { TaskStatus } from "@prisma/client";
 import {
+  APPROVAL_UNDO_MS,
   BUNDLE_MAX_MS,
   BUNDLE_QUIET_MS,
   bundleSendAfter,
@@ -9,8 +11,9 @@ import {
   contractorStatusRefusal,
   notifyAudience,
   statusEventVisibility,
-  targetDate,
-  targetIsVisit,
+  isAfterDue,
+  jobDay,
+  scheduledDay,
   writeAudience,
 } from "./rules";
 
@@ -21,7 +24,27 @@ test("staff can make any status change; nobody can 'change' to the same status",
   assert.equal(canSetStatus("staff", "OPEN", "OPEN"), false);
 });
 
-test("contractors can only Start job and Mark done", () => {
+// docs/specs/tasks-from-claude.md 6.1: a draft becomes a task only through Add, and goes back only through its Undo.
+test("no status change goes to or from Draft, for anyone", () => {
+  const settable: TaskStatus[] = ["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING", "REVIEW", "DONE", "CANCELED"];
+  for (const who of ["staff", "contractor", "system", "asana"] as const) {
+    for (const status of settable) {
+      assert.equal(canSetStatus(who, "DRAFT", status), false, `${who}: Draft to ${status}`);
+      assert.equal(canSetStatus(who, status, "DRAFT"), false, `${who}: ${status} to Draft`);
+    }
+    assert.equal(canSetStatus(who, "DRAFT", "DRAFT"), false);
+  }
+  // Everything else staff could do, they still can.
+  assert.equal(canSetStatus("staff", "OPEN", "IN_PROGRESS"), true);
+});
+
+// Add's Undo relies on it (core.ts undoAddDraft): the job email Add queued is still waiting when the Undo lands.
+test("Add's Undo ends before the job email's quiet time does", () => {
+  assert.ok(APPROVAL_UNDO_MS < BUNDLE_QUIET_MS);
+  assert.ok(BUNDLE_QUIET_MS - APPROVAL_UNDO_MS >= 60_000, "a full minute to spare, the send run's own interval");
+});
+
+test("contractors can only Start job, Mark done and schedule their own day", () => {
   assert.equal(canSetStatus("contractor", "OPEN", "IN_PROGRESS"), true);
   assert.equal(canSetStatus("contractor", "SCHEDULED", "IN_PROGRESS"), true);
   assert.equal(canSetStatus("contractor", "IN_PROGRESS", "REVIEW"), true);
@@ -32,7 +55,11 @@ test("contractors can only Start job and Mark done", () => {
   assert.equal(canSetStatus("contractor", "DONE", "IN_PROGRESS"), false);
   assert.equal(canSetStatus("contractor", "REVIEW", "IN_PROGRESS"), false);
   assert.equal(canSetStatus("contractor", "OPEN", "WAITING"), false);
-  assert.equal(canSetStatus("contractor", "OPEN", "SCHEDULED"), false);
+  // Their own scheduled day: they may move a job that is To do or Waiting to Scheduled, and nothing else new.
+  assert.equal(canSetStatus("contractor", "OPEN", "SCHEDULED"), true);
+  assert.equal(canSetStatus("contractor", "WAITING", "SCHEDULED"), true);
+  assert.equal(canSetStatus("contractor", "IN_PROGRESS", "SCHEDULED"), false);
+  assert.equal(canSetStatus("contractor", "REVIEW", "SCHEDULED"), false);
 });
 
 test("a stale tab's Start job or Mark done is told where the job is now, not the rule", () => {
@@ -86,16 +113,29 @@ test("a staff reply to one contractor never reaches the next one on the job", ()
   assert.equal(contractorSeesRow({ imported: true, actorContactId: null, audienceContactId: null }, "jose"), true);
 });
 
-test("targetDate: visit date while Scheduled, otherwise due", () => {
+test("scheduledDay and jobDay: their day only while Scheduled, else Due (contractor-scheduled-date.md)", () => {
   const due = new Date("2026-10-30T00:00:00Z");
-  const visit = new Date("2026-10-27T00:00:00Z");
-  assert.equal(targetDate({ status: "SCHEDULED", scheduledFor: visit, dueDate: due }), visit);
-  assert.equal(targetDate({ status: "IN_PROGRESS", scheduledFor: visit, dueDate: due }), due);
-  assert.equal(targetDate({ status: "SCHEDULED", scheduledFor: null, dueDate: due }), due);
-  // The portal labels it to match: "Visit date" only when that's the date shown.
-  assert.equal(targetIsVisit({ status: "SCHEDULED", scheduledFor: visit }), true);
-  assert.equal(targetIsVisit({ status: "IN_PROGRESS", scheduledFor: visit }), false);
-  assert.equal(targetIsVisit({ status: "SCHEDULED", scheduledFor: null }), false);
+  const day = new Date("2026-10-27T00:00:00Z");
+  assert.equal(scheduledDay({ status: "SCHEDULED", scheduledFor: day }), day);
+  assert.equal(scheduledDay({ status: "IN_PROGRESS", scheduledFor: day }), null);
+  assert.equal(jobDay({ status: "SCHEDULED", scheduledFor: day, dueDate: due }), day);
+  assert.equal(jobDay({ status: "IN_PROGRESS", scheduledFor: day, dueDate: due }), due);
+  assert.equal(jobDay({ status: "SCHEDULED", scheduledFor: null, dueDate: due }), due);
+});
+
+test("isAfterDue: only a day strictly after Due, with both set", () => {
+  assert.equal(isAfterDue("2026-11-21", "2026-11-20"), true);
+  assert.equal(isAfterDue("2026-11-20", "2026-11-20"), false);
+  assert.equal(isAfterDue("2026-11-19", "2026-11-20"), false);
+  assert.equal(isAfterDue("2026-11-21", null), false);
+  assert.equal(isAfterDue(null, "2026-11-20"), false);
+});
+
+test("a contractor may move To do or Waiting to Scheduled, nothing else", () => {
+  assert.equal(canSetStatus("contractor", "OPEN", "SCHEDULED"), true);
+  assert.equal(canSetStatus("contractor", "WAITING", "SCHEDULED"), true);
+  assert.equal(canSetStatus("contractor", "IN_PROGRESS", "SCHEDULED"), false);
+  assert.equal(canSetStatus("contractor", "REVIEW", "SCHEDULED"), false);
 });
 
 test("email only crosses the staff/contractor line", () => {

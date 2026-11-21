@@ -2,10 +2,10 @@ import "server-only";
 import { Prisma, type AttachmentKind, type TaskStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todayYmdEastern, toYmd, type Ymd } from "@/lib/dates";
-import { ACTIVE_STATUSES, CLOSED_STATUSES, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
+import { ACTIVE_STATUSES, CLOSED_STATUSES, contractorCanOpen, isActiveStatus } from "@/lib/task-scope";
 import { partnersEmailState } from "@/lib/tasks/delivery";
 import { MARK_DONE_WINDOW_MS, finishPhotoIds, orderMedia } from "@/lib/tasks/media";
-import { targetDate, targetIsVisit } from "@/lib/tasks/rules";
+import { scheduledDay } from "@/lib/tasks/rules";
 import { lockboxMasker, NO_ACCESS, readJobAccess, type BodyPart, type JobTenant, type LockboxAccess } from "./access-code";
 import { JOB_EMAIL_SELECT, jobEmailState } from "./job-emails";
 import { NO_NOTICE, dateChange, dateChangeText, noticeCount, sendBackStands, type DateChange, type DateEvent, type JobNotice } from "./job-notice";
@@ -112,9 +112,12 @@ const visibleFile = (contactId: string, kinds: readonly AttachmentKind[]) =>
     ],
   }) satisfies Prisma.TaskAttachmentWhereInput;
 
-/** Jobs this contact can open: an unrevoked access row, and not a playbook template. */
-const accessibleTo = (contactId: string) =>
-  ({ ...excludeTemplateTasks, access: { some: { contactId, revokedAt: null } } }) satisfies Prisma.TaskWhereInput;
+/**
+ * Jobs this contact can open: an unrevoked access row, and never a playbook template or a draft Claude saved that no
+ * partner has added (task-scope.ts contractorCanOpen). My jobs and the job page both start here, and every other read
+ * below is of a job one of them returned, so a draft stays out of the portal even if an access row somehow exists.
+ */
+const accessibleTo = contractorCanOpen;
 
 // ---------------------------------------------------------------------------
 // My jobs
@@ -158,8 +161,8 @@ export async function listMyJobs(p: PortalPrincipal, tab: JobsTab): Promise<JobC
     address: r.property?.address ?? null,
     photoUrl: r.property?.photoUrl ?? null,
     unitLabel: r.unitLabel,
-    target: toYmd(targetDate(r)),
-    targetIsVisit: targetIsVisit(r),
+    due: toYmd(r.dueDate),
+    scheduled: toYmd(scheduledDay(r)),
     finishedOn: tab === "done" && r.completedAt ? todayYmdEastern(r.completedAt) : null,
     newCount: (counts.get(r.id) ?? 0) + (notices.get(r.id) ?? 0),
   }));
@@ -346,9 +349,12 @@ export interface JobDetail {
   /** The property's front photo (public Blob), or null: the fallback tile. */
   photoUrl: string | null;
   unitLabel: string | null;
-  target: Ymd | null;
-  /** The target is the booked visit ("Visit date"), not the due date. */
-  targetIsVisit: boolean;
+  /** HG Capital's due date: the contractor sees it and never changes it. */
+  due: Ymd | null;
+  /** Their scheduled day while the job is Scheduled (rules.ts scheduledDay), else null. */
+  scheduled: Ymd | null;
+  /** Someone lives there and Permission to enter is off: picking today or tomorrow gets the notice toast (Q7). */
+  needsNotice: boolean;
   checklist: { id: string; title: string; done: boolean }[];
   media: JobMedia[];
   /** The ids in `media` sent with the latest Mark done, which lead under "At finish" (uploads 2.5). Empty with no Mark done set. */
@@ -515,8 +521,9 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
     address: task.property?.address ?? null,
     photoUrl: task.property?.photoUrl ?? null,
     unitLabel: task.unitLabel,
-    target: toYmd(targetDate(task)),
-    targetIsVisit: targetIsVisit(task),
+    due: toYmd(task.dueDate),
+    scheduled: toYmd(scheduledDay(task)),
+    needsNotice: access.needsNotice,
     checklist: task.checklist,
     // The grid's order, as on the task page (lib/tasks/media.ts): the Mark done set under "At finish" first, then newest first.
     media: orderMedia(media, { atFinish }).map((a) => toMedia(p, a)),

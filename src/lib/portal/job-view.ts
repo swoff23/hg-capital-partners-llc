@@ -40,10 +40,10 @@ export interface JobCard {
   /** The property's front photo (public Blob), or null: the fallback tile. */
   photoUrl: string | null;
   unitLabel: string | null;
-  /** The neutral Target (rules.ts targetDate), never shown in red. */
-  target: Ymd | null;
-  /** The target is the booked visit ("Visit date"), not the due date. */
-  targetIsVisit: boolean;
+  /** HG Capital's due date, never shown in red here. */
+  due: Ymd | null;
+  /** Their scheduled day while the job is Scheduled (rules.ts scheduledDay), else null. */
+  scheduled: Ymd | null;
   /** The Buffalo day a finished job was closed; null while it's open. */
   finishedOn: Ymd | null;
   /** Shared updates from someone else since the contractor last opened it. */
@@ -69,14 +69,18 @@ export function dayLabel(ymd: Ymd, today: Ymd): string {
   return fmt(ymd, { weekday: "short", month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
 }
 
+/** The day a My jobs row shows and sorts by: their scheduled day, else Due (docs/specs/contractor-scheduled-date.md, Q8). */
+export const shownDay = (j: Pick<JobCard, "due" | "scheduled">): Ymd | null => j.scheduled ?? j.due;
+
 /**
  * A job's date as a label and a day (Connor, Oct 26: "Target today" didn't
- * read): "Due date" then "Today" or "Thu, Oct 29", and "Visit date" for a
- * Scheduled job's booked visit, as staff task rows say it. `short` is the
- * label on a narrow My jobs row, where the status leads the subline.
+ * read): "Due date" then "Today" or "Thu, Oct 29", or "Scheduled" for their
+ * scheduled day. Never "visit" (Connor). `short` is the label on a narrow My
+ * jobs row, where the status leads the subline: "Due", or nothing for the
+ * scheduled day, whose status already says Scheduled.
  */
-export function dueDateParts(target: Ymd, isVisit: boolean, today: Ymd): { label: string; short: string; day: string } {
-  return { label: isVisit ? "Visit date" : "Due date", short: isVisit ? "Visit" : "Due", day: dayLabel(target, today) };
+export function dateParts(day: Ymd, kind: "due" | "scheduled", today: Ymd): { label: string; short: string; day: string } {
+  return kind === "scheduled" ? { label: "Scheduled", short: "", day: dayLabel(day, today) } : { label: "Due date", short: "Due", day: dayLabel(day, today) };
 }
 
 const NO_DATE = "No due date";
@@ -87,8 +91,8 @@ export interface DayOrder {
   order: "asc" | "desc";
 }
 
-/** Open jobs by Target, soonest first; finished ones by the day they were finished, most recent first. */
-const OPEN_ORDER: DayOrder = { dayOf: (j) => j.target, order: "asc" };
+/** Open jobs by the day shown (their day, else Due), soonest first; finished ones by the day they were finished, most recent first. */
+const OPEN_ORDER: DayOrder = { dayOf: shownDay, order: "asc" };
 const DONE_ORDER: DayOrder = { dayOf: (j) => j.finishedOn, order: "desc" };
 
 /** Jobs with a day by that day in `order`, jobs with none last, then A to Z. */

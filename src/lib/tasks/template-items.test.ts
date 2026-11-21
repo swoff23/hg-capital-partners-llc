@@ -1,14 +1,30 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  MOVE_IN_LABEL,
+  MOVE_OUT_LABEL,
+  UNTICK_LEASE,
+  UNTICK_LEASE_SHORT,
+  appliedLeaseLine,
   applyDraftKey,
   applyProblems,
   applyTokens,
+  createLeaseLabel,
   createTasksLabel,
   dueFromOffset,
+  fillInValue,
   hasApplyProblems,
+  homeResolves,
+  isTenantNameToken,
+  isTenantPhoneToken,
   itemsVersion,
+  leaseWhere,
+  moveOutLabel,
+  playbookKind,
+  prefillHousehold,
+  shortNames,
   tasksToCreate,
+  tenantPrefill,
   extractTokens,
   fillNotes,
   hasOpenTokens,
@@ -239,4 +255,108 @@ test("an application's draft is kept per person and per building it was opened f
   assert.notEqual(forA, applyDraftKey("u1", "t2", items, "prop_A"));
   assert.notEqual(forA, applyDraftKey("u1", "t1", [...items, { title: "Walk the unit" }], "prop_A"));
   assert.ok(forA.startsWith(`apply:u1:t1:${itemsVersion(items)}:`));
+});
+
+// Playbooks and leases (docs/specs/tenants.md section 9, tenant-contact.md section 6).
+
+test("the date label says which playbook it is, by the two patterns the spec pins", () => {
+  assert.equal(MOVE_IN_LABEL.source, "move[- ]?in");
+  assert.equal(MOVE_IN_LABEL.flags, "i");
+  assert.equal(MOVE_OUT_LABEL.source, "move[- ]?out");
+  assert.equal(MOVE_OUT_LABEL.flags, "i");
+  for (const label of ["Move-in date", "Move in date", "MOVEIN", "move-in"]) assert.equal(playbookKind(label), "move-in", label);
+  for (const label of ["Move-out date", "Move out date", "moveout"]) assert.equal(playbookKind(label), "move-out", label);
+  // Renamed, or no label at all: no lease box, so it fails safe. Both at once is neither.
+  for (const label of ["Start date", "Closing date", "Moving day", "", null, undefined, "Move-in or move-out date"]) assert.equal(playbookKind(label), null, String(label));
+});
+
+test("the household's names join for a fill-in, and shorten past two for a box or a toast", () => {
+  const joined = (...names: string[]) => tenantPrefill("Tenant", { names, phone: null });
+  assert.equal(joined("Dana Lee"), "Dana Lee");
+  assert.equal(joined("Dana Lee", "Sam Ortiz"), "Dana Lee and Sam Ortiz");
+  assert.equal(joined("Dana Lee", "Sam Ortiz", "Ana Ruiz"), "Dana Lee, Sam Ortiz and Ana Ruiz");
+  assert.equal(joined("Dana Lee", "Sam Ortiz", "Ana Ruiz", "Bo Chen"), "Dana Lee, Sam Ortiz, Ana Ruiz and Bo Chen");
+  // Joined the way comments and the portal join names (job-view.ts), after a trim: a blank name isn't a person.
+  assert.equal(joined(" Dana Lee ", ""), "Dana Lee");
+  assert.equal(joined(" ", ""), undefined);
+  assert.equal(shortNames(["Dana Lee", "Sam Ortiz"]), "Dana Lee and Sam Ortiz");
+  assert.equal(shortNames(["Dana Lee", "Sam Ortiz", "Ana Ruiz"]), "Dana Lee and 2 others");
+});
+
+test("[Tenant] and [tenant name] take the names; a phone fill-in starting with tenant takes the primary's phone", () => {
+  const home = { names: ["Dana Lee", "Sam Ortiz"], phone: "716-555-1234 ext 2" };
+  assert.equal(isTenantNameToken("Tenant"), true);
+  assert.equal(isTenantNameToken("tenant name"), true);
+  assert.equal(isTenantNameToken("tenant email"), false);
+  for (const t of ["tenant number", "Tenant phone", "tenant cell", "tenant mobile"]) {
+    assert.equal(isTenantPhoneToken(t), true, t);
+    assert.equal(tenantPrefill(t, home), "716-555-1234 ext 2", t);
+  }
+  for (const t of ["Tenant", "tenant name"]) assert.equal(tenantPrefill(t, home), "Dana Lee and Sam Ortiz", t);
+  // Nothing else prefills: not the email, not someone else's phone, not the address.
+  for (const t of ["tenant email", "owner phone", "cell", "Address", "unit number"]) assert.equal(tenantPrefill(t, home), undefined, t);
+  // No phone on file: the field stays blank. Nobody living there: nothing prefills.
+  assert.equal(tenantPrefill("tenant number", { names: ["Dana Lee"], phone: null }), undefined);
+  assert.equal(tenantPrefill("Tenant", null), undefined);
+  assert.equal(tenantPrefill("Tenant", { names: [], phone: null }), undefined);
+});
+
+test("a move-in playbook prefills nothing: its tenants are new", () => {
+  const home = { names: ["Dana Lee"], phone: "716-555-1234" };
+  assert.equal(prefillHousehold("move-in", home), null);
+  assert.equal(prefillHousehold("move-out", home), home);
+  assert.equal(prefillHousehold(null, home), home);
+  assert.equal(prefillHousehold(null, undefined), null);
+});
+
+test("the prefill is a computed default: it never lands in the typed values, and anything typed wins", () => {
+  const home = { names: ["Dana Lee", "Sam Ortiz"], phone: "716-555-1234" };
+  const typed = Object.freeze({}) as Record<string, string>;
+  const defaults = { address: "767 Prospect", household: home };
+  assert.equal(fillInValue("Tenant", typed, defaults), "Dana Lee and Sam Ortiz");
+  assert.equal(fillInValue("tenant number", typed, defaults), "716-555-1234");
+  assert.equal(fillInValue("property address", typed, defaults), "767 Prospect");
+  assert.equal(fillInValue("tenant email", typed, defaults), "");
+  // Nothing was written into what was typed, so the draft and the changed check never see the prefill.
+  assert.deepEqual(typed, {});
+  // Typing over it wins, and so does clearing it.
+  assert.equal(fillInValue("Tenant", { Tenant: "Ana Ruiz" }, defaults), "Ana Ruiz");
+  assert.equal(fillInValue("Tenant", { Tenant: "" }, defaults), "");
+  // No household, no address: blank.
+  assert.equal(fillInValue("Tenant", {}, {}), "");
+});
+
+test("a home names one household with a unit picked or a building of one unit", () => {
+  assert.equal(homeResolves(["1", "2"], "2"), true);
+  assert.equal(homeResolves(["1", "2"], null), false, "a building with several units and none picked");
+  assert.equal(homeResolves(["Front", "HSE (house)"], null), true, "the house meter isn't a unit");
+  assert.equal(homeResolves([], null), true, "a whole house");
+  assert.equal(homeResolves(["Front", "HSE (house)"], "HSE (house)"), false);
+});
+
+test("the lease box reads what Apply will do, with the playbook's date", () => {
+  const today = "2026-11-20";
+  assert.equal(createLeaseLabel("Dana Lee", leaseWhere("767 Prospect", "2"), "2026-12-01", today), "Create a lease for Dana Lee at Unit 2, moving in Dec 1");
+  assert.equal(createLeaseLabel(" Dana  Lee ", leaseWhere("767 Prospect", null), "2027-02-01", today), "Create a lease for Dana Lee at 767 Prospect, moving in Feb 1, 2027");
+  assert.equal(leaseWhere("647 Prospect", "Front"), "Front");
+  assert.equal(moveOutLabel(["Dana Lee", "Sam Ortiz"], "2026-12-31", today), "Set Dana Lee and Sam Ortiz to move out Dec 31");
+  assert.equal(moveOutLabel(["Dana Lee", "Sam Ortiz", "Ana Ruiz"], "2026-12-31", today), "Set Dana Lee and 2 others to move out Dec 31");
+  assert.equal(moveOutLabel(["Dana Lee"], "2026-12-31", today), "Set Dana Lee to move out Dec 31");
+});
+
+test("the toast says what happened to the lease in its second clause, short enough to sit beside the count", () => {
+  const today = "2026-11-20";
+  assert.equal(appliedLeaseLine({ kind: "move-in", name: "Dana Lee" }, today), "Lease created for Dana Lee");
+  assert.equal(appliedLeaseLine({ kind: "move-out", names: ["Dana Lee", "Sam Ortiz"], movesOut: "2026-12-31" }, today), "Dana Lee and Sam Ortiz move out Dec 31");
+  assert.equal(appliedLeaseLine({ kind: "move-out", names: ["Dana Lee"], movesOut: "2026-12-31" }, today), "Dana Lee moves out Dec 31");
+  const whole = `10 tasks created for 767 Prospect Ave. · ${appliedLeaseLine({ kind: "move-out", names: ["Dana Lee", "Sam Ortiz", "Ana Ruiz"], movesOut: "2027-01-31" }, today)}`;
+  assert.ok(whole.length <= 90, whole);
+  assert.match(UNTICK_LEASE, /^Untick the box/);
+});
+
+test("a refused lease write ends with the way through, short on a phone", () => {
+  // The way through is never cut (SaveError's action), so on a 375 phone it leaves the refusal about 30 characters.
+  assert.equal(UNTICK_LEASE, "Untick the box to apply without it.");
+  assert.equal(UNTICK_LEASE_SHORT, "Untick to skip it.");
+  assert.ok(UNTICK_LEASE_SHORT.length <= 18);
 });

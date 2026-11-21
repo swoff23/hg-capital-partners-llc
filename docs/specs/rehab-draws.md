@@ -26,7 +26,7 @@ Planned with Connor on Nov 20, 2026, one question at a time (R1 to R11 below), a
 | R3 | MVP: no payments or costs. The next draw stays open as a running draft that Pieter fills in as work wraps up, like Vontive's next column today. Its total is ready to draw. Over or under in the MVP compares funded, at the lender and draft against the revised budget per line; true spend comes with costs later |
 | R4 | Five stages: Draft, Sent (date, amount sent), Inspection, Approved (approved amount), Funded (date, amount that landed). A Waiting on us flag with a short note can sit on any stage after Draft. Each draw shows its days in the current stage. (Nov 20: the Waiting on us flag was removed; see section 10.) |
 | R5 | Pieter moves stages by hand in the MVP. Forwarding lender emails to a draws@ address that suggests the next stage is the first add-on. Reading Pieter's Gmail directly is out |
-| R6 | One rehab per loan. A rehab links one or more properties and shows on each of their pages |
+| R6 | One rehab per loan. A rehab links one or more properties and shows on each of their pages. (Nov 20: New rehab picks one property, and its "More than one property" switch links several for a shared loan; Edit rehab can add one later.) |
 | R7 | A Vontive rehab is set up by uploading its Renovation Draw Worksheet (.xlsx): lines, change orders, the rehab holdback and every past draw. Anything else is typed: line name, original and change order. The upload happens once, at setup; after that the app is the record |
 | R8 | When the lender splits the budget by unit, lines are grouped under each unit with its own totals, and the draft is filled per unit. A rehab without a split shows a plain list |
 | R9 | Tasks stay out of the MVP. Linking them to lines gives a hint ("2 of 3 done") but no dollars, since tasks carry no cost |
@@ -76,7 +76,7 @@ Per draw: **sent** is the draft's total at the moment it's marked Sent. **Approv
 
 On the Draws page, across open rehabs: **ready to draw** = the drafts' totals; **at the lender** = sent amounts in Sent and Inspection plus approved amounts in Approved; **funded** and **left in budgets** add up the lines.
 
-A rehab's **holdback** comes from the worksheet's Initial Rehab Holdback, or the lines' original total when typed. When the revised total stops matching it, the rehab says so, since a lender won't raise it.
+A rehab's **holdback** is typed at New rehab (Nov 20). A rehab whose holdback was cleared takes the worksheet's Initial Rehab Holdback on upload, and with none at all its lines' original total stands in. When the revised total stops matching it, the rehab says so, since a lender won't raise it.
 
 ## 5. Data
 
@@ -99,7 +99,7 @@ Picked with Connor on Nov 20, one at a time, each drawn as low-fi options at lap
 | L1 | **The Draws page** is the totals strip (`FactStrip`: Ready to draw, At the lender, Funded, Left) over one table of open rehabs: Rehab, Current draw, Ready, Left and a Funded meter. The current draw cell reads "Draw 4 · Inspection · 6 days", or "Waiting on us" in the warning color. A row opens the rehab. It's built like the Portfolio page. A separate "In progress" list of draws above the table was turned down: every open draw would show twice |
 | L2 | **A rehab is its own page** (`/draws/[id]`), laid out like the lease page: a BackLink to Draws, the rehab's figures (Holdback, Funded, At the lender, Ready, Left), then Budget and Draws sections in the main column, and a sticky Details rail with the lender, the holdback and the properties as links (Connor, Nov 20, dropped the loan's maturity and notes from it). Not a sheet over the list as deals open: 20 to 40 lines and a typed draft don't fit 672px, and the property pages link to it |
 | L3 | **The property page shows a Rehab section right after Tasks** while a rehab is open: the current draw with its stage and days, a Meter for funded of the holdback, ready and left, and Open rehab. A Rehabbing property with no rehab shows Add rehab there. A done rehab leaves the property page and stays under Done on Draws. Not in the rail under Loan: below laptop width the rail stacks under the whole main column |
-| L4 | **New rehab is a short sheet** (properties, prefilled when it starts from a property, and the lender). The rehab page then opens with an empty Budget offering Upload Vontive's worksheet or Add a line. An upload shows what it found (units, lines, holdback, past draws, and that past draws arrive as Funded without dates) before Add to rehab saves it. Typed lines use the same table's Add a line. Not one stepped sheet: 40 typed lines cramp it, and it would be a second place that edits a budget |
+| L4 | **New rehab is a short sheet** (one property, prefilled when it starts from a property, a "More than one property" switch, the holdback, and the lender; Nov 20). The rehab page then opens with an empty Budget offering Upload Vontive's worksheet or Add a line. An upload shows what it found (units, lines, past draws, and that past draws arrive as Funded without dates) before Add to rehab saves it; the worksheet's holdback shows only when it differs from the one typed, which stays. Typed lines use the same table's Add a line. Not one stepped sheet: 40 typed lines cramp it, and it would be a second place that edits a budget |
 
 **At each size.**
 
@@ -151,7 +151,7 @@ Also the Snowflake cost table on Mobbin ([Mobbin](https://mobbin.com/screens/acf
 
 ## 9. Conflict to settle when costs are planned
 
-The contractor invoices plan (docs/contractor-invoices-plan.md, Oct 23) keeps an invoice as "a total plus the jobs it covers", says "the app isn't for reconciling to properties" (I4), and covers contractor invoices only (I11). Costs on budget lines need invoices, and materials receipts, tied to a rehab and a line. It doesn't touch this MVP. Decide it when costs get their own planning pass; that plan carries a note pointing here.
+The contractor invoices plan (Oct 23, now docs/specs/contractor-invoices/full-plan.md; the Nov 20 MVP in docs/contractor-invoices-plan.md lists a rehab link under Later) keeps an invoice as "a total plus the jobs it covers", says "the app isn't for reconciling to properties" (I4), and covers contractor invoices only (I11). Costs on budget lines need invoices, and materials receipts, tied to a rehab and a line. It doesn't touch this MVP. Decide it when costs get their own planning pass; that plan carries a note pointing here.
 
 ## 10. Build notes (Nov 20)
 
@@ -177,6 +177,10 @@ Connor's calls during the build, all in the code:
 - **Requested** on the Draws list: each rehab's current draw's requested amount, beside Current draw.
 - **The draw sheet's Delete draw** sits at the footer's bottom left, opposite Cancel and Save draw (FormSheet's `footerStart`).
 - **The rehab's Draws rows** are one line each (Connor picked option A, "action on the row"): the stage mark, "Draw 3 · $12,000" over its stage, and the next-step button at the right, the way Deel's Action required rows carry approve ([Deel](https://mobbin.com/screens/ebede796-0ca0-408a-bf05-630420732e1f)). The mark is the status ring's stage variant, as deal stages use it: Sent a quarter, Inspection half, Approved three-quarters, Funded the Done check. Where a row is under 320px (a 320 phone), the button reads only the stage it moves to ("Approved") so the amount is never cut off.
+
+**New rehab picks one property and needs the holdback** (Connor, Nov 20, option A). The property is the stock `PropertyPicker` as a field, the way New lease picks one; Holdback is a required money field, the budget the lender holds back to draw from. Leaving either out says so on its field ("Pick the property.", "Enter the holdback."). A loan over two properties, like 765 and 767 Prospect, still makes one rehab, so one worksheet stays one rehab. Option B, one property everywhere, was turned down because a shared worksheet won't split.
+
+**"More than one property" (Connor, Nov 21, option A).** A stock `Switch` under the property field, off by default, the way "Month to month" changes the lease term sheet's fields. On, the picker becomes Edit rehab's Properties field (`TagsField`), keeping the property already picked as the first; off again keeps the first pick. The rehab is named for all its properties ("765 and 767 Prospect Avenue") and takes one holdback, since one worksheet covers them. Leaving it empty says "Pick at least one property." Edit rehab in the ⋯ menu can still add a property later. Option B, a picker row per property with Add property, was turned down: a taller sheet and a second way to pick many. Uploading the worksheet keeps the typed holdback; when the two differ, its preview lists "Worksheet holdback $X" and "Your holdback stays $Y" (two short lines, since one wraps on a phone), so a typo shows before Add to rehab.
 
 The device check's setup seeds one small open rehab when a local DB has none, so /draws/[id] always has a page.
 

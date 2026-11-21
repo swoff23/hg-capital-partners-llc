@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1033" height="1234" viewBox="0 0 1033 1234">
+<title>Two small visual calls</title>
+<rect width="1033" height="1234" fill="#ffffff"/>
+<defs><clipPath id="c1"><rect x="0" y="0" width="1280" height="300"/></clipPath><clipPath id="c2"><rect x="0" y="0" width="375" height="300"/></clipPath><clipPath id="c3"><rect x="0" y="0" width="1280" height="300"/></clipPath><clipPath id="c4"><rect x="0" y="0" width="375" height="300"/></clipPath><clipPath id="c5"><rect x="0" y="0" width="375" height="210"/></clipPath><clipPath id="c6"><rect x="0" y="0" width="375" height="210"/></clipPath></defs>
+<text x="32" y="40" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="18" font-weight="600" fill="#152133">Two small visual calls</text>
+<text x="32" y="62" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Both are drawn in the screens one way; these show the alternative so you can pick.</text>
+<text x="32" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">1A. The ⋯ menu on the title line</text>
+<rect x="276.908" y="71" width="104" height="18" rx="9" fill="#152133"/>
+<text x="328.908" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#ffffff" text-anchor="middle">Recommended</text>
+<text x="32" y="104" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Where every other record page keeps it (task, deal, property, contractor). The bar holds only the next step.</text>
+<text x="32" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Invoice page, To review</text>
+<g transform="translate(32.0,152.0) scale(0.55)"><g clip-path="url(#c1)"><rect x="0" y="0" width="1280" height="300" rx="0" fill="#ffffff"/>
+<text x="32" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="32" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="1216" y="40" width="32" height="32" rx="6" fill="none"/>
+<g transform="translate(1224.0,48.0) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="32" y="84" width="560" height="140" rx="8" fill="#f2f0ec"/>
+<rect x="88.0" y="100" width="448.0" height="108" rx="0" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="104.0" y="118" width="156.79999999999998" height="10" rx="0" fill="#d5d1ca"/>
+<rect x="104.0" y="152" width="249.6" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="385.6" y="174" width="134.4" height="10" rx="0" fill="#d5d1ca"/>
+<text x="44" y="216" font-size="11" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="624" y="96" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="624" y="102" width="300" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="122.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="940" y="96" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="940" y="102" width="300" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="950" y="122.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<rect x="0" y="240" width="1280" height="60" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="240" x2="1280" y2="240" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="1173.3" y="254" width="74.7" height="32" rx="6" fill="#152133"/>
+<text x="1185.3" y="274.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text></g><rect x="0" y="0" width="1280" height="300" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="776.0" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Invoice page, To review</text>
+<g transform="translate(776.0,152.0) scale(0.6)"><g clip-path="url(#c2)"><rect x="0" y="0" width="375" height="300" rx="0" fill="#ffffff"/>
+<text x="16" y="28" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="16" y="60" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="315" y="36" width="44" height="44" rx="6" fill="none"/>
+<g transform="translate(329.0,50.0) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="16" y="80" width="343" height="56" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="26" y="90" width="36" height="36" rx="6" fill="#f2f0ec"/>
+<g transform="translate(35.0,99.0) scale(0.7500)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></g>
+<text x="72" y="106.0" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="72" y="122.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">PDF · 182 KB</text>
+<text x="345" y="112.5" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Open</text>
+<text x="16" y="162" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="16" y="168" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="194.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<rect x="0" y="224" width="375" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="224" x2="375" y2="224" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="240" width="343" height="44" rx="6" fill="#152133"/>
+<text x="162.15" y="266.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text></g><rect x="0" y="0" width="375" height="300" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="380.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">1B. The ⋯ menu in the bottom bar</text>
+<text x="32" y="400.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">As the spec and screen 03 drew it: beside Approve, so it never moves between stages.</text>
+<text x="32" y="424.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="439.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Invoice page, To review</text>
+<g transform="translate(32.0,448.0) scale(0.55)"><g clip-path="url(#c3)"><rect x="0" y="0" width="1280" height="300" rx="0" fill="#ffffff"/>
+<text x="32" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="32" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="32" y="84" width="560" height="140" rx="8" fill="#f2f0ec"/>
+<rect x="88.0" y="100" width="448.0" height="108" rx="0" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="104.0" y="118" width="156.79999999999998" height="10" rx="0" fill="#d5d1ca"/>
+<rect x="104.0" y="152" width="249.6" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="385.6" y="174" width="134.4" height="10" rx="0" fill="#d5d1ca"/>
+<text x="44" y="216" font-size="11" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="624" y="96" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="624" y="102" width="300" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="122.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="940" y="96" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="940" y="102" width="300" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="950" y="122.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<rect x="0" y="240" width="1280" height="60" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="240" x2="1280" y2="240" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="1173.3" y="254" width="74.7" height="32" rx="6" fill="#152133"/>
+<text x="1185.3" y="274.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text>
+<rect x="1133.3" y="254" width="32" height="32" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(1141.3,262.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g></g><rect x="0" y="0" width="1280" height="300" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="424.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="776.0" y="439.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Invoice page, To review</text>
+<g transform="translate(776.0,448.0) scale(0.6)"><g clip-path="url(#c4)"><rect x="0" y="0" width="375" height="300" rx="0" fill="#ffffff"/>
+<text x="16" y="28" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="16" y="60" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="16" y="80" width="343" height="56" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="26" y="90" width="36" height="36" rx="6" fill="#f2f0ec"/>
+<g transform="translate(35.0,99.0) scale(0.7500)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></g>
+<text x="72" y="106.0" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="72" y="122.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">PDF · 182 KB</text>
+<text x="345" y="112.5" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Open</text>
+<text x="16" y="162" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="16" y="168" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="194.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<rect x="0" y="224" width="375" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="224" x2="375" y2="224" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="240" width="44" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(30.0,254.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="68" y="240" width="291" height="44" rx="6" fill="#152133"/>
+<text x="188.15" y="266.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text></g><rect x="0" y="0" width="375" height="300" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="676.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">2A. One stage word</text>
+<rect x="188.45600000000005" y="663.0" width="104" height="18" rx="9" fill="#152133"/>
+<text x="240.45600000000005" y="676.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#ffffff" text-anchor="middle">Recommended</text>
+<text x="32" y="696.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">The same word in the same spot as on Your invoices: Received, Approved, Paid with its date.</text>
+<text x="32" y="720.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="32" y="735.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Contractor job page, Invoices</text>
+<g transform="translate(32.0,744.0) scale(0.6)"><g clip-path="url(#c5)"><rect x="0" y="0" width="375" height="210" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<line x1="16" y1="48" x2="359" y2="48" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="60" width="36" height="36" rx="6" fill="#f2f0ec"/>
+<g transform="translate(26,70) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2Z"/><path d="M8 8h8"/><path d="M8 12h8"/></g>
+<text x="64" y="76" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<text x="64" y="94" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00 · Sent Nov 18</text>
+<text x="359" y="84" font-size="13" font-weight="500" fill="#424e61" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Approved</text>
+<line x1="16" y1="124" x2="359" y2="124" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="136" width="36" height="36" rx="6" fill="#f2f0ec"/>
+<g transform="translate(26,146) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2Z"/><path d="M8 8h8"/><path d="M8 12h8"/></g>
+<text x="64" y="152" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1041</text>
+<text x="64" y="170" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$300.00 · Sent Nov 15</text>
+<text x="359" y="160" font-size="13" font-weight="500" fill="#1d7038" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 13</text></g><rect x="0" y="0" width="375" height="210" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="918.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">2B. Three steps</text>
+<text x="32" y="938.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">As screen 06 drew it: Received, Approved, Paid as dots, filled when reached.</text>
+<text x="32" y="962.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="32" y="977.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Contractor job page, Invoices</text>
+<g transform="translate(32.0,986.0) scale(0.6)"><g clip-path="url(#c6)"><rect x="0" y="0" width="375" height="210" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<line x1="16" y1="48" x2="359" y2="48" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="60" width="36" height="36" rx="6" fill="#f2f0ec"/>
+<g transform="translate(26,70) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2Z"/><path d="M8 8h8"/><path d="M8 12h8"/></g>
+<text x="64" y="76" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<text x="64" y="94" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00 · Sent Nov 18</text>
+<circle cx="68" cy="110" r="4" fill="#152133" stroke="#152133" stroke-width="1"/>
+<text x="76" y="114" font-size="11" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Received</text>
+<circle cx="138.27679999999998" cy="110" r="4" fill="#152133" stroke="#152133" stroke-width="1"/>
+<text x="146.27679999999998" y="114" font-size="11" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approved</text>
+<circle cx="209.4688" cy="110" r="4" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="217.4688" y="114" font-size="11" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<line x1="16" y1="124" x2="359" y2="124" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="136" width="36" height="36" rx="6" fill="#f2f0ec"/>
+<g transform="translate(26,146) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2Z"/><path d="M8 8h8"/><path d="M8 12h8"/></g>
+<text x="64" y="152" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1041</text>
+<text x="64" y="170" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$300.00 · Sent Nov 15</text>
+<circle cx="68" cy="186" r="4" fill="#152133" stroke="#152133" stroke-width="1"/>
+<text x="76" y="190" font-size="11" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Received</text>
+<circle cx="138.27679999999998" cy="186" r="4" fill="#152133" stroke="#152133" stroke-width="1"/>
+<text x="146.27679999999998" y="190" font-size="11" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approved</text>
+<circle cx="209.4688" cy="186" r="4" fill="#1d7038" stroke="#1d7038" stroke-width="1"/>
+<text x="217.4688" y="190" font-size="11" font-weight="500" fill="#1d7038" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text></g><rect x="0" y="0" width="375" height="210" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="1160.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#152133">Notes</text>
+<circle cx="40" cy="1178.0" r="8" fill="#c8a765"/>
+<text x="40" y="1182.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">1</text>
+<text x="56" y="1182.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">1A follows docs/components.md (RecordMoreMenu, the ghost ⋯ on the title's first line); one place for ⋯ across the app.</text>
+<circle cx="40" cy="1198.0" r="8" fill="#c8a765"/>
+<text x="40" y="1202.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">2</text>
+<text x="56" y="1202.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">2A matches screen 07 and the plain-words rule for stages; 2B adds a second way to show the same thing.</text>
+</svg>

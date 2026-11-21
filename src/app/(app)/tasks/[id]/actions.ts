@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { withLog, withResult } from "@/lib/server-action";
 import { checklistItemText, commentText, notesText, titleText, unitText, waitingOnText } from "@/lib/tasks/limits-schema";
 import { repeatRuleSchema } from "@/lib/tasks/repeat-schema";
+import { saveClosedNote } from "@/lib/residents/requests";
 import * as tasks from "@/lib/tasks/service";
 
 /**
@@ -57,6 +58,8 @@ const statusOptsSchema = z
     note: z.string().max(2000).nullable(),
     // The status the page showed: a change from a stale page is refused.
     expected: statusSchema,
+    // Canceled on a resident's request: the note they see (docs/specs/maintenance-requests.md, section 4.2).
+    closedNote: z.string().max(500),
   })
   .partial()
   .strict();
@@ -69,7 +72,10 @@ export async function setTaskStatus(
 ): Promise<ActionResult> {
   return withResult("setTaskStatus", async () => {
     const user = await requireUser();
-    await tasks.setTaskStatus(id.parse(taskId), statusSchema.parse(to), tasks.staffPrincipal(user), statusOptsSchema.parse(opts));
+    const { closedNote, ...rest } = statusOptsSchema.parse(opts);
+    const status = statusSchema.parse(to);
+    await tasks.setTaskStatus(id.parse(taskId), status, tasks.staffPrincipal(user), rest);
+    if (status === "CANCELED" && closedNote !== undefined) await saveClosedNote(taskId, closedNote);
   });
 }
 

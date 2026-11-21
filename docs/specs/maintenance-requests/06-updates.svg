@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Question 5: how residents hear about updates. A, email. B, texts from an HG Capital number. C (recommended), email at launch and texts once the carriers approve the number.</title>
+<rect width="900" height="600" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Question 5: how do residents hear that something changed?</text>
+<text x="32" y="56" font-size="11" fill="#424e61">The message a resident gets when their repair is scheduled. Each one links back to their status page.</text>
+
+<!-- A -->
+<g transform="translate(32 76)">
+<rect x="0" y="0" width="260" height="446" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">A. Email</text>
+
+<rect x="20" y="48" width="220" height="250" rx="18" fill="#ffffff" stroke="#152133"/>
+<text x="36" y="72" font-size="9" fill="#8f99a8">From HG Capital</text>
+<text x="36" y="96" font-size="13" font-weight="600" fill="#152133">Scheduled for Tue, Nov 25</text>
+<text x="36" y="114" font-size="10" fill="#424e61">Kitchen sink leaks</text>
+<text x="36" y="128" font-size="10" fill="#424e61">56 Tamarack St, Upper</text>
+<text x="36" y="152" font-size="10" fill="#152133">You said we can let ourselves in.</text>
+<rect x="36" y="168" width="188" height="32" rx="8" fill="#152133"/>
+<text x="130" y="188" font-size="11" font-weight="500" fill="#ffffff" text-anchor="middle">See your request</text>
+
+<text x="20" y="326" font-size="10.5" fill="#152133">• Works on day one, no new service.</text>
+<text x="20" y="346" font-size="10.5" fill="#152133">• 51 of 60 tenants have an email on file.</text>
+<text x="20" y="366" font-size="10.5" fill="#152133">• Easy to miss: lots of residents rarely</text>
+<text x="28" y="380" font-size="10.5" fill="#152133">open email, so they text to ask.</text>
+</g>
+
+<!-- B -->
+<g transform="translate(320 76)">
+<rect x="0" y="0" width="260" height="446" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">B. Texts</text>
+
+<rect x="20" y="48" width="220" height="250" rx="18" fill="#ffffff" stroke="#152133"/>
+<text x="130" y="72" font-size="10" font-weight="500" fill="#152133" text-anchor="middle">HG Capital</text>
+<line x1="20" y1="82" x2="240" y2="82" stroke="#eceef1"/>
+<rect x="34" y="96" width="172" height="104" rx="14" fill="#eceef1"/>
+<text x="46" y="116" font-size="10" fill="#152133">HG Capital: your kitchen sink</text>
+<text x="46" y="130" font-size="10" fill="#152133">repair is scheduled for Tue,</text>
+<text x="46" y="144" font-size="10" fill="#152133">Nov 25. See it here:</text>
+<text x="46" y="158" font-size="10" fill="#152133" text-decoration="underline">hgcapitalpartners.com/r/7Kq</text>
+<text x="46" y="184" font-size="9" fill="#424e61">Reply STOP to stop texts.</text>
+
+<text x="20" y="326" font-size="10.5" fill="#152133">• What they read: they already text you.</text>
+<text x="20" y="346" font-size="10.5" fill="#152133">• A new service (Twilio) and an HG</text>
+<text x="28" y="360" font-size="10.5" fill="#152133">Capital number, not your cells.</text>
+<text x="20" y="380" font-size="10.5" fill="#152133">• About $61 to set up, about $12 a</text>
+<text x="28" y="394" font-size="10.5" fill="#152133">month, about a cent a text.</text>
+<text x="20" y="414" font-size="10.5" fill="#152133">• Nothing sends until the carriers</text>
+<text x="28" y="428" font-size="10.5" fill="#152133">approve the number.</text>
+</g>
+
+<!-- C -->
+<g transform="translate(608 76)">
+<rect x="0" y="0" width="260" height="446" rx="10" fill="none" stroke="#c9a96a" stroke-width="1.5"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">C. Email first, then texts</text>
+<rect x="20" y="40" width="92" height="20" rx="10" fill="#f6efe1"/>
+<text x="66" y="54" font-size="10" font-weight="500" fill="#8a6d2f" text-anchor="middle">Recommended</text>
+
+<circle cx="36" cy="96" r="6" fill="#152133"/>
+<text x="52" y="100" font-size="11" font-weight="500" fill="#152133">Launch</text>
+<text x="52" y="116" font-size="10" fill="#424e61">Emails, like A. Start the number's</text>
+<text x="52" y="130" font-size="10" fill="#424e61">carrier registration the same day.</text>
+<line x1="36" y1="104" x2="36" y2="170" stroke="#d9dde3"/>
+<circle cx="36" cy="176" r="6" fill="#ffffff" stroke="#152133"/>
+<text x="52" y="180" font-size="11" font-weight="500" fill="#152133">Number approved</text>
+<text x="52" y="196" font-size="10" fill="#424e61">Texts switch on, like B. Email</text>
+<text x="52" y="210" font-size="10" fill="#424e61">still goes to anyone who has no</text>
+<text x="52" y="224" font-size="10" fill="#424e61">phone or texted STOP.</text>
+
+<text x="20" y="326" font-size="10.5" fill="#152133">• Nobody waits on the carriers.</text>
+<text x="20" y="346" font-size="10.5" fill="#152133">• Ends up where they read: texts.</text>
+<text x="20" y="366" font-size="10.5" fill="#152133">• Same cost as B once texts are on.</text>
+</g>
+
+<text x="32" y="556" font-size="11" fill="#424e61">What sends a message: scheduled with the day, the day changes, done, or closed with your line. Comments and internal changes never do.</text>
+<text x="32" y="574" font-size="11" fill="#424e61">Replies to these come up in a later question. Sizes: these are the resident's own Mail and Messages apps.</text>
+</svg>

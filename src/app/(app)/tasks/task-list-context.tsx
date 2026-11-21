@@ -1,5 +1,6 @@
 "use client";
-import { createContext, useContext, useMemo, useOptimistic, useState, useTransition, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { createContext, useContext, useEffect, useMemo, useOptimistic, useRef, useState, useTransition, type ReactNode } from "react";
 import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/components/assignee-picker";
 import { assigneeRows } from "@/components/entity-picker";
 import type { OptionItem, OptionSection } from "@/components/option-list";
@@ -13,15 +14,19 @@ import {
   doneMessage,
   movedAllMessage,
   movedMessage,
-  targetField,
   tickPlan,
+  toastDay,
   type DateChange,
   type ListAssignee,
   type ListPatch,
   type ListTask,
 } from "@/lib/tasks/list";
+import { personRefs } from "@/lib/tasks/assignee-people";
 import { shortName } from "@/lib/tasks/list-sort";
 import { updateTask } from "./[id]/actions";
+import { addedLine, applyDraftChange, discardedLine, undoAddLine, undoDiscardLine, type DraftChange, type DraftLine, type DraftTask } from "./draft-copy";
+import { addDraftTask, addDraftTasks, discardDraftTask, discardDraftTasks, restoreDraftTasks, undoAddDraftTasks, type AddedDraftResult } from "./draft-actions";
+import { focusPressed, keepFocusBeyond, pressedControl, type PressedControl } from "./draft-focus";
 import { approveTask, rescheduleTasks, sendBackTask, setTaskDone, undoApprove, undoDone, undoReschedule } from "./list-actions";
 
 /**
@@ -54,8 +59,8 @@ interface TaskListApi {
   peopleRows: { pinned: OptionItem[]; sections: OptionSection[] } | null;
   /** Reassign from the row: the task service refuses it when someone else reassigned the task since the list loaded. */
   assign: (task: ListTask, to: AssigneeValue) => void;
-  /** "due" for staff tasks; "target" moves a contractor job's visit date while it's Scheduled. */
-  reschedule: (task: ListTask, to: Ymd | null, which: "due" | "target") => void;
+  /** "due" moves the due date; "scheduled" moves a Scheduled job's day (never cleared). */
+  reschedule: (task: ListTask, to: Ymd | null, which: "due" | "scheduled") => void;
   moveAllToToday: (tasks: ListTask[]) => void;
   setDone: (task: ListTask, done: boolean) => void;
   approve: (task: ListTask) => void;
@@ -67,6 +72,19 @@ interface TaskListApi {
    * then `onDone` with its answer; a refusal toasts why and puts the rows back.
    */
   runEdit: <T>(optimistic: ListPatch, action: () => Promise<ActionResult<T>>, onDone?: (data: T) => void, onFailed?: () => void) => void;
+  /**
+   * The drafts from Claude the Tasks page shows (mine and the other partner's), less any Add or Discard that is
+   * saving. Kept apart from `tasks`: a draft is in no list, count or filter (docs/specs/tasks-from-claude.md 6.2).
+   */
+  drafts: DraftTask[];
+  /** Add on a draft's row: it becomes a To do task; toasts what happened and who hears, with an Undo. */
+  addDraft: (task: DraftTask) => void;
+  /** Add all: every draft in My drafts, in one go or not at all. */
+  addAllDrafts: (tasks: DraftTask[]) => void;
+  /** Discard on a draft's row: gone at once, with an Undo that brings it back. */
+  discardDraft: (task: DraftTask) => void;
+  /** Discard all: every draft in My drafts, with one Undo. */
+  discardAllDrafts: (tasks: DraftTask[]) => void;
 }
 
 const TaskListContext = createContext<TaskListApi | null>(null);
@@ -92,17 +110,22 @@ export function TaskListProvider({
   tasks: rows,
   today,
   people = null,
+  drafts: draftRows = [],
   children,
 }: {
   tasks: ListTask[];
   today: Ymd;
   people?: TaskPeople | null;
+  /** The Tasks page's drafts, mine and the other partner's, in one list. */
+  drafts?: DraftTask[];
   children: ReactNode;
 }) {
   const [tasks, patch] = useOptimistic(rows, applyPatch);
+  const [drafts, patchDrafts] = useOptimistic(draftRows, applyDraftChange);
   const [, startTransition] = useTransition();
   const { toast } = useToast();
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const router = useRouter();
+  const [sendBackNotes, setSendBackNotes] = useState<Record<string, string>>({});
   const peopleRows = useMemo(
     () => (people ? assigneeRows({ users: people.users, contractors: people.contractors, meId: people.meId, recent: people.recent }) : null),
     [people],
@@ -120,8 +143,80 @@ export function TaskListProvider({
     });
   }
 
+  /**
+   * A draft's Add or Discard, or an Undo of one: the rows change at once (the Undo's rows are drawn from the change
+   * itself, DraftSections) and the page's refresh settles them. A refusal puts them as they were and says why.
+   */
+  function runDraft<T>(change: DraftChange, action: () => Promise<ActionResult<T>>, onDone?: (data: T, refused: () => void) => void) {
+    // The row's button is about to leave with its row: focus goes to the next row first (draft-focus.ts).
+    let pressed: PressedControl | null = null;
+    if (change.kind === "hide") {
+      pressed = pressedControl();
+      const movedTo = keepFocusBeyond(new Set(change.ids));
+      if (pressed) pressed.movedTo = movedTo;
+    }
+    // A refusal brings the rows back, and focus goes back to the control that was pressed once they are (effect below).
+    const refused = () => {
+      refocus.current = pressed;
+    };
+    startTransition(async () => {
+      patchDrafts(change);
+      const result = await callAction(action);
+      if (result.ok) onDone?.(result.data, refused);
+      else {
+        toast({ message: result.error });
+        refused();
+      }
+    });
+  }
+  const refocus = useRef<PressedControl | null>(null);
+  useEffect(() => {
+    if (refocus.current && focusPressed(refocus.current)) refocus.current = null;
+  }, [drafts]);
+
+  const draftPeople = useMemo(() => (people ? personRefs(people.users, people.contractors) : []), [people]);
+
+  function toastLine(line: DraftLine, extra: { action?: { label: string; onAction: () => void } } = {}) {
+    toast({ ...line, ...extra });
+  }
+
+  /** Add's toast: what happened and who hears, with an Undo that makes them drafts again (the server holds it to two minutes). */
+  function announceAdded(added: AddedDraftResult[], list: DraftTask[]) {
+    if (added.length === 0) return;
+    const adds = added.map(({ taskId, addEventId }) => ({ taskId, addEventId }));
+    const shown = list.filter((t) => added.some((a) => a.taskId === t.id));
+    toastLine(addedLine(added.map((a) => a.contractor), draftPeople), {
+      action: {
+        label: "Undo",
+        onAction: () =>
+          // The drafts are drawn again at once; what stayed a task goes again when the answer comes (the page's refresh).
+          runDraft({ kind: "show", tasks: shown }, () => undoAddDraftTasks(adds), (out) => {
+            const line = undoAddLine(adds.length, out.undone.length, out.kept);
+            if (line) toastLine(line);
+          }),
+      },
+    });
+  }
+
+  /** Discard's toast, with an Undo that brings the drafts back by their ids. */
+  function announceDiscarded(ids: string[], list: DraftTask[]) {
+    if (ids.length === 0) return;
+    const gone = new Set(ids);
+    const shown = list.filter((t) => gone.has(t.id));
+    toastLine(discardedLine(ids.length), {
+      action: {
+        label: "Undo",
+        onAction: () =>
+          runDraft({ kind: "show", tasks: shown }, () => restoreDraftTasks(ids), (out) => {
+            const line = undoDiscardLine(ids.length, out.restored.length, out.gone.length);
+            if (line) toastLine(line);
+          }),
+      },
+    });
+  }
+
   function keepDraft(taskId: string, note: string | null) {
-    setDrafts((all) => {
+    setSendBackNotes((all) => {
       const next = { ...all };
       if (note) next[taskId] = note;
       else delete next[taskId];
@@ -172,8 +267,12 @@ export function TaskListProvider({
       );
     },
     reschedule(task, to, which) {
-      const field = which === "target" ? targetField(task) : "dueDate";
-      run({ kind: "dates", changes: [{ id: task.id, field, value: to }] }, () => rescheduleTasks([task.id], to, which), moved(movedMessage(to)));
+      const field = which === "scheduled" ? "scheduledFor" : "dueDate";
+      run(
+        { kind: "dates", changes: [{ id: task.id, field, value: to }] },
+        () => rescheduleTasks([task.id], to, which),
+        moved(which === "scheduled" && to ? `Scheduled for ${toastDay(to)}` : movedMessage(to)),
+      );
     },
     moveAllToToday(list) {
       if (!list.length) return;
@@ -247,8 +346,29 @@ export function TaskListProvider({
         () => keepDraft(task.id, note),
       );
     },
-    sendBackDraft: (taskId) => drafts[taskId] ?? "",
+    sendBackDraft: (taskId) => sendBackNotes[taskId] ?? "",
+    drafts,
     runEdit: run,
+    addDraft(task) {
+      runDraft({ kind: "hide", ids: [task.id] }, () => addDraftTask(task.id), (added) => announceAdded([added], [task]));
+    },
+    addAllDrafts(list) {
+      if (!list.length) return;
+      runDraft({ kind: "hide", ids: list.map((t) => t.id) }, () => addDraftTasks(list.map((t) => t.id)), (out, refused) => {
+        if (out.added) return announceAdded(out.added, list);
+        // Nothing was added: the refusal's own line, and a button to the draft that stopped it.
+        refused();
+        const { taskId, message } = out.refused;
+        toast({ message, action: { label: "Open", onAction: () => router.push(`/tasks/${taskId}`) } });
+      });
+    },
+    discardDraft(task) {
+      runDraft({ kind: "hide", ids: [task.id] }, () => discardDraftTask(task.id), (out) => announceDiscarded(out.ids, [task]));
+    },
+    discardAllDrafts(list) {
+      if (!list.length) return;
+      runDraft({ kind: "hide", ids: list.map((t) => t.id) }, () => discardDraftTasks(list.map((t) => t.id)), (out) => announceDiscarded(out.ids, list));
+    },
   };
 
   return <TaskListContext value={api}>{children}</TaskListContext>;

@@ -37,6 +37,14 @@ export function signupLinkToken(rowId: string, secret: string): string {
   return crypto.createHmac("sha256", secret).update(`hg-portal:signup:${rowId}`, "utf8").digest("base64url");
 }
 
+/**
+ * A resident's repair-request link token (docs/specs/maintenance-requests.md), rebuilt from its row the same way as
+ * the sign-up link's, so Copy link shows the link already sent while the table keeps only its hash.
+ */
+export function residentLinkToken(rowId: string, secret: string): string {
+  return crypto.createHmac("sha256", secret).update(`hg-resident:link:${rowId}`, "utf8").digest("base64url");
+}
+
 /** HMAC of a value under a purpose label, so one secret yields unrelated hashes per use. */
 export function keyedHash(purpose: "ip" | "email", value: string, secret: string): string {
   return crypto.createHmac("sha256", secret).update(`hg-portal:${purpose}:${value}`, "utf8").digest("hex");

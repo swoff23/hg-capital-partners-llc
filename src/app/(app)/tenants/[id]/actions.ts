@@ -9,6 +9,8 @@ import { logError } from "@/lib/log";
 import { withLog, withResult } from "@/lib/server-action";
 import { MAX_FILENAME } from "@/lib/attachments/content-types";
 import { appScope, assertQueueOwner } from "@/lib/attachments/queue-owner";
+import * as residentLinks from "@/lib/residents/links";
+import { emailResidentLink } from "@/lib/residents/service";
 import { storeLeaseFile } from "@/lib/tenants/files";
 import * as tenants from "@/lib/tenants/service";
 
@@ -183,5 +185,61 @@ export async function recordLeaseFileAction(
     assertQueueOwner(z.string().max(80).nullish().parse(queueOwner), appScope(user.id));
     const { pathname, filename } = recordedSchema.parse(file);
     return storeLeaseFile(id.parse(leaseId), id.parse(termId), { pathname, filename }, user.id);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Request link (docs/specs/maintenance-requests.md, section 4.4)
+// ---------------------------------------------------------------------------
+
+/** What the tenant sheet's Request link part shows: the link to copy (null once turned off) and when it went and was used. */
+export type RequestLinkView = { link: string | null; off: boolean; emailedAt: string | null; lastUsedAt: string | null };
+
+const linkView = (l: residentLinks.LinkState | null, off = false): RequestLinkView => ({
+  link: l ? residentLinks.residentUrl(l.token) : null,
+  off,
+  emailedAt: l?.emailedAt?.toISOString() ?? null,
+  lastUsedAt: l?.lastUsedAt?.toISOString() ?? null,
+});
+
+/** The person's live link as the sheet opens: made the first time someone never had one, so Copy link is one tap; off once turned off. */
+export async function getRequestLink(tenantId: string, leaseId: string): Promise<ActionResult<RequestLinkView>> {
+  return withResult("getRequestLink", async () => {
+    await requireUser();
+    const { link, off } = await residentLinks.sheetResidentLink(id.parse(tenantId), id.parse(leaseId));
+    return linkView(link, off);
+  });
+}
+
+/** Copy link after Turn off link: a partner asking for it makes the next one. */
+export async function makeRequestLink(tenantId: string, leaseId: string): Promise<ActionResult<RequestLinkView>> {
+  return withResult("makeRequestLink", async () => {
+    await requireUser();
+    return linkView(await residentLinks.currentResidentLink(id.parse(tenantId), id.parse(leaseId)));
+  });
+}
+
+/** Email link: their link to the email on file. */
+export async function emailRequestLink(tenantId: string, leaseId: string): Promise<ActionResult<RequestLinkView>> {
+  return withResult("emailRequestLink", async () => {
+    await requireUser();
+    return linkView(await emailResidentLink(id.parse(tenantId), id.parse(leaseId)));
+  });
+}
+
+/** Send a new link: the old one stops working, and the new one is emailed when there's an email on file. */
+export async function newRequestLink(tenantId: string, leaseId: string, email: boolean): Promise<ActionResult<RequestLinkView>> {
+  return withResult("newRequestLink", async () => {
+    await requireUser();
+    const made = await residentLinks.newResidentLink(id.parse(tenantId), id.parse(leaseId));
+    return linkView(email ? await emailResidentLink(tenantId, leaseId) : made);
+  });
+}
+
+/** Turn off link: it stops working at once. */
+export async function turnOffRequestLink(tenantId: string, leaseId: string): Promise<ActionResult> {
+  return withResult("turnOffRequestLink", async () => {
+    await requireUser();
+    await residentLinks.turnOffResidentLink(id.parse(tenantId), id.parse(leaseId));
   });
 }

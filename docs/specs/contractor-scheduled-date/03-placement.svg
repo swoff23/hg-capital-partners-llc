@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Where the scheduled day sits</title>
+<defs>
+  <g id="phonetop">
+    <rect width="260" height="440" rx="22" fill="#ffffff" stroke="#d5d1ca" stroke-width="1.5"/>
+    <text x="16" y="22" font-size="10.5" fill="#5d6778">‹ My jobs</text>
+    <rect x="214" y="10" width="32" height="16" rx="5" fill="#f2f0ec"/>
+    <rect x="1" y="32" width="258" height="78" fill="#f2f0ec"/>
+    <path d="M110 84 L130 66 L150 84 V98 H110 Z" fill="none" stroke="#d5d1ca" stroke-width="2"/>
+    <text x="14" y="166" font-size="14" font-weight="600" fill="#152133">Fix the kitchen faucet</text>
+    <text x="14" y="184" font-size="10.5" fill="#5d6778">1412 Elm St, Unit 2</text>
+  </g>
+  <g id="desk">
+    <rect width="344" height="190" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1.5"/>
+    <rect x="0.75" y="0.75" width="342.5" height="18" rx="7" fill="#f8f7f3"/>
+    <line x1="1" y1="19" x2="343" y2="19" stroke="#e7e5e0"/>
+    <text x="10" y="13" font-size="8" fill="#5d6778">‹ My jobs</text>
+    <rect x="16" y="32" width="52" height="52" rx="6" fill="#f2f0ec"/>
+    <text x="80" y="66" font-size="11.5" font-weight="600" fill="#152133">Fix the kitchen faucet</text>
+    <text x="80" y="80" font-size="8.5" fill="#5d6778">1412 Elm St, Unit 2</text>
+  </g>
+</defs>
+<rect width="1200" height="900" fill="#ffffff"/>
+<text x="32" y="40" font-size="17" font-weight="600" fill="#152133">Q3. Where does the scheduled day sit on their job page?</text>
+<text x="32" y="62" font-size="12" fill="#5d6778">Shown Scheduled, Tue, Nov 17, due Thu, Nov 19. Phone 375 on top, laptop 1280 below. Tablet 768 takes the phone layout (touch).</text>
+
+<!-- ================= A ================= -->
+<rect x="16" y="80" width="376" height="804" rx="12" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<text x="36" y="108" font-size="14" font-weight="600" fill="#152133">A. Two labeled rows (recommended)</text>
+<text x="36" y="126" font-size="11" fill="#5d6778">Under the address, like a field list.</text>
+
+<g transform="translate(74 140)">
+  <use href="#phonetop"/>
+  <rect x="14" y="124" width="62" height="18" rx="9" fill="#f2f0ec"/>
+  <text x="45" y="137" font-size="9.5" font-weight="500" fill="#424e61" text-anchor="middle">Scheduled</text>
+  <line x1="14" y1="202" x2="246" y2="202" stroke="#e7e5e0"/>
+  <text x="14" y="226" font-size="11" font-weight="500" fill="#424e61">Scheduled</text>
+  <text x="96" y="226" font-size="11" fill="#152133">Tue, Nov 17</text>
+  <line x1="96" y1="230" x2="160" y2="230" stroke="#152133" stroke-dasharray="1.5 2"/>
+  <path d="M240 219 l4 4 l-4 4" fill="none" stroke="#5d6778" stroke-width="1.4"/>
+  <line x1="14" y1="242" x2="246" y2="242" stroke="#e7e5e0"/>
+  <text x="14" y="266" font-size="11" font-weight="500" fill="#424e61">Due</text>
+  <text x="96" y="266" font-size="11" fill="#5d6778">Thu, Nov 19</text>
+  <line x1="14" y1="282" x2="246" y2="282" stroke="#e7e5e0"/>
+  <rect x="14" y="300" width="70" height="7" rx="3.5" fill="#e7e5e0"/>
+  <rect x="14" y="316" width="200" height="6" rx="3" fill="#f2f0ec"/>
+  <rect x="14" y="328" width="160" height="6" rx="3" fill="#f2f0ec"/>
+  <rect x="14" y="392" width="232" height="34" rx="8" fill="#152133"/>
+  <text x="130" y="413" font-size="11" font-weight="500" fill="#ffffff" text-anchor="middle">Start job</text>
+</g>
+
+<text x="36" y="606" font-size="10.5" font-weight="500" fill="#424e61">Before a day is set:</text>
+<text x="144" y="606" font-size="10.5" font-weight="500" fill="#424e61">Scheduled</text>
+<text x="206" y="606" font-size="10.5" fill="#152133">Set a day</text>
+<line x1="206" y1="610" x2="254" y2="610" stroke="#152133" stroke-dasharray="1.5 2"/>
+<path d="M262 600 l4 4 l-4 4" fill="none" stroke="#5d6778" stroke-width="1.4"/>
+<g transform="translate(32 624)">
+  <use href="#desk"/>
+  <rect x="80" y="36" width="44" height="13" rx="6.5" fill="#f2f0ec"/>
+  <text x="102" y="45.5" font-size="7.5" font-weight="500" fill="#424e61" text-anchor="middle">Scheduled</text>
+  <line x1="80" y1="92" x2="300" y2="92" stroke="#e7e5e0"/>
+  <text x="80" y="108" font-size="9" font-weight="500" fill="#424e61">Scheduled</text>
+  <text x="140" y="108" font-size="9" fill="#152133">Tue, Nov 17</text>
+  <line x1="140" y1="111" x2="190" y2="111" stroke="#152133" stroke-dasharray="1.5 2"/>
+  <line x1="80" y1="118" x2="300" y2="118" stroke="#e7e5e0"/>
+  <text x="80" y="134" font-size="9" font-weight="500" fill="#424e61">Due</text>
+  <text x="140" y="134" font-size="9" fill="#5d6778">Thu, Nov 19</text>
+  <line x1="80" y1="144" x2="300" y2="144" stroke="#e7e5e0"/>
+  <rect x="80" y="158" width="60" height="6" rx="3" fill="#e7e5e0"/>
+  <rect x="80" y="170" width="170" height="5" rx="2.5" fill="#f2f0ec"/>
+</g>
+<text x="36" y="836" font-size="11" fill="#424e61">The labels explain it; the whole row is the tap target</text>
+<text x="36" y="852" font-size="11" fill="#424e61">on touch. 320: both fit. 1280: stays with the text.</text>
+<text x="36" y="868" font-size="11" fill="#5d6778">Ref: field lists in ClickUp, Qatalog, Twenty.</text>
+
+<!-- ================= B ================= -->
+<rect x="412" y="80" width="376" height="804" rx="12" fill="#ffffff" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="432" y="108" font-size="14" font-weight="600" fill="#152133">B. In the status line, as today</text>
+<text x="432" y="126" font-size="11" fill="#5d6778">Both dates beside the badge. Tap the first one.</text>
+
+<g transform="translate(470 140)">
+  <use href="#phonetop"/>
+  <rect x="14" y="124" width="62" height="18" rx="9" fill="#f2f0ec"/>
+  <text x="45" y="137" font-size="9.5" font-weight="500" fill="#424e61" text-anchor="middle">Scheduled</text>
+  <text x="84" y="137" font-size="10.5" fill="#152133">Tue, Nov 17</text>
+  <line x1="84" y1="141" x2="142" y2="141" stroke="#152133" stroke-dasharray="1.5 2"/>
+  <text x="148" y="137" font-size="10.5" fill="#5d6778">·</text>
+  <text x="156" y="137" font-size="10.5" font-weight="500" fill="#424e61">Due</text>
+  <text x="178" y="137" font-size="10.5" fill="#5d6778">Thu, Nov 19</text>
+  <rect x="14" y="208" width="70" height="7" rx="3.5" fill="#e7e5e0"/>
+  <rect x="14" y="224" width="200" height="6" rx="3" fill="#f2f0ec"/>
+  <rect x="14" y="236" width="160" height="6" rx="3" fill="#f2f0ec"/>
+  <rect x="14" y="262" width="70" height="7" rx="3.5" fill="#e7e5e0"/>
+  <rect x="14" y="278" width="210" height="6" rx="3" fill="#f2f0ec"/>
+  <rect x="14" y="392" width="232" height="34" rx="8" fill="#152133"/>
+  <text x="130" y="413" font-size="11" font-weight="500" fill="#ffffff" text-anchor="middle">Start job</text>
+</g>
+<text x="432" y="606" font-size="10.5" font-weight="500" fill="#424e61">Before a day is set:</text>
+<rect x="540" y="594" width="40" height="17" rx="8.5" fill="#f2f0ec"/>
+<text x="560" y="606" font-size="9.5" font-weight="500" fill="#424e61" text-anchor="middle">To do</text>
+<text x="586" y="606" font-size="10.5" font-weight="500" fill="#424e61">Due</text>
+<text x="608" y="606" font-size="10.5" fill="#5d6778">Thu, Nov 19 ·</text>
+<text x="680" y="606" font-size="10.5" fill="#152133">Set a day</text>
+<line x1="680" y1="610" x2="734" y2="610" stroke="#152133" stroke-dasharray="1.5 2"/>
+
+<g transform="translate(428 624)">
+  <use href="#desk"/>
+  <rect x="80" y="36" width="44" height="13" rx="6.5" fill="#f2f0ec"/>
+  <text x="102" y="45.5" font-size="7.5" font-weight="500" fill="#424e61" text-anchor="middle">Scheduled</text>
+  <text x="130" y="46" font-size="8.5" fill="#152133">Tue, Nov 17</text>
+  <line x1="130" y1="48.5" x2="176" y2="48.5" stroke="#152133" stroke-dasharray="1.5 2"/>
+  <text x="180" y="46" font-size="8.5" fill="#5d6778">·  Due Thu, Nov 19</text>
+  <rect x="80" y="100" width="60" height="6" rx="3" fill="#e7e5e0"/>
+  <rect x="80" y="112" width="170" height="5" rx="2.5" fill="#f2f0ec"/>
+  <rect x="80" y="128" width="60" height="6" rx="3" fill="#e7e5e0"/>
+  <rect x="80" y="140" width="150" height="5" rx="2.5" fill="#f2f0ec"/>
+</g>
+<text x="432" y="836" font-size="11" fill="#424e61">Tightest. Only a dotted underline says which date</text>
+<text x="432" y="852" font-size="11" fill="#424e61">is theirs. 320: just fits; a date with a year cuts off.</text>
+<text x="432" y="868" font-size="11" fill="#5d6778">Ref: Plane's start and due dates in its header line.</text>
+
+<!-- ================= C ================= -->
+<rect x="808" y="80" width="376" height="804" rx="12" fill="#ffffff" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="828" y="108" font-size="14" font-weight="600" fill="#152133">C. A button in the bottom bar</text>
+<text x="828" y="126" font-size="11" fill="#5d6778">Set a day sits beside Start job until a day is set.</text>
+
+<g transform="translate(866 140)">
+  <use href="#phonetop"/>
+  <rect x="14" y="124" width="40" height="18" rx="9" fill="#f2f0ec"/>
+  <text x="34" y="137" font-size="9.5" font-weight="500" fill="#424e61" text-anchor="middle">To do</text>
+  <text x="62" y="137" font-size="10.5" font-weight="500" fill="#424e61">Due</text>
+  <text x="84" y="137" font-size="10.5" fill="#5d6778">Thu, Nov 19</text>
+  <rect x="14" y="208" width="70" height="7" rx="3.5" fill="#e7e5e0"/>
+  <rect x="14" y="224" width="200" height="6" rx="3" fill="#f2f0ec"/>
+  <rect x="14" y="236" width="160" height="6" rx="3" fill="#f2f0ec"/>
+  <rect x="14" y="262" width="70" height="7" rx="3.5" fill="#e7e5e0"/>
+  <rect x="14" y="278" width="210" height="6" rx="3" fill="#f2f0ec"/>
+  <rect x="14" y="392" width="110" height="34" rx="8" fill="#ffffff" stroke="#c9c5bd" stroke-width="1.2"/>
+  <text x="69" y="413" font-size="11" font-weight="500" fill="#152133" text-anchor="middle">Set a day</text>
+  <rect x="132" y="392" width="114" height="34" rx="8" fill="#152133"/>
+  <text x="189" y="413" font-size="11" font-weight="500" fill="#ffffff" text-anchor="middle">Start job</text>
+</g>
+<text x="828" y="606" font-size="10.5" font-weight="500" fill="#424e61">Once set, the line reads:</text>
+<rect x="960" y="594" width="58" height="17" rx="8.5" fill="#f2f0ec"/>
+<text x="989" y="606" font-size="9.5" font-weight="500" fill="#424e61" text-anchor="middle">Scheduled</text>
+<text x="1024" y="606" font-size="10.5" fill="#152133">Tue, Nov 17</text>
+<text x="1086" y="606" font-size="10.5" fill="#5d6778">· Due ...</text>
+
+<g transform="translate(824 624)">
+  <use href="#desk"/>
+  <rect x="80" y="36" width="30" height="13" rx="6.5" fill="#f2f0ec"/>
+  <text x="95" y="45.5" font-size="7.5" font-weight="500" fill="#424e61" text-anchor="middle">To do</text>
+  <text x="116" y="46" font-size="8.5" fill="#5d6778">Due Thu, Nov 19</text>
+  <rect x="80" y="100" width="60" height="6" rx="3" fill="#e7e5e0"/>
+  <rect x="80" y="112" width="170" height="5" rx="2.5" fill="#f2f0ec"/>
+  <line x1="1" y1="156" x2="343" y2="156" stroke="#e7e5e0"/>
+  <rect x="190" y="164" width="70" height="18" rx="5" fill="#ffffff" stroke="#c9c5bd"/>
+  <text x="225" y="176" font-size="8" font-weight="500" fill="#152133" text-anchor="middle">Set a day</text>
+  <rect x="266" y="164" width="68" height="18" rx="5" fill="#152133"/>
+  <text x="300" y="176" font-size="8" font-weight="500" fill="#ffffff" text-anchor="middle">Start job</text>
+</g>
+<text x="828" y="836" font-size="11" fill="#424e61">The loudest ask. Adds a second button to every To</text>
+<text x="828" y="852" font-size="11" fill="#424e61">do job, and moving the day still needs B's line.</text>
+<text x="828" y="868" font-size="11" fill="#5d6778">Ref: Jobber puts Schedule up front on a new job.</text>
+</svg>

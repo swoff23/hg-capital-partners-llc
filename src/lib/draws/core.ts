@@ -20,6 +20,8 @@ type Tx = Prisma.TransactionClient;
 export type By = { id: string } | null;
 
 export const PICK_PROPERTY = "Pick at least one property.";
+export const PICK_ONE_PROPERTY = "Pick the property.";
+export const HOLDBACK_NEEDED = "Enter the holdback.";
 export const PROPERTY_GONE = "That property is gone. Pick another.";
 export const NAME_NEEDED = "Give it a name.";
 export const LINE_NAME_NEEDED = "Name the line.";
@@ -89,36 +91,52 @@ async function openRehab(tx: Tx, rehabId: string): Promise<{ id: string }> {
   return r;
 }
 
-/** Properties for a rehab: every one must exist, and none may already sit in another open rehab. */
-async function checkProperties(tx: Tx, propertyIds: readonly string[], except: string | null): Promise<void> {
-  if (propertyIds.length === 0) throw new FieldError({ propertyIds: PICK_PROPERTY });
+/**
+ * Properties for a rehab: every one must exist, and none may already sit in another open rehab. `field` is
+ * where a refusal shows: New rehab's one Property, or Edit rehab's Properties.
+ */
+async function checkProperties(tx: Tx, propertyIds: readonly string[], except: string | null, field: "propertyId" | "propertyIds" = "propertyIds"): Promise<void> {
+  if (propertyIds.length === 0) throw new FieldError({ [field]: field === "propertyId" ? PICK_ONE_PROPERTY : PICK_PROPERTY });
   const found = await tx.property.findMany({ where: { id: { in: [...propertyIds] } }, select: { id: true, address: true } });
-  if (found.length !== new Set(propertyIds).size) throw new FieldError({ propertyIds: PROPERTY_GONE });
+  if (found.length !== new Set(propertyIds).size) throw new FieldError({ [field]: PROPERTY_GONE });
   const busy = await tx.rehabProperty.findFirst({
     where: { propertyId: { in: [...propertyIds] }, rehab: { doneAt: null, ...(except ? { id: { not: except } } : {}) } },
     select: { property: { select: { address: true } } },
   });
-  if (busy) throw new FieldError({ propertyIds: alreadyOpenMessage(shortAddress(busy.property.address) || busy.property.address) });
+  if (busy) throw new FieldError({ [field]: alreadyOpenMessage(shortAddress(busy.property.address) || busy.property.address) });
 }
 
 // ---------------------------------------------------------------------------
 // Rehabs
 // ---------------------------------------------------------------------------
 
-export interface NewRehab {
-  propertyIds: string[];
+/**
+ * New rehab: the property and the holdback, the lender's budget to draw from. `propertyIds` instead of
+ * `propertyId` is the "More than one property" switch: a loan over several (765 and 767 Prospect) is one
+ * rehab, named for all of them. A refusal shows on whichever of the two was sent.
+ */
+export type NewRehab = ({ propertyId: string; propertyIds?: undefined } | { propertyIds: string[]; propertyId?: undefined }) & {
+  holdback: number | null;
   lender: string | null;
-}
+};
 
 export async function createRehab(db: Db, input: NewRehab, by: By): Promise<{ id: string }> {
   return db.$transaction(async (tx) => {
-    const ids = [...new Set(input.propertyIds)];
-    await checkProperties(tx, ids, null);
-    const properties = await tx.property.findMany({ where: { id: { in: ids } }, select: { id: true, address: true }, orderBy: { address: "asc" } });
+    const field = input.propertyIds !== undefined ? "propertyIds" : "propertyId";
+    const ids = input.propertyIds !== undefined ? [...new Set(input.propertyIds)] : input.propertyId ? [input.propertyId] : [];
+    // Both blanks say so at once; then the properties' own checks.
+    const blank = {
+      ...(ids.length > 0 ? {} : { [field]: field === "propertyIds" ? PICK_PROPERTY : PICK_ONE_PROPERTY }),
+      ...(input.holdback != null && input.holdback > 0 ? {} : { holdback: HOLDBACK_NEEDED }),
+    };
+    if (Object.keys(blank).length > 0) throw new FieldError(blank);
+    await checkProperties(tx, ids, null, field);
+    const properties = await tx.property.findMany({ where: { id: { in: ids } }, select: { address: true }, orderBy: { address: "asc" } });
     const rehab = await tx.rehab.create({
       data: {
         name: rehabName(properties.map((p) => p.address)),
         lender: input.lender?.trim() || null,
+        holdback: money(input.holdback!),
         createdByUserId: by?.id ?? null,
         properties: { create: ids.map((propertyId) => ({ propertyId })) },
       },
@@ -177,8 +195,9 @@ export async function deleteRehab(db: Db, rehabId: string): Promise<void> {
 
 /**
  * Brings a Vontive worksheet into a rehab with no budget yet (R7): its lines,
- * the holdback when none is entered, and every past draw as Funded with no
- * dates, since the worksheet has none.
+ * the holdback when none is entered (New rehab asks for one, so the typed
+ * figure stays), and every past draw as Funded with no dates, since the
+ * worksheet has none.
  */
 export async function importWorksheet(
   db: Db,

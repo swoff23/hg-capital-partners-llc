@@ -1,4 +1,6 @@
 "use client";
+import { AfterDueMark } from "@/components/after-due-mark";
+import { isAfterDue } from "@/lib/tasks/rules";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
@@ -177,14 +179,14 @@ export function NewTaskForm({
     }
     if (to === "SCHEDULED") {
       return {
-        title: "Visit date",
+        title: "Scheduled day",
         content: ({ close, container }) => (
           <DatePanel
             value={values.scheduledFor}
             today={today}
-            label="Visit date"
+            label="Scheduled day"
             layout={container === "sheet" ? "steps" : "together"}
-            // A scheduled job needs a visit date: "No date" is never offered.
+            // A scheduled job needs a scheduled day: "No date" is never offered.
             allowNone={false}
             onPick={(date) => {
               close();
@@ -202,7 +204,7 @@ export function NewTaskForm({
     set({ taskStatus: to, waitingOn: to === "WAITING" ? values.waitingOn : "", scheduledFor: to === "SCHEDULED" ? values.scheduledFor : null });
   }
 
-  const reason = values.taskStatus === "WAITING" && values.waitingOn ? `Waiting on ${values.waitingOn}` : values.taskStatus === "SCHEDULED" && values.scheduledFor ? `Visit ${fmtShortDay(values.scheduledFor, today)}` : null;
+  const reason = values.taskStatus === "WAITING" && values.waitingOn ? `Waiting on ${values.waitingOn}` : values.taskStatus === "SCHEDULED" && values.scheduledFor ? `Scheduled ${fmtShortDay(values.scheduledFor, today)}` : null;
 
   return (
     <CreateForm<Values, CreatedTask>
@@ -311,7 +313,7 @@ export function NewTaskForm({
 
           {fill && <FillChecklist items={fill.items} />}
 
-          {/* One row of the task page's own chips; below it the Waiting reason or the visit day. Past the edge they scroll. */}
+          {/* One row of the task page's own chips; below it the Waiting reason or the scheduled day. Past the edge they scroll. */}
           <div className="space-y-1">
             <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none]! [&::-webkit-scrollbar]:hidden">
               <AssigneePicker
@@ -352,7 +354,13 @@ export function NewTaskForm({
                 />
               )}
             </div>
-            {reason && <p className="truncate text-meta text-muted-foreground">{reason}</p>}
+            {reason && (
+              <p className="flex min-w-0 items-center gap-1.5 text-meta text-muted-foreground">
+                <span className="truncate">{reason}</span>
+                {/* The day after Due gets the same warning as everywhere else (docs/specs/contractor-scheduled-date.md, Q4). */}
+                {values.taskStatus === "SCHEDULED" && values.due && isAfterDue(values.scheduledFor, values.due) && <AfterDueMark due={values.due} today={today} />}
+              </p>
+            )}
           </div>
 
           {/* Under the chips, once the picked home has tenants; off until it's turned on (tenants.md T11, T13). */}

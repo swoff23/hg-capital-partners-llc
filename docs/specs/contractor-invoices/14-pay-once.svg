@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="872" viewBox="0 0 900 872">
+<title>Two partners, one invoice, one payment</title>
+<rect width="900" height="872" fill="#ffffff"/>
+<defs><clipPath id="c1"><rect x="0" y="0" width="1280" height="210"/></clipPath><clipPath id="c2"><rect x="0" y="0" width="1280" height="210"/></clipPath><clipPath id="c3"><rect x="0" y="0" width="1280" height="210"/></clipPath></defs>
+<text x="32" y="40" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="18" font-weight="600" fill="#152133">Two partners, one invoice, one payment</text>
+<text x="32" y="62" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Money moves in Baselane, not the app. The app can only stop a double payment if someone marks it before paying.</text>
+<text x="32" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">A. Mark it paid in the app as you send the money</text>
+<rect x="405.6080000000002" y="71" width="104" height="18" rx="9" fill="#152133"/>
+<text x="457.6080000000002" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#ffffff" text-anchor="middle">Recommended</text>
+<text x="32" y="104" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">The habit, written into the spec: open the invoice, Mark paid, then send it in Baselane. Undo paid covers a transfer that fails.</text>
+<text x="32" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Invoice #1043, $850, in To pay</text>
+<g transform="translate(32.0,152.0) scale(0.55)"><g clip-path="url(#c1)"><rect x="0" y="0" width="1280" height="210" rx="0" fill="#ffffff"/>
+<text x="24" y="46" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor</text>
+<rect x="120" y="24" width="158.19760000000002" height="34" rx="17" fill="#152133"/>
+<text x="199.0988" y="46" font-size="13" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid in the app</text>
+<line x1="280.1976" y1="41" x2="290.1976" y2="41" stroke="#d5d1ca" stroke-width="1"/>
+<rect x="294.1976" y="24" width="136.9712" height="34" rx="17" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="362.68320000000006" y="46" font-size="13" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Send in Baselane</text>
+<text x="24" y="100" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter</text>
+<rect x="120" y="78" width="147.78719999999998" height="34" rx="17" fill="#f2f0ec"/>
+<text x="193.8936" y="100" font-size="13" font-weight="500" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Opens To pay later</text>
+<line x1="269.7872" y1="95" x2="279.7872" y2="95" stroke="#d5d1ca" stroke-width="1"/>
+<rect x="283.7872" y="78" width="170.23040000000003" height="34" rx="17" fill="#ffffff" stroke="#1d7038" stroke-width="1"/>
+<text x="368.9024" y="100" font-size="13" font-weight="500" fill="#1d7038" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">#1043 is already Paid</text>
+<text x="24" y="186" font-size="14" font-weight="600" fill="#1d7038" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid once. Nothing new to build.</text></g><rect x="0" y="0" width="1280" height="210" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="32" y="315.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">B. Today's habit: pay first, mark later</text>
+<text x="32" y="335.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">What the spec says now. The app only finds out after the money moved.</text>
+<text x="32" y="359.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="374.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Invoice #1043, $850, in To pay</text>
+<g transform="translate(32.0,383.5) scale(0.55)"><g clip-path="url(#c2)"><rect x="0" y="0" width="1280" height="210" rx="0" fill="#ffffff"/>
+<text x="24" y="46" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor</text>
+<rect x="120" y="24" width="136.9712" height="34" rx="17" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="188.4856" y="46" font-size="13" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Send in Baselane</text>
+<line x1="258.9712" y1="41" x2="268.9712" y2="41" stroke="#d5d1ca" stroke-width="1"/>
+<rect x="272.9712" y="24" width="169.55440000000002" height="34" rx="17" fill="#f2f0ec"/>
+<text x="357.7484" y="46" font-size="13" font-weight="500" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Means to mark it later</text>
+<text x="24" y="100" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter</text>
+<rect x="120" y="78" width="136.7008" height="34" rx="17" fill="#f2f0ec"/>
+<text x="188.35039999999998" y="100" font-size="13" font-weight="500" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Sees it in To pay</text>
+<line x1="258.70079999999996" y1="95" x2="268.70079999999996" y2="95" stroke="#d5d1ca" stroke-width="1"/>
+<rect x="272.70079999999996" y="78" width="122.36959999999999" height="34" rx="17" fill="#ffffff" stroke="#b91c1c" stroke-width="1"/>
+<text x="333.88559999999995" y="100" font-size="13" font-weight="500" fill="#b91c1c" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Writes a check</text>
+<line x1="397.07039999999995" y1="95" x2="407.07039999999995" y2="95" stroke="#d5d1ca" stroke-width="1"/>
+<rect x="411.07039999999995" y="78" width="111.28319999999998" height="34" rx="17" fill="#152133"/>
+<text x="466.71199999999993" y="100" font-size="13" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Marks it paid</text>
+<text x="24" y="186" font-size="14" font-weight="600" fill="#b91c1c" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid twice, and the app shows it paid once.</text></g><rect x="0" y="0" width="1280" height="210" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="32" y="547.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">C. A new 'Paying' step</text>
+<text x="32" y="567.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Tap I'm paying this before Baselane; the row shows Paying, Connor until Mark paid. Another stage to build and keep current.</text>
+<text x="32" y="591.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="606.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Invoice #1043, $850, in To pay</text>
+<g transform="translate(32.0,615.0) scale(0.55)"><g clip-path="url(#c3)"><rect x="0" y="0" width="1280" height="210" rx="0" fill="#ffffff"/>
+<text x="24" y="46" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor</text>
+<rect x="120" y="24" width="126.2904" height="34" rx="17" fill="#152133"/>
+<text x="183.1452" y="46" font-size="13" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">I'm paying this</text>
+<line x1="248.29039999999998" y1="41" x2="258.2904" y2="41" stroke="#d5d1ca" stroke-width="1"/>
+<rect x="262.2904" y="24" width="136.9712" height="34" rx="17" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="330.77599999999995" y="46" font-size="13" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Send in Baselane</text>
+<line x1="401.2616" y1="41" x2="411.2616" y2="41" stroke="#d5d1ca" stroke-width="1"/>
+<rect x="415.2616" y="24" width="90.3272" height="34" rx="17" fill="#152133"/>
+<text x="460.4252" y="46" font-size="13" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid</text>
+<text x="24" y="100" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter</text>
+<rect x="120" y="78" width="157.92720000000003" height="34" rx="17" fill="#ffffff" stroke="#1d7038" stroke-width="1"/>
+<text x="198.9636" y="100" font-size="13" font-weight="500" fill="#1d7038" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Sees Paying, Connor</text>
+<text x="24" y="186" font-size="14" font-weight="600" fill="#1d7038" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid once, at the cost of a fourth stage and an extra tap.</text></g><rect x="0" y="0" width="1280" height="210" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="32" y="778.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#152133">Notes</text>
+<circle cx="40" cy="796.5" r="8" fill="#c8a765"/>
+<text x="40" y="800.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">1</text>
+<text x="56" y="800.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">A adds no screen and no copy under the button (a control is its label); it's a working rule for you and Pieter, in the spec and the launch note.</text>
+<circle cx="40" cy="816.5" r="8" fill="#c8a765"/>
+<text x="40" y="820.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">2</text>
+<text x="56" y="820.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">A: if a Baselane transfer fails or bounces, Undo paid in the ⋯ puts it back in To pay, and the Paid email waits out the Undo window.</text>
+<circle cx="40" cy="836.5" r="8" fill="#c8a765"/>
+<text x="40" y="840.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">3</text>
+<text x="56" y="840.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">C is in the drawing for comparison; it goes against the MVP's three stages.</text>
+</svg>

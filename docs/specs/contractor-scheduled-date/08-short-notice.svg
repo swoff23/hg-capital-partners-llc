@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="684" viewBox="0 0 1200 684" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Picking a day with less than 24 hours' notice</title>
+<defs>
+  <g id="phone">
+    <rect width="260" height="470" rx="22" fill="#ffffff" stroke="#d5d1ca" stroke-width="1.5"/>
+    <text x="16" y="22" font-size="10.5" fill="#5d6778">‹ My jobs</text>
+    <rect x="1" y="32" width="258" height="60" fill="#f2f0ec"/>
+    <text x="14" y="142" font-size="14" font-weight="600" fill="#152133">Fix the kitchen faucet</text>
+    <text x="14" y="160" font-size="10.5" fill="#5d6778">1412 Elm St, Unit 2</text>
+  </g>
+  <g id="sheetbase">
+    <rect x="1" y="196" width="258" height="273" rx="16" fill="#ffffff" stroke="#d5d1ca"/>
+    <rect x="110" y="204" width="40" height="4" rx="2" fill="#d5d1ca"/>
+    <text x="130" y="228" font-size="11.5" font-weight="600" fill="#152133" text-anchor="middle">Scheduled day</text>
+  </g>
+</defs>
+<rect width="1200" height="684" fill="#ffffff"/>
+
+<text x="32" y="40" font-size="17" font-weight="600" fill="#152133">Q7. At a home that needs notice, they pick today or tomorrow. What happens?</text>
+<text x="32" y="62" font-size="12" fill="#5d6778">Today is Sat, Nov 21. Someone lives there and Permission to enter is off. Their date sheet on a phone; a popover on a laptop works the same.</text>
+
+<!-- ============ A ============ -->
+<rect x="16" y="80" width="376" height="588" rx="12" fill="#ffffff" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="36" y="108" font-size="14" font-weight="600" fill="#152133">A. A line in the date sheet</text>
+<text x="36" y="126" font-size="11" fill="#5d6778">Shown every time they open it at these homes.</text>
+<g transform="translate(74 142)">
+  <use href="#phone"/>
+  <rect x="1" y="176" width="258" height="294" fill="#152133" opacity="0.18"/>
+  <use href="#sheetbase"/>
+  <rect x="14" y="240" width="232" height="34" rx="6" fill="#fff5ec"/>
+  <text x="24" y="254" font-size="9.5" font-weight="500" fill="#a54e09">Give the tenant 24 hours' notice unless</text>
+  <text x="24" y="267" font-size="9.5" font-weight="500" fill="#a54e09">they said yes to a sooner day.</text>
+  <text x="14" y="300" font-size="11" fill="#152133">Today</text><text x="246" y="300" font-size="10.5" fill="#5d6778" text-anchor="end">Sat</text>
+  <line x1="14" y1="312" x2="246" y2="312" stroke="#e7e5e0"/>
+  <text x="14" y="334" font-size="11" fill="#152133">Tomorrow</text><text x="246" y="334" font-size="10.5" fill="#5d6778" text-anchor="end">Sun</text>
+  <line x1="14" y1="346" x2="246" y2="346" stroke="#e7e5e0"/>
+  <text x="14" y="368" font-size="11" fill="#152133">Monday</text><text x="246" y="368" font-size="10.5" fill="#5d6778" text-anchor="end">Nov 23</text>
+  <line x1="14" y1="380" x2="246" y2="380" stroke="#e7e5e0"/>
+  <text x="14" y="402" font-size="11" fill="#152133">Pick a date</text><path d="M240 395 l4 4 l-4 4" fill="none" stroke="#5d6778" stroke-width="1.4"/>
+</g>
+<text x="36" y="636" font-size="11" fill="#424e61">Warns before the pick, but it's a standing line most days.</text>
+
+<!-- ============ B ============ -->
+<rect x="412" y="80" width="376" height="588" rx="12" fill="#ffffff" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="432" y="108" font-size="14" font-weight="600" fill="#152133">B. Today and tomorrow can't be picked</text>
+<text x="432" y="126" font-size="11" fill="#5d6778">Greyed out at these homes.</text>
+<g transform="translate(470 142)">
+  <use href="#phone"/>
+  <rect x="1" y="176" width="258" height="294" fill="#152133" opacity="0.18"/>
+  <use href="#sheetbase"/>
+  <rect x="14" y="240" width="232" height="34" rx="6" fill="#f8f7f3"/>
+  <text x="24" y="254" font-size="9.5" fill="#424e61">Today and tomorrow need permission to</text>
+  <text x="24" y="267" font-size="9.5" fill="#424e61">enter. Ask HG Capital to turn it on.</text>
+  <text x="14" y="300" font-size="11" fill="#c9c5bd">Today</text><text x="246" y="300" font-size="10.5" fill="#c9c5bd" text-anchor="end">Sat</text>
+  <line x1="14" y1="312" x2="246" y2="312" stroke="#e7e5e0"/>
+  <text x="14" y="334" font-size="11" fill="#c9c5bd">Tomorrow</text><text x="246" y="334" font-size="10.5" fill="#c9c5bd" text-anchor="end">Sun</text>
+  <line x1="14" y1="346" x2="246" y2="346" stroke="#e7e5e0"/>
+  <text x="14" y="368" font-size="11" fill="#152133">Monday</text><text x="246" y="368" font-size="10.5" fill="#5d6778" text-anchor="end">Nov 23</text>
+  <line x1="14" y1="380" x2="246" y2="380" stroke="#e7e5e0"/>
+  <text x="14" y="402" font-size="11" fill="#152133">Pick a date</text><path d="M240 395 l4 4 l-4 4" fill="none" stroke="#5d6778" stroke-width="1.4"/>
+</g>
+<text x="432" y="636" font-size="11" fill="#424e61">Blocks a same-day visit the tenant already agreed to.</text>
+
+<!-- ============ C ============ -->
+<rect x="808" y="80" width="376" height="588" rx="12" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<text x="828" y="108" font-size="14" font-weight="600" fill="#152133">C. They can pick it; the toast reminds them</text>
+<text x="828" y="126" font-size="11" fill="#5d6778">(recommended) And the heads-up email goes right away (Q6).</text>
+<g transform="translate(866 142)">
+  <use href="#phone"/>
+  <rect x="14" y="124" width="62" height="18" rx="9" fill="#f2f0ec" transform="translate(0 -22)"/>
+  <text x="45" y="115" font-size="9.5" font-weight="500" fill="#424e61" text-anchor="middle">Scheduled</text>
+  <line x1="14" y1="178" x2="246" y2="178" stroke="#e7e5e0"/>
+  <text x="14" y="200" font-size="11" font-weight="500" fill="#424e61">Scheduled</text>
+  <text x="96" y="200" font-size="11" fill="#152133">Sun, Nov 22</text>
+  <line x1="96" y1="204" x2="160" y2="204" stroke="#152133" stroke-dasharray="1.5 2"/>
+  <path d="M240 193 l4 4 l-4 4" fill="none" stroke="#5d6778" stroke-width="1.4"/>
+  <line x1="14" y1="214" x2="246" y2="214" stroke="#e7e5e0"/>
+  <text x="14" y="236" font-size="11" font-weight="500" fill="#424e61">Due</text>
+  <text x="96" y="236" font-size="11" fill="#5d6778">Mon, Nov 23</text>
+  <line x1="14" y1="250" x2="246" y2="250" stroke="#e7e5e0"/>
+  <rect x="14" y="268" width="70" height="7" rx="3.5" fill="#e7e5e0"/>
+  <rect x="14" y="284" width="200" height="6" rx="3" fill="#f2f0ec"/>
+  <rect x="14" y="296" width="160" height="6" rx="3" fill="#f2f0ec"/>
+  <rect x="14" y="366" width="232" height="46" rx="10" fill="#152133"/>
+  <text x="26" y="385" font-size="10" fill="#ffffff">Scheduled for tomorrow. The tenant</text>
+  <text x="26" y="400" font-size="10" fill="#ffffff">needs 24 hours' notice.</text>
+  <rect x="14" y="420" width="232" height="34" rx="8" fill="#152133" opacity="0.15"/>
+  <text x="130" y="441" font-size="11" font-weight="500" fill="#152133" text-anchor="middle" opacity="0.5">Start job</text>
+</g>
+<text x="828" y="636" font-size="11" fill="#424e61">Picking today: "Scheduled for today. Only go in if the</text>
+<text x="828" y="652" font-size="11" fill="#424e61">tenant said yes." Other days and other homes: no change.</text>
+</svg>

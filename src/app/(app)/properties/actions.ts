@@ -1,4 +1,5 @@
 "use server";
+import { ListingStatus } from "@prisma/client";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import type { ActionResult } from "@/lib/action-result";
@@ -6,6 +7,8 @@ import { withLog, withResult } from "@/lib/server-action";
 import * as properties from "@/lib/properties/service";
 import { staffPrincipal } from "@/lib/tasks/service";
 import { LOCKBOX_LOCATION_MAX } from "@/lib/property-types";
+import { readSignUp, toWaitlistRow, type RemovedWaitlistEntry, type WaitlistRow } from "@/lib/waitlist/fields";
+import * as waitlist from "@/lib/waitlist/service";
 
 /**
  * Thin server actions: authenticate, validate, call the property service.
@@ -116,21 +119,9 @@ const listingSchema = z.object({
   baths: z.string(),
   sqft: z.string(),
   availableDate: z.string(),
-  status: z.enum(["AVAILABLE", "LEASED", "HIDDEN"]),
+  status: z.enum(ListingStatus),
   photos: z.array(z.object({ url: z.string(), pathname: z.string() })).max(20),
 });
-
-export async function updatePropertyListings(
-  propertyId: string,
-  listings: unknown,
-  expectedVersion: string,
-): Promise<ActionResult> {
-  return withResult("updatePropertyListings", async () => {
-    const me = await requireUser();
-    const parsed = z.array(listingSchema).parse(listings).map((l) => ({ ...l, id: l.id ?? null }));
-    await properties.replaceListings(propertyId, parsed, expectedVersion, me);
-  });
-}
 
 /** One listing from its sheet, fields and photos together. Returns its id, so a new listing is known once saved. */
 export async function savePropertyListing(
@@ -146,10 +137,52 @@ export async function savePropertyListing(
 }
 
 /** One listing and its photos, after the confirm. */
-export async function deletePropertyListing(propertyId: string, listingId: string, expectedVersion: string): Promise<ActionResult> {
+export async function deletePropertyListing(
+  propertyId: string,
+  listingId: string,
+  expectedVersion: string,
+  expectedWaiting = 0,
+): Promise<ActionResult> {
   return withResult("deletePropertyListing", async () => {
     const me = await requireUser();
-    await properties.deleteListing(propertyId, z.string().min(1).parse(listingId), expectedVersion, me);
+    await properties.deleteListing(propertyId, z.string().min(1).parse(listingId), expectedVersion, me, z.number().int().min(0).parse(expectedWaiting));
+  });
+}
+
+/* ---------------- A listing's sign-up list (docs/specs/coming-soon.md 3.5) ---------------- */
+
+const entryId = z.string().min(1).max(40);
+
+/** Remove from list, at once. The row as it was, for the toast's Undo; null when it was already gone. */
+export async function removeWaitlistEntry(propertyId: string, id: string): Promise<ActionResult<RemovedWaitlistEntry | null>> {
+  return withResult("removeWaitlistEntry", async () => {
+    await requireUser();
+    return waitlist.remove(z.string().min(1).parse(propertyId), entryId.parse(id));
+  });
+}
+
+// What removeWaitlistEntry returned, read again by the sign-up form's rules before it goes back.
+const removedEntrySchema = z
+  .object({
+    id: entryId,
+    listingId: z.string().min(1).max(40),
+    firstName: z.string().max(500),
+    email: z.string().max(500),
+    phone: z.string().max(500).nullable(),
+    createdAt: z.iso.datetime(),
+  })
+  .transform((v, ctx): RemovedWaitlistEntry => {
+    const read = readSignUp({ firstName: v.firstName, email: v.email, phone: v.phone ?? "" });
+    if (read.ok) return { ...v, ...read.data };
+    for (const [field, message] of Object.entries(read.problems)) ctx.addIssue({ code: "custom", path: [field], message });
+    return z.NEVER;
+  });
+
+/** The toast's Undo after Remove: the row back on its listing with its id and the day it signed up. */
+export async function restoreWaitlistEntry(propertyId: string, entry: unknown): Promise<ActionResult<WaitlistRow>> {
+  return withResult("restoreWaitlistEntry", async () => {
+    await requireUser();
+    return toWaitlistRow(await waitlist.restore(z.string().min(1).parse(propertyId), removedEntrySchema.parse(entry)));
   });
 }
 

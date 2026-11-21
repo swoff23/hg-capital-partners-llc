@@ -18,9 +18,21 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 /**
  * An empty Budget (docs/specs/rehab-draws.md, L4): upload Vontive's Renovation Draw Worksheet (.xlsx) or add a line.
  * The file is read first and what it holds is shown, so nothing comes in until Add to rehab. It takes a drop on a
- * laptop and opens Files on a phone. A refusal from the reader shows under the buttons.
+ * laptop and opens Files on a phone. A refusal from the reader shows under the buttons. The holdback typed at New
+ * rehab stays, so the worksheet's shows only when it differs, beside the typed one, to catch a typo.
  */
-export function WorksheetUpload({ rehabId, units, onAdd }: { rehabId: string; units: UnitOption[]; onAdd: () => void }) {
+export function WorksheetUpload({
+  rehabId,
+  holdback,
+  units,
+  onAdd,
+}: {
+  rehabId: string;
+  /** The rehab's holdback as entered, or null when none is (then the worksheet's comes in). */
+  holdback: number | null;
+  units: UnitOption[];
+  onAdd: () => void;
+}) {
   const input = useRef<HTMLInputElement>(null);
   const [found, setFound] = useState<WorksheetRead | null>(null);
   const [over, setOver] = useState(false);
@@ -85,10 +97,21 @@ export function WorksheetUpload({ rehabId, units, onAdd }: { rehabId: string; un
         <ul className="space-y-1 text-body text-fg-2">
           {found.units.length > 0 && units.length === 0 && <li>{found.units.join(", ")}</li>}
           <li>{plural(found.lines.length, "line", "lines")}</li>
-          {found.holdback != null && (
+          {found.holdback != null && holdback == null && (
             <li>
               Holdback <Money value={found.holdback} />
             </li>
+          )}
+          {found.holdback != null && holdback != null && Math.round(found.holdback) !== Math.round(holdback) && (
+            // Two short facts, not one line: together they wrap on a phone.
+            <>
+              <li>
+                Worksheet holdback <Money value={found.holdback} />
+              </li>
+              <li>
+                Your holdback stays <Money value={holdback} />
+              </li>
+            </>
           )}
           {found.draws.length > 0 && (
             <li>

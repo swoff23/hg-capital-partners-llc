@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { LeaseSource, Prisma, PrismaClient } from "@prisma/client";
 import { FieldError } from "@/lib/action-result";
-import { toYmd, ymdToDate, type Ymd } from "@/lib/dates";
+import { todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { isHouseMeterRow, isPlaceholderUnitId, parseUnits, type PropertyUnit } from "@/lib/property-types";
 import { MAX_TENANTS, readDeposit, readStay, readTenant, readTerm, type TenantData, type TermData } from "./fields";
 import { leaseStatus, overlappingTerms, staysOverlap } from "./status";
@@ -45,6 +45,7 @@ export function rentableUnits(units: readonly PropertyUnit[]): PropertyUnit[] {
  * placeholder turned into the unit's new id.
  */
 export async function ensureUnitIds(tx: Tx, propertyId: string, picked: string | null = null): Promise<{ units: PropertyUnit[]; picked: string | null } | null> {
+  await lockProperty(tx, propertyId);
   const property = await tx.property.findUnique({ where: { id: propertyId }, select: { units: true } });
   if (!property) return null;
   const raw = Array.isArray(property.units) ? (property.units as PropertyUnit[]) : [];
@@ -54,6 +55,21 @@ export async function ensureUnitIds(tx: Tx, propertyId: string, picked: string |
   const at = picked && isPlaceholderUnitId(picked) ? Number(picked.slice("unit-at-".length)) : NaN;
   return { units: parseUnits(fixed), picked: Number.isInteger(at) ? (fixed[at]?.id ?? null) : picked };
 }
+
+/**
+ * Holds the property row until the caller's transaction ends, taken before the
+ * units are read. A units save locks it too (properties/units-write.ts, FOR
+ * UPDATE), so a unit can't be deleted, or given a new id, between a lease's
+ * check and its insert, and two lease writes on one property take turns, so
+ * neither passes the overlap check beside the other. NO KEY UPDATE, so tasks
+ * can still be added to the property meanwhile (as in tasks/core.ts setStatus).
+ */
+async function lockProperty(tx: Tx, propertyId: string): Promise<void> {
+  await tx.$executeRaw`SELECT 1 FROM "Property" WHERE "id" = ${propertyId} FOR NO KEY UPDATE`;
+}
+
+/** A lease on a deleted unit stays ended, so the unit it was in never has tenants again. */
+const unitRemoved = (label: string | null) => `${label || "This unit"} isn't on the property anymore, so this lease stays ended.`;
 
 /**
  * Which unit a lease is in, checked against the property's units today. A
@@ -122,7 +138,17 @@ function readNewTenants(picks: readonly TenantPick[]): (TenantData | string)[] {
   return out;
 }
 
-export async function createLease(db: Db, input: NewLease, by: By): Promise<{ id: string }> {
+/** A new lease's fields, read and checked before anything is written, so every refusal comes before the transaction. */
+type ReadLease = {
+  ids: string[];
+  people: (TenantData | string)[];
+  dates: { movesIn: Ymd | null; movesOut: Ymd | null };
+  deposit: string | null;
+  term: TermData | null;
+  primary: number;
+};
+
+function readNewLease(input: NewLease): ReadLease {
   if (input.tenants.length === 0) fail({ tenants: "Add at least one tenant." });
   if (input.tenants.length > MAX_TENANTS) fail({ tenants: TOO_MANY });
   const ids = input.tenants.flatMap((t) => ("tenantId" in t ? [t.tenantId] : []));
@@ -135,37 +161,58 @@ export async function createLease(db: Db, input: NewLease, by: By): Promise<{ id
   const term = input.term ? readTerm(input.term) : null;
   if (term && !term.ok) fail(term.problems);
   const primary = Math.min(Math.max(input.primary ?? 0, 0), people.length - 1);
+  return {
+    ids,
+    people,
+    dates: { movesIn: stay.data.movesIn ?? null, movesOut: stay.data.movesOut ?? null },
+    deposit: deposit.data.deposit,
+    term: term?.ok ? term.data : null,
+    primary,
+  };
+}
 
-  return db.$transaction(async (tx) => {
-    const unit = await resolveUnit(tx, input.propertyId, input.unitId);
-    const dates = { movesIn: stay.data.movesIn ?? null, movesOut: stay.data.movesOut ?? null };
-    await assertNoOverlap(tx, { propertyId: input.propertyId, unitId: unit.unitId }, dates, unit.unitLabel, "movesIn");
-    if (ids.length) {
-      const found = await tx.tenant.count({ where: { id: { in: ids } } });
-      if (found !== ids.length) fail({ tenants: "Someone on this lease is no longer in the app. Add them again." });
-    }
-    const lease = await tx.lease.create({
-      data: {
-        propertyId: input.propertyId,
-        ...unit,
-        movesIn: ymdToDate(dates.movesIn),
-        movesOut: ymdToDate(dates.movesOut),
-        deposit: deposit.data.deposit,
-        notes: input.notes?.trim() || null,
-        source: input.source ?? "APP",
-        createdByUserId: by?.id ?? null,
-      },
-      select: { id: true },
-    });
-    for (const [i, p] of people.entries()) {
-      const tenantId = typeof p === "string" ? p : (await tx.tenant.create({ data: { ...p, fullName: p.fullName! }, select: { id: true } })).id;
-      await tx.leaseTenant.create({ data: { leaseId: lease.id, tenantId, position: i, primary: i === primary } });
-    }
-    if (term?.ok) {
-      await tx.leaseTerm.create({ data: { leaseId: lease.id, ...termColumns(term.data) } });
-    }
-    return lease;
+async function insertLease(tx: Tx, input: NewLease, r: ReadLease, by: By): Promise<{ id: string }> {
+  const unit = await resolveUnit(tx, input.propertyId, input.unitId);
+  await assertNoOverlap(tx, { propertyId: input.propertyId, unitId: unit.unitId }, r.dates, unit.unitLabel, "movesIn");
+  if (r.ids.length) {
+    const found = await tx.tenant.count({ where: { id: { in: r.ids } } });
+    if (found !== r.ids.length) fail({ tenants: "Someone on this lease is no longer in the app. Add them again." });
+  }
+  const lease = await tx.lease.create({
+    data: {
+      propertyId: input.propertyId,
+      ...unit,
+      movesIn: ymdToDate(r.dates.movesIn),
+      movesOut: ymdToDate(r.dates.movesOut),
+      deposit: r.deposit,
+      notes: input.notes?.trim() || null,
+      source: input.source ?? "APP",
+      createdByUserId: by?.id ?? null,
+    },
+    select: { id: true },
   });
+  for (const [i, p] of r.people.entries()) {
+    const tenantId = typeof p === "string" ? p : (await tx.tenant.create({ data: { ...p, fullName: p.fullName! }, select: { id: true } })).id;
+    await tx.leaseTenant.create({ data: { leaseId: lease.id, tenantId, position: i, primary: i === r.primary } });
+  }
+  if (r.term) {
+    await tx.leaseTerm.create({ data: { leaseId: lease.id, ...termColumns(r.term) } });
+  }
+  return lease;
+}
+
+export async function createLease(db: Db, input: NewLease, by: By): Promise<{ id: string }> {
+  const r = readNewLease(input);
+  return db.$transaction((tx) => insertLease(tx, input, r, by));
+}
+
+/**
+ * createLease on a transaction the caller already holds, for a lease that
+ * commits or fails with other writes: a playbook's Apply creates the lease
+ * and its tasks together (docs/specs/tenants.md section 9). Same rules.
+ */
+export async function createLeaseIn(tx: Tx, input: NewLease, by: By): Promise<{ id: string }> {
+  return insertLease(tx, input, readNewLease(input), by);
 }
 
 function termColumns(t: TermData) {
@@ -184,30 +231,44 @@ export type LeasePatch = Partial<Record<"movesIn" | "movesOut" | "deposit" | "no
 
 /** One or more of the lease's own facts. A date change is checked against the other leases in the unit. */
 export async function patchLease(db: Db, id: string, patch: LeasePatch): Promise<void> {
-  await db.$transaction(async (tx) => {
-    const lease = await tx.lease.findUnique({ where: { id }, select: { propertyId: true, unitId: true, unitLabel: true, movesIn: true, movesOut: true } });
-    if (!lease) throw new Error("This lease is gone.");
-    const data: Prisma.LeaseUpdateInput = {};
-    if ("movesIn" in patch || "movesOut" in patch) {
-      const current = { movesIn: toYmd(lease.movesIn), movesOut: toYmd(lease.movesOut) };
-      const dates: Record<string, string | null | undefined> = {};
-      if ("movesIn" in patch) dates.movesIn = patch.movesIn ?? "";
-      if ("movesOut" in patch) dates.movesOut = patch.movesOut ?? "";
-      const stay = readStay(dates, current);
-      if (!stay.ok) fail(stay.problems);
-      const next = { movesIn: "movesIn" in stay.data ? stay.data.movesIn! : current.movesIn, movesOut: "movesOut" in stay.data ? stay.data.movesOut! : current.movesOut };
-      await assertNoOverlap(tx, { propertyId: lease.propertyId, unitId: lease.unitId, excludeId: id }, next, lease.unitLabel, "movesIn" in patch ? "movesIn" : "movesOut");
-      data.movesIn = ymdToDate(next.movesIn);
-      data.movesOut = ymdToDate(next.movesOut);
+  await db.$transaction((tx) => patchLeaseIn(tx, id, patch));
+}
+
+/**
+ * patchLease on a transaction the caller already holds: a move-out
+ * playbook's Apply sets Moves out and creates its tasks together
+ * (docs/specs/tenants.md section 9). Same rules.
+ */
+export async function patchLeaseIn(tx: Tx, id: string, patch: LeasePatch): Promise<void> {
+  const lease = await tx.lease.findUnique({ where: { id }, select: { propertyId: true, unitId: true, unitLabel: true, movesIn: true, movesOut: true } });
+  if (!lease) throw new Error("This lease is gone.");
+  const data: Prisma.LeaseUpdateInput = {};
+  if ("movesIn" in patch || "movesOut" in patch) {
+    const current = { movesIn: toYmd(lease.movesIn), movesOut: toYmd(lease.movesOut) };
+    const dates: Record<string, string | null | undefined> = {};
+    if ("movesIn" in patch) dates.movesIn = patch.movesIn ?? "";
+    if ("movesOut" in patch) dates.movesOut = patch.movesOut ?? "";
+    const stay = readStay(dates, current);
+    if (!stay.ok) fail(stay.problems);
+    const next = { movesIn: "movesIn" in stay.data ? stay.data.movesIn! : current.movesIn, movesOut: "movesOut" in stay.data ? stay.data.movesOut! : current.movesOut };
+    const field = "movesIn" in patch ? "movesIn" : "movesOut";
+    // Under the property's lock, so a units save can't delete the unit between this check and the update.
+    await lockProperty(tx, lease.propertyId);
+    if (lease.unitId && leaseStatus(next, todayYmdEastern()) !== "past") {
+      const property = await tx.property.findUnique({ where: { id: lease.propertyId }, select: { units: true } });
+      if (!rentableUnits(parseUnits(property?.units)).some((u) => u.id === lease.unitId)) fail({ [field]: unitRemoved(lease.unitLabel) });
     }
-    if ("deposit" in patch) {
-      const d = readDeposit(patch.deposit);
-      if (!d.ok) fail(d.problems);
-      data.deposit = d.data.deposit;
-    }
-    if ("notes" in patch) data.notes = patch.notes?.replace(/\r\n?/g, "\n").trim() || null;
-    await tx.lease.update({ where: { id }, data });
-  });
+    await assertNoOverlap(tx, { propertyId: lease.propertyId, unitId: lease.unitId, excludeId: id }, next, lease.unitLabel, field);
+    data.movesIn = ymdToDate(next.movesIn);
+    data.movesOut = ymdToDate(next.movesOut);
+  }
+  if ("deposit" in patch) {
+    const d = readDeposit(patch.deposit);
+    if (!d.ok) fail(d.problems);
+    data.deposit = d.data.deposit;
+  }
+  if ("notes" in patch) data.notes = patch.notes?.replace(/\r\n?/g, "\n").trim() || null;
+  await tx.lease.update({ where: { id }, data });
 }
 
 /** A person's own details, the same on every lease they're on. */

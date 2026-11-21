@@ -19,6 +19,15 @@ function revalidateLease(leaseId?: string): void {
 
 export type { NewLease, LeasePatch, TenantPick } from "./core";
 
+/**
+ * After a write that held its own transaction and wrote a lease through
+ * core.ts (a playbook's Apply, docs/specs/tenants.md section 9): the same
+ * pages refresh as for a write through here.
+ */
+export function leaseChanged(leaseId: string): void {
+  revalidateLease(leaseId);
+}
+
 export async function createLease(input: core.NewLease, by: core.By): Promise<{ id: string }> {
   const lease = await core.createLease(prisma, input, by);
   revalidateLease(lease.id);

@@ -33,8 +33,11 @@ export function TitleField({ taskId, title, closed }: { taskId: string; title: s
   );
 }
 
-/** "…": Copy link, Delete. */
-export function MoreMenu({ taskId, title }: { taskId: string; title: string }) {
+/**
+ * "…": Copy link, Delete. A draft from Claude has Copy link alone: its banner's Discard is the way out, with an
+ * Undo (a delete would take it, its photos and its comments for good, and the service refuses it).
+ */
+export function MoreMenu({ taskId, title, draft = false }: { taskId: string; title: string; draft?: boolean }) {
   const { toast } = useToast();
   const [confirming, setConfirming] = useState(false);
   const [deleting, startDelete] = useTransition();
@@ -72,10 +75,12 @@ export function MoreMenu({ taskId, title }: { taskId: string; title: string }) {
           <MenuItem icon={<Link2 />} onAction={copyLink}>
             Copy link
           </MenuItem>
-          <MenuSeparator />
-          <MenuItem variant="destructive" icon={<Trash2 />} onAction={() => setConfirming(true)}>
-            Delete
-          </MenuItem>
+          {!draft && <MenuSeparator />}
+          {!draft && (
+            <MenuItem variant="destructive" icon={<Trash2 />} onAction={() => setConfirming(true)}>
+              Delete
+            </MenuItem>
+          )}
         </Menu>
       </MenuTrigger>
       {confirming && (

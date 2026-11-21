@@ -18,7 +18,7 @@ test("the drain re-reads each item's event after it claims the row, not before",
   const liveAt = code.indexOf("await liveItems(");
   assert.ok(claimAt > 0 && liveAt > claimAt, "read the events from the claimed items");
   // Claimed rows are the ones the claim returned: what is read is what is sent.
-  assert.match(code, /liveItems\(row\.taskId, parseItems\(claimed\.items\)/);
+  assert.match(code, /liveItems\(taskId, parseItems\(claimed\.items\)/);
 });
 
 test("it reads in one query per row, scoped to the row's task, only for items that name events", () => {
@@ -29,8 +29,13 @@ test("it reads in one query per row, scoped to the row's task, only for items th
   assert.match(code, /attachments: \{ where: \{ deletedAt: null \}/);
 });
 
-test("a row whose items all drop closes as 'nothing to send', never as an empty email", () => {
-  assert.match(code, /items\.length === 0[\s\S]{0,200}lastError: "nothing to send"/);
+test("a claimed row with nothing left to say closes with the second decision's reason, never as an empty email", () => {
+  // claimedRowVerdict (content.test.ts) answers "no task", "draft" or "nothing to send"; the run writes that and moves on.
+  // It also gets whether the home needs 24 hours' notice (contractor-scheduled-date.md, Q6), read before it.
+  assert.match(code, /const second = claimedRowVerdict\(\{\s*audience: delivery\.audience,\s*items: live\.items,\s*job: fresh,\s*hasAccess: !!accessRow,\s*needsNotice: !!jobAccess\?\.needsNotice,\s*today: todayYmdEastern\(now\),\s*\}\);\s*if \(!second\.send\) \{\s*await prisma\.notificationOutbox\.updateMany\(\{ where: \{ id: row\.id \}, data: \{ sentAt: now, lastError: second\.reason \} \}\);\s*result\.skipped\+\+;\s*continue;/);
+  // The job and the access it judges are read after the claim, so an Add undone in between is seen.
+  const drain = code.slice(code.indexOf("export async function drainDue"));
+  assert.ok(drain.indexOf("await claim(row.id, now)") < drain.indexOf("prisma.task.findUnique({ where: { id: taskId }"));
 });
 
 test("the drain never deletes or rewrites a row to retract a line", () => {
@@ -56,8 +61,9 @@ test("every write to a claimed row is an updateMany by id, so a row deleteTask's
   assert.doesNotMatch(code, /notificationOutbox\.update\(/, "no update that needs the row to be there");
   const drain = code.slice(code.indexOf("export async function drainDue"));
   const writes = drain.match(/notificationOutbox\.updateMany\(\{\s*where: \{ [^}]*\}/g) ?? [];
-  // the task gone at the claim, nothing to send, sent, refused for Resend's limits, failed: each by the row's id alone.
-  assert.equal(writes.length, 5);
+  // closed by the second decision (the task gone, a draft, nothing to send), sent, refused for Resend's limits,
+  // failed: each by the row's id alone.
+  assert.equal(writes.length, 4);
   for (const w of writes) assert.match(w, /where: \{ id: row\.id \}$/);
   // A count of 0 is not an error: nothing reads it, and the loop goes on to the next row.
   assert.doesNotMatch(drain, /const \{ count \} = await prisma\.notificationOutbox\.updateMany/);
@@ -68,6 +74,9 @@ test("every write to a claimed row is an updateMany by id, so a row deleteTask's
 // docs/specs/contractor-email-switch.md: a line still waiting when Job emails goes off is dropped by the run.
 test("the drain reads the contractor's Job emails switch with the row and closes a refused row unsent, with the reason", () => {
   assert.match(code, /portalAccount: \{ select: \{ email: true, status: true, jobEmails: true \} \}/);
-  // deliveryFor's refusal (content.test.ts: "emails off") is the row's lastError, so nothing reads it as emailed.
-  assert.match(code, /await closeUnsent\(row\.id, now, !row\.task \? "no task" : delivery\.ok \? "no recipient" : delivery\.reason\)/);
+  // The first decision's refusal (content.test.ts dueRowVerdict: "emails off", "draft", "no task") is the row's
+  // lastError, so nothing reads it as emailed, and the row is never claimed.
+  assert.match(code, /const first = dueRowVerdict\(row\);\s*if \(!first\.send\) \{\s*await closeUnsent\(row\.id, now, first\.reason\);\s*result\.skipped\+\+;\s*continue;\s*\}/);
+  const drain = code.slice(code.indexOf("export async function drainDue"));
+  assert.ok(drain.indexOf("dueRowVerdict(row)") < drain.indexOf("await claim(row.id, now)"), "decided before the claim");
 });

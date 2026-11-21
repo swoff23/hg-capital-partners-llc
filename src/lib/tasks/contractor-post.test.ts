@@ -587,7 +587,8 @@ test("removeAttachment: the removed line names the file as it is under the lock,
   const { tx, calls } = fakeTx(onPost("e1", undefined, "Kitchen before.jpg"));
   assert.equal(await removeAttachment(tx, file({}), CONNOR), true);
   const read = calls.find((c) => c.model === "taskAttachment" && c.op === "findUnique")!.args as CallArgs;
-  assert.deepEqual(read.select, { eventId: true, filename: true }, "one read, under the lock");
+  // Which post, the name, and whether its task is a draft someone discarded: all from the one read under the lock.
+  assert.deepEqual(read.select, { eventId: true, filename: true, task: { select: { discardedAt: true } } }, "one read, under the lock");
   const line = calls.find((c) => c.model === "taskEvent" && c.op === "create")!.args as CallArgs;
   assert.deepEqual(line.data?.data, { attachmentId: "a1", filename: "Kitchen before.jpg", removed: true, eventId: "e1" });
 });

@@ -10,6 +10,7 @@ import { SortHeader } from "@/components/sort-header";
 import { EmptyState, LinkButton, PageHeader, Table, Td, Th, chromeIconClass, pendingRowFill } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { TenantFilters } from "../filters";
+import { LaunchLinks } from "./launch-links";
 import {
   DEFAULT_TENANT_SORT,
   emptyTenants,
@@ -23,6 +24,8 @@ import {
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Tenants" };
+// Email request links sends one email at a time, spaced for Resend (residents/service.ts): 51 take about 45 seconds.
+export const maxDuration = 120;
 
 /** An empty cell: the lone dash glyph in --muted-foreground (docs/brand-guidelines.md, section 3). */
 const EMPTY = <span className="text-muted-foreground">—</span>;
@@ -51,10 +54,13 @@ export default async function TenantsPage({ searchParams }: PageProps<"/tenants"
         title="Tenants"
         subtitle={tenantsCount(total, f.view)}
         actions={
-          <LinkButton href="/tenants/new" variant="primary">
-            <Plus aria-hidden="true" className={chromeIconClass} />
-            New lease
-          </LinkButton>
+          <div className="flex items-center gap-2">
+            <LaunchLinks />
+            <LinkButton href="/tenants/new" variant="primary">
+              <Plus aria-hidden="true" className={chromeIconClass} />
+              New lease
+            </LinkButton>
+          </div>
         }
       />
       <TenantFilters data={{ properties, shown: rows.length, hidden: total - rows.length, filtered: narrowed }}>

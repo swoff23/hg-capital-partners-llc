@@ -28,8 +28,7 @@ export default function ResidentsPage() {
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         <Tile title="Moving in" body="Move-in checklist and the condition form." href="/residents/moving-in" />
         <Tile title="Pay rent" body="Handled securely through Baselane." href={BASELANE_URL} />
-        {/* No line under it until the request form exists: this page doesn't promise photos it can't take (PUBLIC-035). */}
-        <Tile title="Request maintenance" />
+        <Tile title="Request maintenance" body="Repairs go through your own link." href="/residents/maintenance" />
       </div>
     </main>
   );

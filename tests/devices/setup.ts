@@ -1,11 +1,14 @@
 import { PrismaClient } from "@prisma/client";
-import { todayYmdEastern } from "../../src/lib/dates";
+import { todayYmdEastern, ymdToDate } from "../../src/lib/dates";
 import { hashPassword } from "../../src/lib/password";
-import { generateStartingPassword, hashToken, newToken, signupLinkToken } from "../../src/lib/portal/tokens";
+import { generateStartingPassword, hashToken, newToken, residentLinkToken, signupLinkToken } from "../../src/lib/portal/tokens";
 import { addDaysYmd } from "../../src/lib/quick-dates";
 import { signSessionToken } from "../../src/lib/session-token";
 import * as core from "../../src/lib/tasks/core";
 import * as draws from "../../src/lib/draws/core";
+import { rentableUnitLabels } from "../../src/lib/property-types";
+import * as waitlist from "../../src/lib/waitlist/core";
+import { readSignUp } from "../../src/lib/waitlist/fields";
 import { PORTAL_FIXTURE_EMAIL, ROUTE_SESSION_OVERRIDE, SAMPLE_PARAMS, listRoutes } from "./routes";
 
 /**
@@ -15,10 +18,13 @@ import { PORTAL_FIXTURE_EMAIL, ROUTE_SESSION_OVERRIDE, SAMPLE_PARAMS, listRoutes
  * and seeds two fixture contractor logins for the (portal) pages. All of it
  * reaches the test workers through process.env.
  *
- * Staff data is only read. The portal fixtures are the one write: for each,
- * a Contact, its PortalAccount and a fresh PortalSession, reused across runs
- * by email, plus one job assigned to the "portal" contractor. A DB with no
- * open rehab also gets one, so /draws/[id] has a page to load. Like
+ * Staff data is otherwise read; the writes are fixtures, each made once and
+ * reused. The portal fixtures: for each, a Contact, its PortalAccount and a
+ * fresh PortalSession, reused across runs by email, plus one job assigned to
+ * the "portal" contractor. A DB with no open rehab also gets one, so
+ * /draws/[id] has a page to load. A DB with no coming-soon listing gets two
+ * on the sample property page, one with two sign-ups, so Rentals, the
+ * listing row and its Waiting section render with them. Like
  * `npm run db:dev-passwords`, it refuses anything but a localhost
  * DATABASE_URL.
  *
@@ -121,6 +127,42 @@ async function seedSignupLink(db: PrismaClient): Promise<void> {
   await db.portalInvite.create({ data: { id, shared: true, tokenHash: hashToken(token) } });
 }
 
+/** The resident link the device check opens (docs/specs/maintenance-requests.md): a fixed row, its token rebuilt under the check's own secret. */
+export const DEVICE_RESIDENT_LINK_ID = "devicecheckresidentlink";
+
+/**
+ * A live request link and one open request on it, so /r/[token], its form and
+ * /r/[token]/[requestId] render with real parts: the first lease that isn't
+ * past, its first tenant, and a request with a note and the let-us-in and pets
+ * answers. The link's hash is set again every run, since each run has its own
+ * SESSION_SECRET. Rows only, through core.createTask, so nothing is emailed.
+ */
+async function seedResidentFixture(db: PrismaClient): Promise<void> {
+  assertLocalDb();
+  const today = new Date();
+  const lease = await db.lease.findFirst({
+    where: { OR: [{ movesOut: null }, { movesOut: { gt: today } }], tenants: { some: {} } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, propertyId: true, unitLabel: true, tenants: { select: { tenant: { select: { id: true, fullName: true } } }, orderBy: { position: "asc" }, take: 1 } },
+  });
+  const tenant = lease?.tenants[0]?.tenant;
+  if (!lease || !tenant) return;
+  const tokenHash = hashToken(residentLinkToken(DEVICE_RESIDENT_LINK_ID, process.env.DEVICE_SESSION_SECRET!));
+  await db.residentLink.upsert({
+    where: { id: DEVICE_RESIDENT_LINK_ID },
+    create: { id: DEVICE_RESIDENT_LINK_ID, tenantId: tenant.id, leaseId: lease.id, tokenHash },
+    update: { tenantId: tenant.id, leaseId: lease.id, tokenHash, revokedAt: null },
+  });
+  if (await db.residentRequest.findFirst({ where: { leaseId: lease.id, task: { status: "OPEN" } }, select: { id: true } })) return;
+  await db.$transaction(async (tx) => {
+    const p: core.Principal = { kind: "system", label: `${tenant.fullName} (resident)` };
+    const task = await core.createTask(tx, { title: "Kitchen sink leaks", description: "Water under the sink when the dishwasher runs.", propertyId: lease.propertyId, unitLabel: lease.unitLabel }, p);
+    await tx.residentRequest.create({
+      data: { taskId: task.id, leaseId: lease.id, tenantId: tenant.id, tenantName: tenant.fullName, whatsWrong: task.title, details: task.description, letUsIn: true, pets: true, petsNote: "A cat" },
+    });
+  });
+}
+
 /** The fixture job's actor: a system writer, so seeding it never queues an email. */
 const FIXTURE_WRITER: core.Principal = { kind: "system", label: "Device check" };
 
@@ -190,7 +232,7 @@ async function seedRehabFixture(db: PrismaClient): Promise<void> {
   assertLocalDb();
   const property = await db.property.findFirst({ where: { archivedAt: null, rehabs: { none: {} } }, select: { id: true }, orderBy: { createdAt: "asc" } });
   if (!property) return;
-  const { id } = await draws.createRehab(db, { propertyIds: [property.id], lender: "Vontive" }, null);
+  const { id } = await draws.createRehab(db, { propertyId: property.id, holdback: 40000, lender: "Vontive" }, null);
   await draws.patchRehab(db, id, { notes: "Fixture for npm run test:devices. Safe to delete locally." });
   const lines = [];
   for (const [name, original] of [["Demo", 12000], ["Electrical (Rough)", 16000], ["Kitchen Cabinets", 9500]] as const) {
@@ -200,6 +242,77 @@ async function seedRehabFixture(db: PrismaClient): Promise<void> {
   const sent = await draws.sendDraft(db, id, todayYmdEastern());
   await draws.updateDraw(db, sent.drawId, { stage: "INSPECTION" }, todayYmdEastern());
   await draws.setDraftAmount(db, lines[1].id, 6000);
+}
+
+/** The sign-ups on the dated fixture listing: hg.localhost addresses, one with a phone. */
+const COMING_SOON_SIGN_UPS = [
+  { firstName: "Dana", email: "device-check-dana@hg.localhost", phone: "716-555-0142" },
+  { firstName: "Sam", email: "device-check-sam@hg.localhost", phone: "" },
+];
+
+/**
+ * Two coming-soon listings on the property the property page samples (routes.ts SAMPLE_PARAMS), when the local DB
+ * has none at a live property (docs/specs/coming-soon.md 6): one dated next month, with a rent and a Zillow link,
+ * and one with no date, rent or photos. The first gets two sign-ups through src/lib/waitlist/core.ts like any
+ * Notify me. A DB that already has a coming-soon listing is left alone, so it can run twice.
+ */
+async function seedComingSoonFixture(db: PrismaClient): Promise<void> {
+  assertLocalDb();
+  if ((await db.listing.count({ where: { status: "COMING_SOON", property: { archivedAt: null } } })) > 0) return;
+  const sample = await SAMPLE_PARAMS["properties/[id]"](db);
+  const property = sample && (await db.property.findFirst({ where: { id: sample.id, archivedAt: null }, select: { id: true, units: true } }));
+  if (!property) return;
+  const units = rentableUnitLabels(property.units);
+  // The 1st of next month, so the pill reads "Coming in" that month.
+  const [y, m] = todayYmdEastern().split("-").map(Number);
+  const nextMonth = ymdToDate(`${m === 12 ? y + 1 : y}-${String((m % 12) + 1).padStart(2, "0")}-01`);
+  const dated = await db.listing.create({
+    data: {
+      propertyId: property.id,
+      unitLabel: units[0] ?? "Unit",
+      status: "COMING_SOON",
+      availableDate: nextMonth,
+      rent: 1450,
+      beds: "2",
+      baths: "1",
+      zillowUrl: "https://www.zillow.com/buffalo-ny/rentals/",
+    },
+    select: { id: true },
+  });
+  await db.listing.create({ data: { propertyId: property.id, unitLabel: units[1] ?? units[0] ?? "Unit", status: "COMING_SOON" } });
+  for (const input of COMING_SOON_SIGN_UPS) {
+    const read = readSignUp(input);
+    if (!read.ok) throw new Error(`The coming-soon fixture's sign-up for ${input.firstName} doesn't read: ${Object.values(read.problems).join(" ")}`);
+    await waitlist.join(db, dated.id, read.data);
+  }
+}
+
+/**
+ * Two drafts from Claude for the signed-in partner, so /tasks shows My drafts
+ * with its heading buttons and row buttons at every size, and Home shows the
+ * "Drafts from Claude" row (docs/specs/tasks-from-claude.md 6.3). Saved the
+ * way the connector saves them; the same batch key again adds nothing, so
+ * every run after the first reuses them unless they were added or discarded.
+ * One goes to the fixture contractor, so its row and banner name who hears, and
+ * its page is the second sample for /tasks/[id] (routes.ts EXTRA_PAGES). A draft
+ * a person discarded doesn't count: it is gone from every screen.
+ */
+async function seedDraftFixture(db: PrismaClient, userEmail: string, contactId: string): Promise<void> {
+  assertLocalDb();
+  const user = await db.user.findUnique({ where: { email: userEmail }, select: { id: true, name: true } });
+  if (!user) return;
+  if ((await db.task.count({ where: { status: "DRAFT", discardedAt: null, createdByUserId: user.id } })) > 0) return;
+  const property = await db.property.findFirst({ where: { archivedAt: null }, select: { id: true }, orderBy: { createdAt: "asc" } });
+  const writer: core.Principal = { kind: "staff", userId: user.id, label: user.name ?? "Device check" };
+  const batchKey = `device-check-${Date.now()}`;
+  await db.$transaction(async (tx) => {
+    await core.createTask(
+      tx,
+      { title: "Fix gutters pulling off the back", description: "Gutters are pulling off the back. Get out there before the rain.", propertyId: property?.id ?? null, assignee: { contactId }, dueDate: addDaysYmd(todayYmdEastern(), 7), draft: { batchKey, index: 0 } },
+      writer,
+    );
+    await core.createTask(tx, { title: "Call the city about the permit", draft: { batchKey, index: 1 } }, writer);
+  });
 }
 
 export default async function setup() {
@@ -238,7 +351,10 @@ export default async function setup() {
     });
     process.env.DEVICE_PORTAL_SETUP_TOKEN = setup.token;
     await seedSignupLink(db);
+    await seedResidentFixture(db);
     await seedRehabFixture(db);
+    await seedComingSoonFixture(db);
+    await seedDraftFixture(db, user.email, portal.contactId);
 
     const samples: Record<string, string> = {};
     for (const [key, find] of Object.entries(SAMPLE_PARAMS)) {

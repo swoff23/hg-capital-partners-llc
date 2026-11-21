@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="790" viewBox="0 0 1000 790" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Question 12: how a resident's request looks on your task page. A (recommended): the task's own places, plus Pets and Requested by rows in Details. B: a From Dana card at the top of the main column. C: everything as text in Notes.</title>
+<rect width="1000" height="790" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Question 12: how does a resident's request look on your task page?</text>
+<text x="32" y="56" font-size="11" fill="#424e61">Laptop 1280, Details on the right. Below 1024 the Details rows become the chips under the title, as they do today.</text>
+
+<!-- A -->
+<g transform="translate(32 76)">
+<rect x="0" y="0" width="936" height="420" rx="10" fill="none" stroke="#c9a96a" stroke-width="1.5"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">A. The task's own places, plus two rows</text>
+<rect x="296" y="16" width="92" height="20" rx="10" fill="#f6efe1"/>
+<text x="342" y="30" font-size="10" font-weight="500" fill="#8a6d2f" text-anchor="middle">Recommended</text>
+
+<rect x="20" y="48" width="600" height="352" rx="10" fill="#ffffff" stroke="#152133"/>
+<text x="40" y="74" font-size="10" fill="#424e61">‹ Tasks  /  Open ▾</text>
+<text x="40" y="100" font-size="16" font-weight="600" fill="#152133">Kitchen sink leaks</text>
+<text x="40" y="130" font-size="10" font-weight="500" fill="#424e61">Notes</text>
+<text x="40" y="146" font-size="10.5" fill="#152133">Water under the sink when the dishwasher runs.</text>
+<text x="40" y="176" font-size="10" font-weight="500" fill="#424e61">Photos and videos</text>
+<rect x="40" y="184" width="56" height="42" rx="4" fill="#e6e9ee"/>
+<rect x="102" y="184" width="56" height="42" rx="4" fill="#e6e9ee"/>
+<text x="40" y="254" font-size="10" font-weight="500" fill="#424e61">Activity</text>
+<circle cx="48" cy="274" r="7" fill="#e6e9ee"/>
+<text x="62" y="278" font-size="10" fill="#152133">Dana (resident) sent this request</text>
+<text x="390" y="278" font-size="9.5" fill="#8f99a8" text-anchor="end">Fri 9:02 am</text>
+<circle cx="48" cy="300" r="7" fill="#e6e9ee"/>
+<text x="62" y="304" font-size="10" fill="#152133">Connor assigned Zack</text>
+<text x="390" y="304" font-size="9.5" fill="#8f99a8" text-anchor="end">Fri 9:40 am</text>
+
+<line x1="410" y1="60" x2="410" y2="388" stroke="#eceef1"/>
+<text x="426" y="80" font-size="10.5" font-weight="600" fill="#152133">Details</text>
+<text x="426" y="104" font-size="9.5" fill="#424e61">Assignee</text><text x="604" y="104" font-size="10" fill="#152133" text-anchor="end">Zack</text>
+<text x="426" y="126" font-size="9.5" fill="#424e61">Due</text><text x="604" y="126" font-size="10" fill="#152133" text-anchor="end">Today</text>
+<text x="426" y="148" font-size="9.5" fill="#424e61">Property</text><text x="604" y="148" font-size="10" fill="#152133" text-anchor="end">56 Tamarack St</text>
+<text x="426" y="170" font-size="9.5" fill="#424e61">Unit</text><text x="604" y="170" font-size="10" fill="#152133" text-anchor="end">Upper</text>
+<text x="426" y="192" font-size="9.5" fill="#424e61">Tenant</text><text x="604" y="192" font-size="10" fill="#152133" text-anchor="end">Dana Lee</text>
+<text x="426" y="214" font-size="9.5" fill="#424e61">Permission to enter</text>
+<rect x="576" y="204" width="28" height="16" rx="8" fill="#152133"/><circle cx="596" cy="212" r="6" fill="#ffffff"/>
+<rect x="418" y="226" width="194" height="52" rx="6" fill="#f6efe1"/>
+<text x="426" y="244" font-size="9.5" fill="#424e61">Pets</text><text x="604" y="244" font-size="10" fill="#152133" text-anchor="end">Yes, a cat</text>
+<text x="426" y="268" font-size="9.5" fill="#424e61">Requested by</text><text x="604" y="268" font-size="10" fill="#152133" text-anchor="end">Dana · sees status</text>
+<text x="426" y="300" font-size="9.5" fill="#424e61">Created</text><text x="604" y="300" font-size="10" fill="#152133" text-anchor="end">Fri, Nov 21</text>
+<text x="515" y="380" font-size="8.5" fill="#8a6d2f" text-anchor="middle">gold here only marks what's new</text>
+
+<text x="644" y="80" font-size="10.5" fill="#152133">• Their words become the title and notes,</text>
+<text x="652" y="94" font-size="10.5" fill="#152133">their photos the task's photos, their Yes</text>
+<text x="652" y="108" font-size="10.5" fill="#152133">the Permission to enter switch.</text>
+<text x="644" y="130" font-size="10.5" fill="#152133">• Two new rows: Pets (only after a Yes)</text>
+<text x="652" y="144" font-size="10.5" fill="#152133">and Requested by. "Sees status" is the</text>
+<text x="652" y="158" font-size="10.5" fill="#152133">reminder that a status change emails Dana.</text>
+<text x="644" y="180" font-size="10.5" fill="#152133">• Edit the title or notes freely: Dana's page</text>
+<text x="652" y="194" font-size="10.5" fill="#152133">keeps the words they sent.</text>
+<text x="644" y="216" font-size="10.5" fill="#152133">• Their later additions are Activity lines</text>
+<text x="652" y="230" font-size="10.5" fill="#152133">(question 8).</text>
+<text x="644" y="252" font-size="10.5" fill="#152133">• Pets also shows on the contractor's job</text>
+<text x="652" y="266" font-size="10.5" fill="#152133">page beside Access (question 3b).</text>
+</g>
+
+<!-- B -->
+<g transform="translate(32 516)">
+<rect x="0" y="0" width="456" height="240" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">B. A "From Dana" card above your notes</text>
+<rect x="20" y="44" width="250" height="140" rx="8" fill="#ffffff" stroke="#152133"/>
+<text x="34" y="64" font-size="10" font-weight="500" fill="#152133">From Dana (resident)</text>
+<text x="34" y="82" font-size="10" fill="#152133">Water under the sink when the</text>
+<text x="34" y="96" font-size="10" fill="#152133">dishwasher runs.</text>
+<rect x="34" y="104" width="40" height="30" rx="4" fill="#e6e9ee"/>
+<rect x="80" y="104" width="40" height="30" rx="4" fill="#e6e9ee"/>
+<text x="34" y="154" font-size="9.5" fill="#424e61">Let yourselves in · Pets: a cat</text>
+<text x="34" y="174" font-size="9.5" fill="#8f99a8">Notes (yours) below</text>
+<text x="284" y="64" font-size="10.5" fill="#152133">• Their words stay apart</text>
+<text x="292" y="78" font-size="10.5" fill="#152133">from yours.</text>
+<text x="284" y="98" font-size="10.5" fill="#152133">• A new block on the page,</text>
+<text x="292" y="112" font-size="10.5" fill="#152133">and photos in two places.</text>
+<text x="284" y="132" font-size="10.5" fill="#152133">• Notes start empty.</text>
+</g>
+
+<!-- C -->
+<g transform="translate(512 516)">
+<rect x="0" y="0" width="456" height="240" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">C. Everything as text in Notes</text>
+<rect x="20" y="44" width="250" height="140" rx="8" fill="#ffffff" stroke="#152133"/>
+<text x="34" y="64" font-size="10" font-weight="500" fill="#424e61">Notes</text>
+<text x="34" y="82" font-size="10" fill="#152133">Water under the sink when the</text>
+<text x="34" y="96" font-size="10" fill="#152133">dishwasher runs.</text>
+<text x="34" y="116" font-size="10" fill="#152133">Let us in: Yes</text>
+<text x="34" y="130" font-size="10" fill="#152133">Pets: Yes, a cat</text>
+<text x="34" y="144" font-size="10" fill="#152133">Sent by: Dana Lee</text>
+<text x="284" y="64" font-size="10.5" fill="#152133">• How the move-in report</text>
+<text x="292" y="78" font-size="10.5" fill="#152133">arrives today.</text>
+<text x="284" y="98" font-size="10.5" fill="#152133">• Least to build.</text>
+<text x="284" y="118" font-size="10.5" fill="#152133">• Pets can't reach the job</text>
+<text x="292" y="132" font-size="10.5" fill="#152133">page as its own line, and an</text>
+<text x="292" y="146" font-size="10.5" fill="#152133">edit can wipe the answers.</text>
+</g>
+
+<text x="32" y="776" font-size="11" fill="#424e61">Sizes: tablet and phone show Details as chips under the title, as today; Pets and Requested by join them as two more chips. Nothing else moves.</text>
+</svg>

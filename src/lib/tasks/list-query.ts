@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { joinFacet, parseFacet } from "@/lib/list-memory";
 import { LIST_CEILING, LIST_PAGE, listLimit } from "@/lib/list-page";
 import { everyTermMatches, searchTerms } from "@/lib/search";
-import { activeTask, closedTask, excludeTemplateTasks } from "@/lib/task-scope";
+import { activeTask, closedTask, draftTask, listedTask, notDiscarded } from "@/lib/task-scope";
 import type { TaskSort } from "./list-sort";
 
 /**
@@ -184,11 +184,11 @@ export function searchWhere(q: string): Prisma.TaskWhereInput {
 
 /**
  * The palette's task search: the Tasks page's words over the same fields, on
- * the same rows. Template rows are playbooks, not work, so neither one finds
- * them.
+ * the same rows. Template rows are playbooks, not work, and a draft isn't a
+ * task until a partner adds it, so neither one finds them.
  */
 export function paletteTaskWhere(q: string): Prisma.TaskWhereInput {
-  return { AND: [excludeTemplateTasks, searchWhere(q)] };
+  return { AND: [listedTask, searchWhere(q)] };
 }
 
 /**
@@ -239,14 +239,15 @@ export function propertyWhere(property: readonly string[]): Prisma.TaskWhereInpu
 export const repeatsWhere = { repeatRule: { not: Prisma.DbNull } } satisfies Prisma.TaskWhereInput;
 
 /**
- * The Tasks page's `where`: no Template rows, the view, the picks, the
- * search. Each part is its own entry in one AND, since owner and property
+ * The Tasks page's `where`: listed tasks only (no Template rows, no drafts;
+ * drafts sit in their own groups above the list, `draftsWhere`), the view,
+ * the picks, the search. Each part is its own entry in one AND, since owner and property
  * both need an OR of their own. `omit` leaves one facet out, for the counts
  * beside its rows.
  */
 export function allTasksWhere(f: AllFilters, legacy: LegacyNames = new Map(), omit?: OmitFacet): Prisma.TaskWhereInput {
   const parts: Prisma.TaskWhereInput[] = [
-    excludeTemplateTasks,
+    listedTask,
     viewWhere(f.status),
     omit === "owner" ? {} : ownerWhere(f.owner, legacy),
     omit === "property" ? {} : propertyWhere(f.property),
@@ -256,10 +257,155 @@ export function allTasksWhere(f: AllFilters, legacy: LegacyNames = new Map(), om
   return { AND: parts.filter((p) => Object.keys(p).length > 0) };
 }
 
-/** Every task in the view, whatever the picks and the search: what "hidden by filters" is measured against. */
+/** Every listed task in the view, whatever the picks and the search: what "hidden by filters" is measured against. */
 export function viewScopeWhere(status: TaskView): Prisma.TaskWhereInput {
-  return { AND: [excludeTemplateTasks, viewWhere(status)].filter((p) => Object.keys(p).length > 0) };
+  return { AND: [listedTask, viewWhere(status)].filter((p) => Object.keys(p).length > 0) };
 }
+
+/**
+ * Everything Today shows, for either partner: their own active tasks, every
+ * active contractor job (D8), and every active task nobody owns. Never a
+ * Template row or a draft.
+ */
+export function todayWhere(userId: string): Prisma.TaskWhereInput {
+  return {
+    ...activeTask,
+    ...listedTask,
+    OR: [{ assigneeUserId: userId }, { assigneeContactId: { not: null } }, { assigneeUserId: null, assigneeContactId: null }],
+  };
+}
+
+/** The listed tasks that carry only an imported name for an assignee (queries.ts legacyAssignees). */
+export const legacyNameWhere = {
+  assigneeUserId: null,
+  assigneeContactId: null,
+  assigneeName: { not: null },
+  ...listedTask,
+} satisfies Prisma.TaskWhereInput;
+
+/* ---------------- Task reads on other pages ----------------
+ *
+ * Each `where` a page or a job spells for its own task read lives here, by
+ * name, so the page and the database test that proves a draft is absent from
+ * it run the same clause (drafts.pg.test.ts; docs/specs/tasks-from-claude.md
+ * 6.2). A new read of tasks gets its builder here too.
+ */
+
+/**
+ * A task's own page, by id: any task, and a draft until a partner discards
+ * it. A discarded draft is gone to everyone at once, so its page is a 404
+ * though its row waits out its Undo (task-scope.ts notDiscarded).
+ */
+export function taskPageWhere(id: string): Prisma.TaskWhereInput {
+  return { id, ...notDiscarded };
+}
+
+/** A property page's tasks: the open ones there. */
+export function propertyOpenTasksWhere(propertyId: string): Prisma.TaskWhereInput {
+  return { propertyId, ...activeTask, ...listedTask };
+}
+
+/** The Properties list's open count beside each building. */
+export const openByPropertyWhere = { ...activeTask, ...listedTask, propertyId: { not: null } } satisfies Prisma.TaskWhereInput;
+
+/** Apply playbook's "still open" line: this playbook's open tasks, by building. */
+export function playbookOpenTasksWhere(taskTemplateId: string): Prisma.TaskWhereInput {
+  return { ...listedTask, ...activeTask, taskTemplateId, propertyId: { not: null } };
+}
+
+/** The tasks a comment's links name, by their ids here and by their Asana ids, for the titles the links show. */
+export function linkedTasksWhere(ids: readonly string[], asanaGids: readonly string[]): Prisma.TaskWhereInput {
+  return { ...listedTask, OR: [{ id: { in: [...ids] } }, { asanaId: { in: [...asanaGids] } }] };
+}
+
+/**
+ * Missing info's "worked this year" (missing/queries.ts workedThisYear): a
+ * job assigned to a contractor that is open now or was finished since
+ * `since`. Of `contactIds` when given, otherwise of every contractor.
+ */
+export function workedSinceWhere(since: Date, contactIds?: readonly string[]): Prisma.TaskWhereInput {
+  return {
+    ...listedTask,
+    assigneeContactId: contactIds ? { in: [...contactIds] } : { not: null },
+    status: { not: "CANCELED" },
+    OR: [{ status: { not: "DONE" } }, { completedAt: { gte: since } }],
+  };
+}
+
+/**
+ * Make task's items still waiting on their Missing info rows (missing/queries.ts
+ * handedOff, missing/service.ts settleMissingInfo): unticked, keyed to a row,
+ * on an open task. Open means active, so a draft hands nothing off and
+ * nothing ticks on one.
+ */
+export const openMakeTaskItemsWhere = { checkKey: { not: null }, done: false, task: activeTask } satisfies Prisma.TaskChecklistItemWhereInput;
+
+/**
+ * "Choose from photos taken here" (properties/photo.ts takenHerePhotos): the
+ * photos on this property's tasks. Never a draft's: a draft that is discarded
+ * loses its files a few minutes later (core.ts sweepDiscardedDrafts), which
+ * would break a property photo picked from one. Once it is added they count.
+ */
+export function takenHerePhotosWhere(propertyId: string): Prisma.TaskAttachmentWhereInput {
+  return { kind: "IMAGE", deletedAt: null, task: { propertyId, NOT: { status: "DRAFT" } } };
+}
+
+/**
+ * The 8 am run's jobs (notifications/reminders.ts): a contractor's job that
+ * waits on them, with its due date, or its scheduled day while Scheduled, on
+ * one of `days`. The four statuses are named, so never In review, Done,
+ * Canceled or a draft.
+ */
+export function dueReminderWhere(days: readonly Date[]): Prisma.TaskWhereInput {
+  return {
+    assigneeContactId: { not: null },
+    // Due by Due for every open job, their scheduled day while Scheduled (docs/specs/contractor-scheduled-date.md).
+    OR: [
+      { status: { in: ["OPEN", "SCHEDULED", "WAITING", "IN_PROGRESS"] }, dueDate: { in: [...days] } },
+      { status: "SCHEDULED", scheduledFor: { in: [...days] } },
+    ],
+  };
+}
+
+/**
+ * The lines the picker's Recent rows read (assignee-options.ts; the people
+ * come out in assignee-people.ts recentAssigneeKeys): the viewer's own
+ * assignments, and the tasks they gave an assignee as they made them. A
+ * CREATED line with no `to` assigned no one; leaving those out keeps them
+ * from crowding the window the query reads. Never a line on a draft: Claude
+ * picked that person in the partner's name, and until a partner adds the
+ * draft nobody has been assigned (docs/specs/tasks-from-claude.md 6.2). Once
+ * it is added the line counts, as any assignment does.
+ */
+export function recentAssignmentsWhere(viewerId: string): Prisma.TaskEventWhereInput {
+  return {
+    actorUserId: viewerId,
+    deletedAt: null,
+    OR: [{ kind: "ASSIGNED" }, { kind: "CREATED", data: { path: ["to"], not: Prisma.DbNull } }],
+    task: { NOT: { status: "DRAFT" } },
+  };
+}
+
+/* ---------------- Drafts from Claude (docs/specs/tasks-from-claude.md 6.3) ---------------- */
+
+/**
+ * A partner's own waiting drafts: the ones their Claude saved
+ * (`createdByUserId`, core.ts createTask's draft path) and nobody has
+ * discarded (task-scope.ts draftTask). A draft whose partner is gone (the
+ * user row deleted, which clears the column) is everyone's, so it never sits
+ * where nobody can see it.
+ */
+export function myDraftsWhere(userId: string): Prisma.TaskWhereInput {
+  return { ...draftTask, OR: [{ createdByUserId: userId }, { createdByUserId: null }] };
+}
+
+/** Every other partner's waiting drafts: the second group on the Tasks list, named for them. */
+export function othersDraftsWhere(userId: string): Prisma.TaskWhereInput {
+  return { ...draftTask, createdByUserId: { not: null }, NOT: { createdByUserId: userId } };
+}
+
+/** Drafts sit newest first; filters and sorting never move them. The id breaks a tie, so the order is stable. */
+export const DRAFTS_ORDER_BY = [{ createdAt: "desc" }, { id: "desc" }] satisfies Prisma.TaskOrderByWithRelationInput[];
 
 /**
  * Open and All: soonest due first, undated last, newest made first among

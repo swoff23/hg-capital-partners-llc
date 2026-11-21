@@ -1,0 +1,174 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1084" height="1034" viewBox="0 0 1084 1034">
+<title>Send invoice in the bottom bar: which job statuses</title>
+<rect width="1084" height="1034" fill="#ffffff"/>
+<defs><clipPath id="c1"><rect x="0" y="0" width="375" height="150"/></clipPath><clipPath id="c2"><rect x="0" y="0" width="375" height="150"/></clipPath><clipPath id="c3"><rect x="0" y="0" width="375" height="150"/></clipPath><clipPath id="c4"><rect x="0" y="0" width="375" height="150"/></clipPath><clipPath id="c5"><rect x="0" y="0" width="1280" height="150"/></clipPath><clipPath id="c6"><rect x="0" y="0" width="375" height="150"/></clipPath><clipPath id="c7"><rect x="0" y="0" width="375" height="150"/></clipPath><clipPath id="c8"><rect x="0" y="0" width="375" height="150"/></clipPath><clipPath id="c9"><rect x="0" y="0" width="375" height="150"/></clipPath><clipPath id="c10"><rect x="0" y="0" width="375" height="150"/></clipPath><clipPath id="c11"><rect x="0" y="0" width="375" height="150"/></clipPath><clipPath id="c12"><rect x="0" y="0" width="375" height="150"/></clipPath><clipPath id="c13"><rect x="0" y="0" width="375" height="150"/></clipPath></defs>
+<text x="32" y="40" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="18" font-weight="600" fill="#152133">Send invoice in the bottom bar: which job statuses</text>
+<text x="32" y="62" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">The contractor job page's bottom bar, by job status. Today Done jobs have no bar.</text>
+<text x="32" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">B1. Once the work is finished</text>
+<rect x="261.308" y="71" width="104" height="18" rx="9" fill="#152133"/>
+<text x="313.308" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#ffffff" text-anchor="middle">Recommended</text>
+<text x="32" y="104" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">In review and Done get Send invoice in the bar. Before that, no Send invoice: they bill when the work's done, or reply to the job email.</text>
+<text x="32" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="32" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">To do</text>
+<g transform="translate(32.0,152.0) scale(0.6)"><g clip-path="url(#c1)"><rect x="0" y="0" width="375" height="150" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<text x="16" y="52" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To do</text>
+<rect x="0" y="74" width="375" height="76" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="74" x2="375" y2="74" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="90" width="167.5" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="47.7656" y="116.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add photo/video</text>
+<rect x="191.5" y="90" width="167.5" height="44" rx="6" fill="#152133"/>
+<text x="247.6016" y="116.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Start job</text></g><rect x="0" y="0" width="375" height="150" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="297.0" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="297.0" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">In progress</text>
+<g transform="translate(297.0,152.0) scale(0.6)"><g clip-path="url(#c2)"><rect x="0" y="0" width="375" height="150" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<text x="16" y="52" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">In progress</text>
+<rect x="0" y="74" width="375" height="76" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="74" x2="375" y2="74" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="90" width="167.5" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="47.7656" y="116.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add photo/video</text>
+<rect x="191.5" y="90" width="167.5" height="44" rx="6" fill="#152133"/>
+<text x="225.0232" y="116.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Send for review</text></g><rect x="0" y="0" width="375" height="150" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="562.0" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="562.0" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">In review</text>
+<g transform="translate(562.0,152.0) scale(0.6)"><g clip-path="url(#c3)"><rect x="0" y="0" width="375" height="150" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<text x="16" y="52" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">In review</text>
+<rect x="0" y="74" width="375" height="76" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="74" x2="375" y2="74" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="90" width="167.5" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="47.7656" y="116.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add photo/video</text>
+<rect x="191.5" y="90" width="167.5" height="44" rx="6" fill="#152133"/>
+<text x="234.9604" y="116.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Send invoice</text></g><rect x="0" y="0" width="375" height="150" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="827.0" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="827.0" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Done</text>
+<g transform="translate(827.0,152.0) scale(0.6)"><g clip-path="url(#c4)"><rect x="0" y="0" width="375" height="150" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<text x="16" y="52" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Done</text>
+<rect x="0" y="74" width="375" height="76" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="74" x2="375" y2="74" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="90" width="343" height="44" rx="6" fill="#152133"/>
+<text x="147.2104" y="116.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Send invoice</text></g><rect x="0" y="0" width="375" height="150" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="290.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">B1 on a computer and tablet</text>
+<text x="32" y="310.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">The same buttons, right-aligned in the bar, as today.</text>
+<text x="32" y="334.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="349.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">In review</text>
+<g transform="translate(32.0,358.0) scale(0.55)"><g clip-path="url(#c5)"><rect x="0" y="0" width="1280" height="150" rx="0" fill="#ffffff"/>
+<text x="32" y="34" font-size="20" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<text x="32" y="58" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">In review</text>
+<rect x="0" y="86" width="1280" height="64" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="86" x2="1280" y2="86" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="1143.4208" y="100" width="104.57919999999999" height="36" rx="6" fill="#152133"/>
+<text x="1155.4208" y="122.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Send invoice</text>
+<rect x="1007.4520000000001" y="100" width="127.9688" height="36" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="1019.4520000000001" y="122.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add photo/video</text></g><rect x="0" y="0" width="1280" height="150" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="32" y="488.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">B2. Every status, extra actions in a menu</text>
+<text x="32" y="508.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Send invoice is always in the bar; on open jobs Add photo/video moves into a menu button so nothing wraps.</text>
+<text x="32" y="532.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="32" y="547.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">To do</text>
+<g transform="translate(32.0,556.5) scale(0.6)"><g clip-path="url(#c6)"><rect x="0" y="0" width="375" height="150" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<text x="16" y="52" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To do</text>
+<rect x="0" y="74" width="375" height="76" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="74" x2="375" y2="74" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="90" width="44" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(30.0,104.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="68" y="90" width="141.5" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="98.4604" y="116.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Send invoice</text>
+<rect x="217.5" y="90" width="141.5" height="44" rx="6" fill="#152133"/>
+<text x="260.6016" y="116.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Start job</text></g><rect x="0" y="0" width="375" height="150" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="297.0" y="532.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="297.0" y="547.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">In progress</text>
+<g transform="translate(297.0,556.5) scale(0.6)"><g clip-path="url(#c7)"><rect x="0" y="0" width="375" height="150" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<text x="16" y="52" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">In progress</text>
+<rect x="0" y="74" width="375" height="76" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="74" x2="375" y2="74" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="90" width="44" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(30.0,104.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="68" y="90" width="141.5" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="98.4604" y="116.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Send invoice</text>
+<rect x="217.5" y="90" width="141.5" height="44" rx="6" fill="#152133"/>
+<text x="238.0232" y="116.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Send for review</text></g><rect x="0" y="0" width="375" height="150" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="562.0" y="532.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="562.0" y="547.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">In review</text>
+<g transform="translate(562.0,556.5) scale(0.6)"><g clip-path="url(#c8)"><rect x="0" y="0" width="375" height="150" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<text x="16" y="52" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">In review</text>
+<rect x="0" y="74" width="375" height="76" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="74" x2="375" y2="74" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="90" width="167.5" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="47.7656" y="116.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add photo/video</text>
+<rect x="191.5" y="90" width="167.5" height="44" rx="6" fill="#152133"/>
+<text x="234.9604" y="116.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Send invoice</text></g><rect x="0" y="0" width="375" height="150" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="827.0" y="532.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="827.0" y="547.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Done</text>
+<g transform="translate(827.0,556.5) scale(0.6)"><g clip-path="url(#c9)"><rect x="0" y="0" width="375" height="150" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<text x="16" y="52" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Done</text>
+<rect x="0" y="74" width="375" height="76" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="74" x2="375" y2="74" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="90" width="343" height="44" rx="6" fill="#152133"/>
+<text x="147.2104" y="116.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Send invoice</text></g><rect x="0" y="0" width="375" height="150" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="694.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">B3. Only after you approve it</text>
+<text x="32" y="714.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Send invoice shows only on Done jobs. A contractor in review waits for your approval before billing.</text>
+<text x="32" y="738.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="32" y="753.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">To do</text>
+<g transform="translate(32.0,762.5) scale(0.6)"><g clip-path="url(#c10)"><rect x="0" y="0" width="375" height="150" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<text x="16" y="52" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To do</text>
+<rect x="0" y="74" width="375" height="76" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="74" x2="375" y2="74" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="90" width="167.5" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="47.7656" y="116.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add photo/video</text>
+<rect x="191.5" y="90" width="167.5" height="44" rx="6" fill="#152133"/>
+<text x="247.6016" y="116.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Start job</text></g><rect x="0" y="0" width="375" height="150" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="297.0" y="738.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="297.0" y="753.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">In progress</text>
+<g transform="translate(297.0,762.5) scale(0.6)"><g clip-path="url(#c11)"><rect x="0" y="0" width="375" height="150" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<text x="16" y="52" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">In progress</text>
+<rect x="0" y="74" width="375" height="76" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="74" x2="375" y2="74" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="90" width="167.5" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="47.7656" y="116.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add photo/video</text>
+<rect x="191.5" y="90" width="167.5" height="44" rx="6" fill="#152133"/>
+<text x="225.0232" y="116.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Send for review</text></g><rect x="0" y="0" width="375" height="150" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="562.0" y="738.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="562.0" y="753.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">In review</text>
+<g transform="translate(562.0,762.5) scale(0.6)"><g clip-path="url(#c12)"><rect x="0" y="0" width="375" height="150" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<text x="16" y="52" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">In review</text>
+<rect x="0" y="74" width="375" height="76" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="74" x2="375" y2="74" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="90" width="167.5" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="47.7656" y="116.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add photo/video</text>
+<rect x="191.5" y="90" width="167.5" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="243.478" y="116.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">In review</text></g><rect x="0" y="0" width="375" height="150" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="827.0" y="738.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="827.0" y="753.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Done</text>
+<g transform="translate(827.0,762.5) scale(0.6)"><g clip-path="url(#c13)"><rect x="0" y="0" width="375" height="150" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<text x="16" y="52" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Done</text>
+<rect x="0" y="74" width="375" height="76" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="74" x2="375" y2="74" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="90" width="343" height="44" rx="6" fill="#152133"/>
+<text x="147.2104" y="116.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Send invoice</text></g><rect x="0" y="0" width="375" height="150" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="900.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#152133">Notes</text>
+<circle cx="40" cy="918.5" r="8" fill="#c8a765"/>
+<text x="40" y="922.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">1</text>
+<text x="56" y="922.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">B1: In review swaps today's grayed-out 'In review' button for Send invoice; the job's status still shows under its title.</text>
+<circle cx="40" cy="938.5" r="8" fill="#c8a765"/>
+<text x="40" y="942.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">2</text>
+<text x="56" y="942.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">B1: an hour after Send for review, Add photo/video hides as today, so Send invoice takes the full bar.</text>
+<circle cx="40" cy="958.5" r="8" fill="#c8a765"/>
+<text x="40" y="962.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">3</text>
+<text x="56" y="962.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">B1 and B3: the spec's M7 changes from 'any job but Canceled' to these statuses for the portal button. Staff can still attach any job.</text>
+<circle cx="40" cy="978.5" r="8" fill="#c8a765"/>
+<text x="40" y="982.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">4</text>
+<text x="56" y="982.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">B2: Add photo/video, the most-used action on an open job, goes behind a menu tap. Not recommended.</text>
+<circle cx="40" cy="998.5" r="8" fill="#c8a765"/>
+<text x="40" y="1002.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">5</text>
+<text x="56" y="1002.5" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">All three: at 320 each half-width button is 140px; 'Add photo/video' and 'Send for review' already fit there today, and 'Send invoice' is shorter.</text>
+</svg>

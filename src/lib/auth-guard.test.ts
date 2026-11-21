@@ -49,8 +49,16 @@ const ALLOWLIST = new Set([
   "src/app/login/actions.ts#signOut", // only clears the caller's own cookie
   "src/app/login/actions.ts#requestPasswordReset", // same answer for every email; DB rate limit
   "src/app/(marketing)/residents/moving-in/actions.ts#submitMoveInInspection", // public form; IP and global caps
+  "src/app/(marketing)/rentals/actions.ts#joinWaitlist", // public form; honeypot, IP and daily caps
   "src/app/join/[token]/actions.ts#createAccount", // a contractor's invite or the sign-up link; the single-use or resettable 32-byte token is the check, per-IP limit
   "src/app/join/[token]/actions.ts#openInvite", // only stamps a first-open time on a live invite; the token is the check, returns nothing
+  // A resident's request link (docs/specs/maintenance-requests.md): the 32-byte link token is the check
+  // (residents/links.ts requireResidentLink), live only while the lease is, and each acts on that household alone.
+  "src/app/(marketing)/r/[token]/actions.ts#recordUpload", // checks the blob is in the link's own folder with head()
+  "src/app/(marketing)/r/[token]/actions.ts#sendRequest", // 20 requests a day per tenant
+  "src/app/(marketing)/r/[token]/actions.ts#addMore", // only on the household's own open request
+  "src/app/(marketing)/r/[token]/actions.ts#cancelRequest", // only the household's own, while it shows Received
+  "src/app/(marketing)/residents/maintenance/actions.ts#emailMyLink", // emails only an address already on file, same answer either way; honeypot, IP and daily caps
   "/login/reset/submit", // the reset link's form; does nothing without a live single-use token
   "/api/health", // detail behind HEALTH_TOKEN
   "/api/version", // only the live commit, which /api/health already shows anyone; no database (update-notice.tsx asks it)
@@ -58,6 +66,13 @@ const ALLOWLIST = new Set([
   "/api/cron/notifications", // CRON_SECRET, the same check as /api/quickbooks/sync
   "/j/[token]/calendar", // a job email's link token (job-links.ts resolveJobLink): only while it still opens the job
   "/api/email/inbound", // Resend's webhook signature (RESEND_WEBHOOK_SECRET), checked before anything is read
+  // Tasks from Claude (docs/specs/tasks-from-claude.md, section 8). All six answer 404 to every method while CLAUDE_CONNECTOR_ENABLED is off.
+  "/api/mcp/[key]", // Claude's connector at a partner's own address: the bearer token issued for that address is the check (verifyAccessToken), with per-connection limits
+  "/api/oauth/authorize", // where Claude sends a partner's browser: parks a request for the owner of the address it names and grants nothing (Allow does, behind requireUser); GET asks getCurrentUser; per-IP limit
+  "/api/oauth/token", // the single-use code with its PKCE verifier, or the rotating refresh token, is the check; per-IP limit
+  "/api/oauth/revoke", // the token is the check; the same answer either way
+  "/.well-known/oauth-protected-resource/api/mcp/[key]", // public discovery document for one address; no data, and the key is never looked up
+  "/.well-known/oauth-authorization-server", // public discovery document; no data
 ]);
 
 /**

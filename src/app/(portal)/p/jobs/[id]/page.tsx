@@ -9,13 +9,14 @@ import { addressLine, firstName, nextStep } from "@/lib/portal/job-view";
 import { noteJobViewed } from "@/lib/portal/jobs";
 import { getJob } from "@/lib/portal/queries";
 import { requirePortalPrincipal } from "@/lib/portal/session";
+import { jobPetsLine } from "@/lib/residents/pets";
 import { isActiveStatus } from "@/lib/task-scope";
 import { cn } from "@/lib/utils";
 import { CrewText } from "./_components/crew-text";
 import { HashScroll } from "./_components/hash-scroll";
 import { JobActions } from "./_components/job-actions";
 import { JobHeader } from "./_components/job-header";
-import { JobDate } from "./_components/job-date";
+import { JobDates } from "./_components/job-date";
 import { AddressActions, JobChecklist, LockboxSection, TenantsSection } from "./_components/job-details";
 import { JobMediaSection } from "./_components/job-media";
 import { JobNotice } from "./_components/job-notice";
@@ -52,6 +53,8 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
   const job = await getJob(principal, id);
   if (!job) notFound();
 
+  // A resident's pets answer, beside Access while they let the contractor in (docs/specs/maintenance-requests.md, 4.6).
+  const pets = job.lockbox && job.tenants.permitted ? await jobPetsLine(job.id) : null;
   // Read state and the lockbox and tenants log, written after the page is sent.
   await noteJobViewed(job.id, { lockboxShown: !!job.lockbox, tenantShown: job.tenants.people.length > 0 });
 
@@ -81,20 +84,22 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
                   <StatusBadge status={job.status} className="shrink-0" />
-                  {active && (
-                    <JobDate
-                      taskId={job.id}
-                      target={job.target}
-                      isVisit={job.targetIsVisit}
-                      today={today}
-                      editable={contractorMaySetDate(job.status)}
-                      openOnLoad={ask === "date"}
-                    />
-                  )}
                 </div>
                 <h1 className="mt-1 text-title text-balance break-words text-foreground">{job.title}</h1>
                 {(job.address || job.unitLabel) && (
                   <p className="mt-1 text-meta text-muted-foreground">{addressLine(job.address, job.unitLabel)}</p>
+                )}
+                {/* Their scheduled day and HG Capital's due date, before the address actions (contractor-scheduled-date, Q3 A). */}
+                {active && (
+                  <JobDates
+                    taskId={job.id}
+                    scheduled={job.scheduled}
+                    due={job.due}
+                    today={today}
+                    editable={contractorMaySetDate(job.status)}
+                    needsNotice={job.needsNotice}
+                    openOnLoad={ask === "date"}
+                  />
                 )}
               </div>
             </div>
@@ -106,7 +111,7 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
           {job.tenants.people.length > 0 && <TenantsSection tenants={job.tenants} />}
 
           {job.lockbox && (
-            <LockboxSection taskId={job.id} lockbox={job.lockbox} permittedBy={job.tenants.permitted ? job.tenants.people.length : 0} />
+            <LockboxSection taskId={job.id} lockbox={job.lockbox} permittedBy={job.tenants.permitted ? job.tenants.people.length : 0} pets={pets} />
           )}
 
           {job.notes && (

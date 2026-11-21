@@ -10,9 +10,9 @@ import { recordView } from "@/lib/recent-views";
 import { TextLink } from "@/components/ui";
 import { toMoneyNumber } from "@/lib/utils";
 import { toYmd, todayYmdEastern } from "@/lib/dates";
-import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
-import { byDateThenStatus, isTargetLate } from "@/lib/tasks/list";
-import { targetDate } from "@/lib/tasks/rules";
+import { byDateThenStatus, isOverdue } from "@/lib/tasks/list";
+import { propertyOpenTasksWhere } from "@/lib/tasks/list-query";
+import { scheduledDay } from "@/lib/tasks/rules";
 import { buildingLine, loanPosition } from "@/lib/properties/figures";
 import { parseBuildingCapex, parseUnits, propertyUnitCount, withUnitIds } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
@@ -21,12 +21,15 @@ import { BackLink } from "@/components/back-link";
 import { ArchivedNotice } from "@/components/record-archive";
 import { archivedLine } from "@/lib/archive";
 import { shortAddress } from "@/lib/normalize";
+import { toWaitlistRow, type WaitlistRow } from "@/lib/waitlist/fields";
 import { setPropertyArchived } from "../actions";
 import { PropertyAddressField, PropertyDetailsSection, PropertyNotesSection } from "./edit-details";
 import { DocumentsSection, propertyDocuments } from "./documents-section";
 import { PropertyLoanSection } from "./edit-loan";
 import { PropertyInsuranceSection } from "./edit-insurance";
 import { UnitsSection } from "./edit-units";
+import { TenantsSection } from "./tenants-section";
+import { propertyTenants } from "@/lib/tenants/queries";
 import { ListingsSection, type EditableListing } from "./edit-listings";
 import { BuildingSystems } from "./building-capex";
 import { CapexForecastCard } from "./capex-outlook";
@@ -74,7 +77,7 @@ function taskAssignee(t: {
  * 1200 with a 320 rail from lg. The identity header (the address as the h1,
  * then beds, baths, square feet and units; the photo once one is set), the
  * four-fact strip, then the work
- * first (docs/specs/property-page.md): tasks, units and access, financials,
+ * first (docs/specs/property-page.md): tasks, units and access, tenants, financials,
  * CapEx and rental listings, beside the facts rail (details, loan, insurance)
  * and the property's documents and notes. Below lg it's one column in that
  * order, so on a phone the tasks and lockbox codes sit under the figures.
@@ -86,11 +89,11 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   preload(propertyDocuments(id));
   // One wave: the session check runs beside the reads and is awaited with them, so nothing is shown without it.
   const today = todayYmdEastern();
-  const [user, property, openTasks, sourceDeal, propertyListings, capexRules, entities, missingInfo, handed] = await Promise.all([
+  const [user, property, openTasks, sourceDeal, propertyListings, capexRules, entities, missingInfo, handed, tenants] = await Promise.all([
     requireUser(),
     getPropertyById(id),
     prisma.task.findMany({
-      where: { propertyId: id, ...activeTask, ...excludeTemplateTasks },
+      where: propertyOpenTasksWhere(id),
       orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }],
       include: { assignee: { select: { name: true, email: true } }, assigneeContact: { select: { fullName: true } } },
     }),
@@ -98,13 +101,16 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
     prisma.listing.findMany({
       where: { propertyId: id },
       orderBy: { createdAt: "asc" },
-      include: { photos: { orderBy: { sortOrder: "asc" } } },
+      // The sign-up list rides along for the sheet's Waiting section; it never enters the editable listing.
+      include: { photos: { orderBy: { sortOrder: "asc" } }, waitlist: { orderBy: { createdAt: "desc" } } },
     }),
     getCapexRules(),
     getEntityChoices(),
     // Its required blanks (docs/specs/missing-info.md, D2): the line under the header and the marks in each section.
     loadMissingInfo(today, { propertyId: id }),
     handedOff(),
+    // Its rows come from the property's units; getPropertyById is cached, so this shares the page's own read.
+    getPropertyById(id).then((p) => (p ? propertyTenants(id, p.units, today) : null)),
   ]);
   if (!property) notFound();
   const missing = ofPriority(missingInfo.gaps, "required");
@@ -131,12 +137,14 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
     photos: l.photos.map((p) => ({ url: p.url, pathname: p.pathname })),
   }));
 
+  // Each listing's sign-ups, newest first, their days read in Eastern.
+  const waitlists: Record<string, WaitlistRow[]> = Object.fromEntries(propertyListings.map((l) => [l.id, l.waitlist.map(toWaitlistRow)]));
+
   const unitCount = propertyUnitCount(property) ?? 0;
   const unitLabels = [...new Set(units.map((u) => u.label?.trim()).filter((l): l is string => !!l))];
 
-  // Each task's Target (D7: the visit date while Scheduled, otherwise Due), soonest first, as on Today.
-  // A past Target reads red by Today's rule (isTargetLate: never Waiting or Review); it's
-  // the date this list shows, so it's the date judged.
+  // Each task's Due date, soonest first, as on Today. Past Due reads red by Today's rule (isOverdue: never
+  // Waiting or Review). A Scheduled job's day rides with its status, after Due or not.
   const tasks = openTasks
     .map((t) => ({
       id: t.id,
@@ -144,11 +152,12 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
       status: t.status,
       waitingOn: t.status === "WAITING" ? t.waitingOn?.trim() || null : null,
       createdAt: t.createdAt,
-      target: ymd(targetDate(t)),
-      late: isTargetLate({ status: t.status, scheduledFor: ymd(t.scheduledFor), due: ymd(t.dueDate) }, today),
+      due: ymd(t.dueDate),
+      scheduled: scheduledDay({ status: t.status, scheduledFor: ymd(t.scheduledFor) }),
+      late: isOverdue({ status: t.status, due: ymd(t.dueDate) }, today),
       who: taskAssignee(t),
     }))
-    .sort(byDateThenStatus((t) => t.target));
+    .sort(byDateThenStatus((t) => t.due));
 
   const value = d(property.value);
   const balance = d(property.currentLoan);
@@ -218,6 +227,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
               unitRefs={countUnitRefs(openTasks, propertyListings)}
             />
 
+            {tenants && <TenantsSection propertyId={property.id} data={tenants} today={today} />}
+
             <PropertyFinancialsCard propertyId={property.id} />
 
             <CapexForecastCard units={units} building={buildingCapex} rules={capexRules}>
@@ -225,7 +236,14 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
             </CapexForecastCard>
 
             {/* Nothing until the first listing; the header's ⋯ "Add listing" opens its sheet. */}
-            <ListingsSection propertyId={property.id} version={version} initial={listings} unitLabels={unitLabels} />
+            <ListingsSection
+              propertyId={property.id}
+              version={version}
+              initial={listings}
+              waitlists={waitlists}
+              street={shortAddress(property.address)}
+              unitLabels={unitLabels}
+            />
           </div>
 
           {/* The facts rail, then the property's documents and notes. Sections sit 32px apart, 24 on touch. */}

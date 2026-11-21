@@ -55,17 +55,33 @@ Invites are on hold until you say go. The portal is on, but only your test contr
 - [ ] Give the office phone number for the portal's Call button. It stays hidden until then.
 - [ ] Say "invite them" when you're ready.
 
+## Tasks from Claude
+
+Built, and on the live site switched off. The spec is [tasks-from-claude.md](specs/tasks-from-claude.md): Pieter says tasks to Claude, and they land as drafts on the Tasks list. These switch it on, in order. Do the first connection with Claude watching the logs.
+
+- [x] Say "build it" (Nov 20).
+- [x] Pieter's Claude plan: Pro, confirmed Nov 20. It allows custom connectors.
+- [ ] Have Pieter try two things on his phone (10 minutes): dictate for 2 minutes in the Claude app and send it, and record a minute in Voice Memos and copy its transcript. If either fails, the plan changes.
+- [ ] In Vercel, check that Production's `APP_URL` is `https://www.hgcapitalpartners.com`, with the www. Claude can't follow the redirect from the address without it.
+- [ ] In Vercel, add `CLAUDE_CONNECTOR_ENABLED` = `1` for Production and redeploy.
+- [ ] Connect your own Claude, on a computer. In the app: Settings › Claude, Connect, copy your address. In Claude: Customize, Connectors, Add custom connector, name it HG Capital, paste the address, Continue, Add, then Connect and Allow.
+- [ ] Say to Claude: "HG Capital. A test task for me, no date." Check the draft shows in My drafts, then discard it.
+- [ ] Pieter connects the same way with his own address, then runs five real dictations (spec, section 13).
+- [ ] Disconnect Asana from your Claude if you no longer need it there, so "HG Capital" has no rival task tool.
+- [ ] Decide the open calls in the spec's section 17.
+
+If Vercel Firewall or bot protection is ever switched on, let Anthropic's addresses (160.79.104.0/21) reach `/api/mcp`, `/api/oauth` and `/.well-known`.
+
 ## When you have time
 
 - [ ] Playbook timing: for NEW TENANT, NEW MOVE OUT and NEW REFI, when each step is due relative to the start date ("collect the deposit 3 days before move-in"). Until then you set dates on the review screen when you apply a playbook.
 - [ ] Look at the new screens on a computer: Today, All, the task page, playbooks and a contractor's page.
 - [ ] Pick a provider for address suggestions (Google Places, Mapbox or Smarty) and get its API key. Until then, suggestions come from your own properties and deals.
 - [ ] To give old deal notes their author, Claude needs a way to write to the production database (the same `.env.prod-write` the Asana import needs). Until then, old notes keep the author in their text, as today.
-- [ ] Contractor invoices: confirm or correct the 11 defaults in [docs/contractor-invoices-plan.md](contractor-invoices-plan.md), then say "build it" after the cutover. Its section 9 lists the API key and DNS steps that come before the inbox.
 
 - [ ] Database certificate check (date to be set). Its own change: prove Supabase's certificate from a laptop with a read-only connection, then ship it behind one environment variable. A wrong setting fails every query, so the way back is a redeploy or a rollback. See fix 3 in [docs/specs/performance.md](specs/performance.md).
 - [ ] Send the link to HG's Zillow profile. Until then the Rentals page says "Our homes are also listed on Zillow." with no link.
-- [ ] Say how residents should request maintenance (a form, an email, a phone number). Until then the Residents page's "Request maintenance" tile reads "Soon".
+- [ ] Resident maintenance requests are live ([docs/specs/maintenance-requests.md](specs/maintenance-requests.md)). On launch day, press Email maintenance request links on the Tenants list and tell each group chat that repairs go through the link from now on.
 
 ## Small calls (no rush)
 

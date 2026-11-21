@@ -1,8 +1,8 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
 import { easternDayStart, toYmd, type Ymd } from "@/lib/dates";
+import { firstName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
 import { DAILY_EMAIL_CAP } from "@/lib/notifications/content";
 import { sentSince } from "@/lib/notifications/sent-count";
@@ -12,13 +12,18 @@ import { toListTask, withLegacyPeople, type ListAssignee, type ListTask } from "
 import { groupCounts, personKey, personName, placeKey, sortRows, type SortRow, type TaskSort } from "./list-sort";
 import { unreadTaskIds } from "./read-state";
 import {
+  DRAFTS_ORDER_BY,
   NONE,
   allTasksOrderBy,
   allTasksWhere,
+  legacyNameWhere,
+  myDraftsWhere,
+  othersDraftsWhere,
   ownerCounts,
   personOfLegacyName,
   personRefs,
   propertyCounts,
+  todayWhere,
   viewScopeWhere,
   TASK_VIEWS,
   type AllFilters,
@@ -29,7 +34,11 @@ import {
 /**
  * Staff read queries for the task lists: Today (on Home) and All. Staff only;
  * the portal has its own queries in src/lib/portal (auth-guard.test.ts keeps
- * portal code out of here). Every list leaves out Template rows.
+ * portal code out of here). Every list leaves out Template rows and drafts
+ * (task-scope.ts listedTask); only `draftTasks` and `myDraftCount` read
+ * drafts, for their own groups on the Tasks list and Home's row. The `where`
+ * of every query here is built in ./list-query, which a database test runs
+ * (drafts.pg.test.ts): this file can't be loaded outside Next.
  */
 
 const LIST_SELECT = {
@@ -66,17 +75,55 @@ async function withUnread(userId: string, tasks: ListTask[]): Promise<ListTask[]
  */
 export async function todayTasks(userId: string): Promise<ListTask[]> {
   const [rows, { users, contractors, archived }] = await Promise.all([
-    prisma.task.findMany({
-      where: {
-        ...activeTask,
-        ...excludeTemplateTasks,
-        OR: [{ assigneeUserId: userId }, { assigneeContactId: { not: null } }, { assigneeUserId: null, assigneeContactId: null }],
-      },
-      select: LIST_SELECT,
-    }),
+    prisma.task.findMany({ where: todayWhere(userId), select: LIST_SELECT }),
     assigneeOptions(),
   ]);
   return withUnread(userId, withLegacyPeople(rows.map(toListTask), personRefs(users, contractors, archived)));
+}
+
+/** The other partner's drafts, as the Tasks list groups them: "Connor's drafts". */
+export interface DraftGroup {
+  /** The partner whose Claude saved them. */
+  userId: string;
+  /** Their first name, for the heading. */
+  name: string;
+  tasks: ListTask[];
+}
+
+/**
+ * The Tasks list's draft groups (docs/specs/tasks-from-claude.md 6.3, D17):
+ * the viewer's own drafts for My drafts, and each other partner's for a group
+ * named for them, all newest first. Rows are the list's own shape; a draft
+ * shows no status mark and no unread dot, so neither is worked out. Empty
+ * groups are left out: with no drafts this is `{ mine: [], others: [] }` and
+ * the list shows nothing for it.
+ */
+export async function draftTasks(viewerId: string): Promise<{ mine: ListTask[]; others: DraftGroup[] }> {
+  const [mine, theirs] = await Promise.all([
+    prisma.task.findMany({ where: myDraftsWhere(viewerId), orderBy: DRAFTS_ORDER_BY, select: LIST_SELECT }),
+    prisma.task.findMany({
+      where: othersDraftsWhere(viewerId),
+      orderBy: DRAFTS_ORDER_BY,
+      select: { ...LIST_SELECT, createdBy: { select: { id: true, name: true, email: true } } },
+    }),
+  ]);
+  const others: DraftGroup[] = [];
+  for (const row of theirs) {
+    const by = row.createdBy;
+    if (!by) continue;
+    let group = others.find((g) => g.userId === by.id);
+    if (!group) {
+      group = { userId: by.id, name: firstName(by.name || by.email.split("@")[0]), tasks: [] };
+      others.push(group);
+    }
+    group.tasks.push(toListTask(row));
+  }
+  return { mine: mine.map(toListTask), others };
+}
+
+/** How many drafts wait in the viewer's My drafts: Home's "Drafts from Claude" row (home/needs-you.ts). */
+export async function myDraftCount(viewerId: string): Promise<number> {
+  return prisma.task.count({ where: myDraftsWhere(viewerId) });
 }
 
 /** What the Property and Assignee sorts read from every matching row (list-sort.ts SortRow). */
@@ -215,7 +262,7 @@ export async function legacyAssignees(
   // The names are read while the people are still loading, when the caller passes them as a promise.
   const [rows, refs] = await Promise.all([
     prisma.task.findMany({
-      where: { assigneeUserId: null, assigneeContactId: null, assigneeName: { not: null }, ...excludeTemplateTasks },
+      where: legacyNameWhere,
       select: { assigneeName: true },
       distinct: ["assigneeName"],
       orderBy: { assigneeName: "asc" },

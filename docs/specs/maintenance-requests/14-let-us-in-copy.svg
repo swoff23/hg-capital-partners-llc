@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="590" viewBox="0 0 1080 590" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Clearer wording for "Can we let ourselves in?", drawn at 320 wide at the phone's real text sizes. A (recommended): Can we come in if you're not home? B: friendlier, less detail. C: today's words, sharpened.</title>
+<rect width="1080" height="590" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">"Can we let ourselves in?": three clearer wordings</text>
+<text x="32" y="56" font-size="11" fill="#424e61">Each drawn at 320, the narrowest phone, at a phone's real sizes (16px titles, 14px lines). Every line has to fit on one line here.</text>
+
+<!-- A -->
+<g transform="translate(32 80)">
+<text x="0" y="12" font-size="13" font-weight="600" fill="#152133">A. Say when, say what happens</text>
+<rect x="232" y="0" width="92" height="20" rx="10" fill="#f6efe1"/>
+<text x="278" y="14" font-size="10" font-weight="500" fill="#8a6d2f" text-anchor="middle">Recommended</text>
+<rect x="0" y="28" width="320" height="300" rx="12" fill="#101824"/>
+<text x="16" y="62" font-size="16" font-weight="500" fill="#f2efe9">Can we come in if you're not home?</text>
+<rect x="16" y="76" width="288" height="62" rx="8" fill="none" stroke="#f2efe9" stroke-width="1.5"/>
+<circle cx="36" cy="107" r="8" fill="#f2efe9"/><circle cx="36" cy="107" r="3.5" fill="#101824"/>
+<text x="56" y="102" font-size="16" fill="#f2efe9">Yes, come on in</text>
+<text x="56" y="122" font-size="14" fill="#8f99a8">Fastest. We'll email you the day.</text>
+<rect x="16" y="146" width="288" height="62" rx="8" fill="none" stroke="#2c3747"/>
+<circle cx="36" cy="177" r="8" fill="none" stroke="#5d6878"/>
+<text x="56" y="172" font-size="16" fill="#f2efe9">No, call me first</text>
+<text x="56" y="192" font-size="14" fill="#8f99a8">It may take longer to get fixed.</text>
+<text x="16" y="236" font-size="12" fill="#8f99a8">After No:</text>
+<text x="16" y="256" font-size="14" fill="#8f99a8">No problem. We'll call to find a time.</text>
+<text x="0" y="356" font-size="10.5" fill="#152133">• Says when ("if you're not home") and who</text>
+<text x="8" y="370" font-size="10.5" fill="#152133">tells them the day (by email).</text>
+<text x="0" y="390" font-size="10.5" fill="#152133">• The two lines match: what each choice means</text>
+<text x="8" y="404" font-size="10.5" fill="#152133">for getting it fixed.</text>
+<text x="0" y="424" font-size="10.5" fill="#152133">• Keeps your nudge, said kindly.</text>
+</g>
+
+<!-- B -->
+<g transform="translate(380 80)">
+<text x="0" y="12" font-size="13" font-weight="600" fill="#152133">B. Warmest, least detail</text>
+<rect x="0" y="28" width="320" height="300" rx="12" fill="#101824"/>
+<text x="16" y="62" font-size="16" font-weight="500" fill="#f2efe9">Okay to come in while you're out?</text>
+<rect x="16" y="76" width="288" height="62" rx="8" fill="none" stroke="#f2efe9" stroke-width="1.5"/>
+<circle cx="36" cy="107" r="8" fill="#f2efe9"/><circle cx="36" cy="107" r="3.5" fill="#101824"/>
+<text x="56" y="102" font-size="16" fill="#f2efe9">Yes, that's fine</text>
+<text x="56" y="122" font-size="14" fill="#8f99a8">The quickest way to get it fixed.</text>
+<rect x="16" y="146" width="288" height="62" rx="8" fill="none" stroke="#2c3747"/>
+<circle cx="36" cy="177" r="8" fill="none" stroke="#5d6878"/>
+<text x="56" y="172" font-size="16" fill="#f2efe9">No, I'd rather be home</text>
+<text x="56" y="192" font-size="14" fill="#8f99a8">We'll call to find a time.</text>
+<text x="16" y="236" font-size="12" fill="#8f99a8">After No: nothing more</text>
+<text x="0" y="356" font-size="10.5" fill="#152133">• Friendliest to read.</text>
+<text x="0" y="376" font-size="10.5" fill="#152133">• Doesn't say No can be slower, so it</text>
+<text x="8" y="390" font-size="10.5" fill="#152133">nudges toward Yes the least.</text>
+<text x="0" y="410" font-size="10.5" fill="#152133">• Doesn't say they'll hear the day first.</text>
+</g>
+
+<!-- C -->
+<g transform="translate(728 80)">
+<text x="0" y="12" font-size="13" font-weight="600" fill="#152133">C. Today's words, sharpened</text>
+<rect x="0" y="28" width="320" height="300" rx="12" fill="#101824"/>
+<text x="16" y="62" font-size="16" font-weight="500" fill="#f2efe9">Can we let ourselves in?</text>
+<rect x="16" y="76" width="288" height="62" rx="8" fill="none" stroke="#f2efe9" stroke-width="1.5"/>
+<circle cx="36" cy="107" r="8" fill="#f2efe9"/><circle cx="36" cy="107" r="3.5" fill="#101824"/>
+<text x="56" y="102" font-size="16" fill="#f2efe9">Yes, let yourselves in</text>
+<text x="56" y="122" font-size="14" fill="#8f99a8">Fastest. We'll email you the day.</text>
+<rect x="16" y="146" width="288" height="62" rx="8" fill="none" stroke="#2c3747"/>
+<circle cx="36" cy="177" r="8" fill="none" stroke="#5d6878"/>
+<text x="56" y="172" font-size="16" fill="#f2efe9">No, set a time with me</text>
+<text x="56" y="192" font-size="14" fill="#8f99a8">We'll call you. It can take longer.</text>
+<text x="16" y="236" font-size="12" fill="#8f99a8">After No: nothing more</text>
+<text x="0" y="356" font-size="10.5" fill="#152133">• Smallest change from what's built.</text>
+<text x="0" y="376" font-size="10.5" fill="#152133">• "You'll see the day" becomes the concrete</text>
+<text x="8" y="390" font-size="10.5" fill="#152133">"We'll email you the day."</text>
+<text x="0" y="410" font-size="10.5" fill="#152133">• The question still doesn't say "when</text>
+<text x="8" y="424" font-size="10.5" fill="#152133">you're not home."</text>
+</g>
+
+<text x="32" y="540" font-size="11" fill="#424e61">Wherever the answer is read back, it follows the pick: the request page, the resident's emails, your New request line and the task.</text>
+<text x="32" y="558" font-size="11" fill="#424e61">For A: "Come in when you're out" or "Call me first". Today: "Let yourselves in" or "Set a time with me".</text>
+</svg>

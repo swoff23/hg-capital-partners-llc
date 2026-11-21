@@ -1,7 +1,6 @@
 import type { TaskStatus } from "@prisma/client";
-import { fmtDay, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
+import { fmtDay, toYmd, type Ymd } from "@/lib/dates";
 import { STATUS_ORDER } from "@/lib/task-scope";
-import { targetDate, targetIsVisit } from "@/lib/tasks/rules";
 
 /**
  * What a contractor is told at the top of their job page about changes HG
@@ -16,17 +15,18 @@ import { targetDate, targetIsVisit } from "@/lib/tasks/rules";
  * last open) and hands them here. Nothing here sees a NOTES event's text or
  * its `data.from`: a partner may have taken text out of the notes on purpose.
  *
- * The date is the Target (rules.ts targetDate): the booked visit while the
- * job is Scheduled, otherwise the due date. It is compared before and after
- * each date edit with the status the job had at that moment, the rule core
- * uses for the TARGET email, so a contractor starting their own job (which
- * swaps the visit date for the due date) never reads as HG moving it. The
- * words are "Due date" and "Visit", never "target" (Connor, Oct 26).
+ * A job has two dates (docs/specs/contractor-scheduled-date.md): Due, and
+ * the scheduled day, which counts only while the job is Scheduled. Each is
+ * followed on its own, through its own edits, with the status the job had at
+ * that moment, so a contractor starting their own job (which ends the
+ * scheduled day) never reads as HG moving it. When both moved, the due date's
+ * change is the one shown: it's HG Capital's, and the day is theirs. The
+ * words are "Due date" and "Scheduled day", never "target" or "visit".
  */
 
 const isStatus = (v: unknown): v is TaskStatus => typeof v === "string" && (STATUS_ORDER as readonly string[]).includes(v);
 
-/** A date edit or a status change on the job, oldest first; what the Target is worked out from. */
+/** A date edit or a status change on the job, oldest first; what the two dates are worked out from. */
 export interface DateEvent {
   kind: "DUE" | "SCHEDULED" | "STATUS";
   /** The value before and after: a day for the two dates, a status for STATUS. */
@@ -45,7 +45,7 @@ export interface JobDates {
 
 export interface DateChange {
   kind: "moved" | "set" | "cleared";
-  /** The date is the booked visit ("Visit"), not the due date. */
+  /** The date is the scheduled day ("Scheduled day"), not the due date. */
   visit: boolean;
   from: Ymd | null;
   to: Ymd | null;
@@ -54,15 +54,14 @@ export interface DateChange {
 
 const ymd = (v: string | null): Ymd | null => toYmd(v);
 
-const targetOf = (s: JobDates): Ymd | null =>
-  toYmd(targetDate({ status: s.status, dueDate: ymdToDate(s.due), scheduledFor: ymdToDate(s.scheduled) }));
-
-const visitOf = (s: JobDates): boolean => targetIsVisit({ status: s.status, scheduledFor: ymdToDate(s.scheduled) });
+/** The scheduled day as the job had it: only while Scheduled (rules.ts scheduledDay). */
+const dayOf = (s: JobDates): Ymd | null => (s.status === "SCHEDULED" ? s.scheduled : null);
 
 /**
- * The change to the date the contractor sees, from the events since they last
- * opened the job (oldest first), or null when it ends where it started or never
- * moved. Several moves in a row read as one, from the first day to the last.
+ * The change to a date the contractor sees, from the events since they last
+ * opened the job (oldest first), or null when each ends where it started or
+ * never moved. Several moves in a row read as one, from the first day to the
+ * last. Due wins when both moved.
  */
 export function dateChange(now: JobDates, events: readonly DateEvent[]): DateChange | null {
   // Back to how the job stood when they last looked, undoing the newest first.
@@ -73,34 +72,33 @@ export function dateChange(now: JobDates, events: readonly DateEvent[]): DateCha
     else if (isStatus(e.from)) s.status = e.from;
   }
 
-  // The change so far; a holder, since a variable assigned in this loop would be read as the null it started as.
-  const acc: { net: DateChange | null } = { net: null };
+  // The change so far for each date; a holder, since variables assigned in this loop would be read as the null they
+  // started as.
+  const nets: { due: DateChange | null; day: DateChange | null } = { due: null, day: null };
   for (const e of events) {
     if (e.kind === "STATUS") {
       if (isStatus(e.to)) s.status = e.to;
       continue;
     }
-    const before = targetOf(s);
-    const wasVisit = visitOf(s);
-    if (e.kind === "DUE") s.due = ymd(e.to);
-    else s.scheduled = ymd(e.to);
-    const after = targetOf(s);
+    const visit = e.kind === "SCHEDULED";
+    const before = visit ? dayOf(s) : s.due;
+    if (visit) s.scheduled = ymd(e.to);
+    else s.due = ymd(e.to);
+    const after = visit ? dayOf(s) : s.due;
     if (before === after) continue;
-    const visit = after ? visitOf(s) : wasVisit;
-    const prev = acc.net;
-    acc.net =
-      prev && prev.visit === visit && prev.to === before
-        ? { ...prev, to: after, by: e.by }
-        : { kind: "moved", visit, from: before, to: after, by: e.by };
+    const key = visit ? "day" : "due";
+    const prev = nets[key];
+    nets[key] = prev && prev.to === before ? { ...prev, to: after, by: e.by } : { kind: "moved", visit, from: before, to: after, by: e.by };
   }
-  const net = acc.net;
-  if (!net || net.from === net.to) return null;
-  return { ...net, kind: net.from === null ? "set" : net.to === null ? "cleared" : "moved" };
+  for (const net of [nets.due, nets.day]) {
+    if (net && net.from !== net.to) return { ...net, kind: net.from === null ? "set" : net.to === null ? "cleared" : "moved" };
+  }
+  return null;
 }
 
 /** "Due date moved to Fri, Oct 30 (was Thu, Oct 29)"; the person is a separate field, so a narrow screen can drop it. */
 export function dateChangeText(c: DateChange, today: Ymd): string {
-  const label = c.visit ? "Visit" : "Due date";
+  const label = c.visit ? "Scheduled day" : "Due date";
   const day = (d: Ymd | null) => fmtDay(d, { weekday: true, year: "auto", now: today });
   switch (c.kind) {
     case "moved":

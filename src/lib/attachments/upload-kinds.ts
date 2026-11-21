@@ -1,5 +1,5 @@
 import { uploadSlug } from "./media";
-import { taskUploadPath, type UploadRole } from "./paths";
+import { residentUploadPath, taskUploadPath, type UploadRole } from "./paths";
 import type { FileKind } from "./content-types";
 
 /**
@@ -33,12 +33,13 @@ export const UPLOAD_KINDS = [
   "portal-contact-upload",
   "contact-upload",
   "lease-upload",
+  "resident-upload",
 ] as const;
 
 export type UploadKind = (typeof UPLOAD_KINDS)[number];
 
 /** The clientPayload key naming the row each kind uploads to, which the token route checks. */
-export const UPLOAD_KIND_PARENT: Record<UploadKind, "taskId" | "propertyId" | "contactId" | "leaseId"> = {
+export const UPLOAD_KIND_PARENT: Record<UploadKind, "taskId" | "propertyId" | "contactId" | "leaseId" | "linkId"> = {
   "task-upload": "taskId",
   "portal-task-upload": "taskId",
   "property-upload": "propertyId",
@@ -48,6 +49,8 @@ export const UPLOAD_KIND_PARENT: Record<UploadKind, "taskId" | "propertyId" | "c
   "portal-contact-upload": "contactId",
   "contact-upload": "contactId",
   "lease-upload": "leaseId",
+  // A resident's request link (docs/specs/maintenance-requests.md): files go up before the request exists.
+  "resident-upload": "linkId",
 };
 
 /** Listing and property photos are public Blob (the public site and PhotoThumb read them); everything else is private, the lockbox photo included. */
@@ -61,6 +64,7 @@ export const UPLOAD_KIND_ACCESS: Record<UploadKind, "private" | "public"> = {
   "portal-contact-upload": "private",
   "contact-upload": "private",
   "lease-upload": "private",
+  "resident-upload": "private",
 };
 
 /**
@@ -84,6 +88,8 @@ export const UPLOAD_KIND_ALLOWED: Record<UploadKind, readonly FileKind[]> = {
   "contact-upload": ["image", "file"],
   // A signed lease: the PDF, or a phone photo of the pages.
   "lease-upload": ["image", "file"],
+  // A resident's request: photos and videos.
+  "resident-upload": ["image", "video"],
 };
 
 /** The kinds whose record step keeps a thumbnail and a video poster (TaskAttachment.thumbPathname, posterPathname). */
@@ -98,6 +104,7 @@ export const UPLOAD_KIND_PREVIEWS: Record<UploadKind, boolean> = {
   "portal-contact-upload": false,
   "contact-upload": false,
   "lease-upload": false,
+  "resident-upload": true,
 };
 
 export function isUploadKind(kind: unknown): kind is UploadKind {
@@ -121,6 +128,7 @@ export function uploadTargetKey(kind: UploadKind, parentId: string): string {
     "portal-contact-upload": "portal-contact",
     "contact-upload": "contact-doc",
     "lease-upload": "lease-doc",
+    "resident-upload": "resident",
   };
   return `${prefix[kind]}:${parentId}`;
 }
@@ -139,6 +147,9 @@ export function uploadTargetHref(kind: UploadKind, parentId: string): string {
       return `/contractors/${encodeURIComponent(readContactDocParent(parentId)?.contactId ?? "")}`;
     case "lease-upload":
       return `/tenants/${encodeURIComponent(readLeaseDocParent(parentId)?.leaseId ?? "")}`;
+    case "resident-upload":
+      // The resident's pages carry their link; a toast has nowhere else to send them.
+      return "";
     default:
       return `/properties/${id}`;
   }
@@ -199,6 +210,9 @@ export function uploadRequest(
       const docKind = parent?.docKind ?? "w9";
       return { pathname: `contacts/${contactId}/${docKind}/${slug}`, clientPayload: owned({ contactId, docKind, fileKind: file.fileKind }) };
     }
+    case "resident-upload":
+      // The resident's link rides in `owner` (queue-owner.ts residentScope), which the token route reads.
+      return { pathname: residentUploadPath(parentId, slug, role, file.contentType), clientPayload: owned({ linkId: parentId, fileKind: file.fileKind }) };
     case "lease-upload": {
       const parent = readLeaseDocParent(parentId);
       const leaseId = parent?.leaseId ?? "";

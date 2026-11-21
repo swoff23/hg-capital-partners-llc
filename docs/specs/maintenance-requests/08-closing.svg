@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="720" viewBox="0 0 1000 720" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Question 7: closing a request without fixing it. A (recommended): Canceled asks for an optional note to the resident, who sees Closed with it, and a resident can cancel their own while it's still Received. B: pick a reason that sends a fixed line.</title>
+<rect width="1000" height="720" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Question 7: what happens when you don't do it?</text>
+<text x="32" y="56" font-size="11" fill="#424e61">Not yours to fix, already asked, sent by mistake. You pick Canceled on the task, as you do today.</text>
+
+<!-- A -->
+<g transform="translate(32 76)">
+<rect x="0" y="0" width="936" height="384" rx="10" fill="none" stroke="#c9a96a" stroke-width="1.5"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">A. An optional note, and they can cancel their own</text>
+<rect x="352" y="16" width="92" height="20" rx="10" fill="#f6efe1"/>
+<text x="398" y="30" font-size="10" font-weight="500" fill="#8a6d2f" text-anchor="middle">Recommended</text>
+
+<!-- staff dialog -->
+<text x="20" y="62" font-size="10" fill="#424e61">You: Canceled on a resident's task</text>
+<rect x="20" y="72" width="280" height="180" rx="10" fill="#ffffff" stroke="#152133"/>
+<text x="38" y="100" font-size="12.5" font-weight="600" fill="#152133">Close Dana's request?</text>
+<text x="38" y="124" font-size="10" font-weight="500" fill="#424e61">Note for Dana (optional)</text>
+<rect x="38" y="130" width="244" height="56" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="48" y="148" font-size="10" fill="#8f99a8">Same as your other request.</text>
+<rect x="104" y="206" width="78" height="30" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="143" y="225" font-size="10.5" fill="#152133" text-anchor="middle">Keep open</text>
+<rect x="190" y="206" width="92" height="30" rx="6" fill="#152133"/>
+<text x="236" y="225" font-size="10.5" font-weight="500" fill="#ffffff" text-anchor="middle">Close request</text>
+<text x="20" y="282" font-size="10.5" fill="#152133">• Only on tasks that came from a resident.</text>
+<text x="20" y="302" font-size="10.5" fill="#152133">• Blank is fine: they see "Questions? Text us</text>
+<text x="28" y="316" font-size="10.5" fill="#152133">in our group chat." in its place.</text>
+<text x="20" y="336" font-size="10.5" fill="#152133">• Reopen it and they're back on Received.</text>
+
+<!-- resident closed -->
+<text x="332" y="62" font-size="10" fill="#424e61">Dana sees, and gets an email</text>
+<rect x="332" y="72" width="196" height="232" rx="18" fill="#ffffff" stroke="#152133"/>
+<text x="348" y="96" font-size="9.5" fill="#424e61">‹ My requests</text>
+<text x="348" y="118" font-size="13" font-weight="600" fill="#152133">Kitchen sink leaks</text>
+<circle cx="354" cy="142" r="5" fill="#152133"/>
+<text x="366" y="146" font-size="10.5" font-weight="500" fill="#152133">Received</text>
+<text x="512" y="146" font-size="9.5" fill="#424e61" text-anchor="end">Fri, Nov 21</text>
+<line x1="354" y1="148" x2="354" y2="166" stroke="#152133"/>
+<circle cx="354" cy="172" r="5" fill="#152133"/>
+<text x="366" y="176" font-size="10.5" font-weight="500" fill="#152133">Closed</text>
+<text x="512" y="176" font-size="9.5" fill="#424e61" text-anchor="end">Sat, Nov 22</text>
+<rect x="366" y="186" width="146" height="32" rx="6" fill="#f5f6f8"/>
+<text x="374" y="206" font-size="9.5" fill="#152133">Same as your other request.</text>
+<text x="348" y="250" font-size="9.5" font-weight="500" fill="#424e61">What you sent</text>
+<rect x="348" y="260" width="34" height="28" rx="4" fill="#e6e9ee"/>
+<text x="332" y="332" font-size="10.5" fill="#152133">• Closed takes Done's place.</text>
+<text x="332" y="352" font-size="10.5" fill="#152133">• Moves to Done on their list.</text>
+
+<!-- resident withdraws -->
+<text x="560" y="62" font-size="10" fill="#424e61">Dana sent it by mistake</text>
+<rect x="560" y="72" width="196" height="232" rx="18" fill="#ffffff" stroke="#152133"/>
+<text x="576" y="96" font-size="9.5" fill="#424e61">‹ My requests</text>
+<text x="576" y="118" font-size="13" font-weight="600" fill="#152133">Kitchen sink leaks</text>
+<circle cx="582" cy="142" r="5" fill="#152133"/>
+<text x="594" y="146" font-size="10.5" font-weight="500" fill="#152133">Received</text>
+<text x="740" y="146" font-size="9.5" fill="#424e61" text-anchor="end">Fri, Nov 21</text>
+<line x1="582" y1="148" x2="582" y2="166" stroke="#d9dde3"/>
+<circle cx="582" cy="172" r="5" fill="#ffffff" stroke="#8f99a8"/>
+<text x="594" y="176" font-size="10.5" fill="#8f99a8">Scheduled</text>
+<line x1="582" y1="178" x2="582" y2="196" stroke="#d9dde3"/>
+<circle cx="582" cy="202" r="5" fill="#ffffff" stroke="#8f99a8"/>
+<text x="594" y="206" font-size="10.5" fill="#8f99a8">Done</text>
+<text x="576" y="282" font-size="10" fill="#152133" text-decoration="underline">Cancel this request</text>
+<text x="560" y="332" font-size="10.5" fill="#152133">• Only while it's still Received.</text>
+<text x="560" y="352" font-size="10.5" fill="#152133">• One confirm, then your task is</text>
+<text x="568" y="366" font-size="10.5" fill="#152133">Canceled: "Dana canceled it."</text>
+
+<text x="788" y="96" font-size="10.5" fill="#152133">Every case is one</text>
+<text x="788" y="110" font-size="10.5" fill="#152133">status you already</text>
+<text x="788" y="124" font-size="10.5" fill="#152133">have: Canceled.</text>
+<text x="788" y="148" font-size="10.5" fill="#152133">Nothing new to pick,</text>
+<text x="788" y="162" font-size="10.5" fill="#152133">and a duplicate is a</text>
+<text x="788" y="176" font-size="10.5" fill="#152133">Canceled with "Same</text>
+<text x="788" y="190" font-size="10.5" fill="#152133">as your other request."</text>
+</g>
+
+<!-- B -->
+<g transform="translate(32 480)">
+<rect x="0" y="0" width="936" height="200" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">B. Pick a reason that sends a set line</text>
+<rect x="20" y="44" width="280" height="140" rx="10" fill="#ffffff" stroke="#152133"/>
+<text x="38" y="68" font-size="12.5" font-weight="600" fill="#152133">Why are you closing it?</text>
+<circle cx="44" cy="90" r="5" fill="#ffffff" stroke="#8f99a8"/><text x="56" y="94" font-size="10.5" fill="#152133">Not ours to fix</text>
+<circle cx="44" cy="112" r="5" fill="#ffffff" stroke="#8f99a8"/><text x="56" y="116" font-size="10.5" fill="#152133">Already asked</text>
+<circle cx="44" cy="134" r="5" fill="#ffffff" stroke="#8f99a8"/><text x="56" y="138" font-size="10.5" fill="#152133">Sent by mistake</text>
+<circle cx="44" cy="156" r="5" fill="#ffffff" stroke="#8f99a8"/><text x="56" y="160" font-size="10.5" fill="#152133">Something else (type a line)</text>
+<text x="332" y="68" font-size="10.5" fill="#152133">• Each reason sends a set line, like "This one is yours to fix under your lease."</text>
+<text x="332" y="90" font-size="10.5" fill="#152133">• Gives you counts by reason later.</text>
+<text x="332" y="112" font-size="10.5" fill="#152133">• One more pick every time, and set lines can read cold to the resident.</text>
+<text x="332" y="134" font-size="10.5" fill="#152133">• No way for them to cancel their own; they text you instead.</text>
+</g>
+
+<text x="32" y="704" font-size="11" fill="#424e61">Sizes: the dialog is centered on laptop and tablet and a bottom sheet on phones, as the app's dialogs are today. Resident pages keep the 480 column.</text>
+</svg>

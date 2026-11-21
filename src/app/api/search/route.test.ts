@@ -32,6 +32,7 @@ function matches(row: Row, cond: Row): boolean {
   return Object.entries(cond).every(([key, value]) => {
     if (key === "AND") return (value as Row[]).every((c) => matches(row, c));
     if (key === "OR") return (value as Row[]).some((c) => matches(row, c));
+    if (key === "NOT") return !matches(row, value as Row);
     const have = row[key];
     if (value !== null && typeof value === "object" && !(value instanceof Date)) {
       const filter = value as Row;
@@ -186,10 +187,32 @@ test("a Template task never comes back, in the rows or the total", async () => {
   assert.deepEqual(elsewhere.groups.map((g) => [g.type, g.total, g.rows.length]), [["task", 1, 0]]);
 });
 
+// A draft Claude saved isn't a task until a partner adds it (docs/specs/tasks-from-claude.md 6.2): search finds it
+// nowhere, though its title, its property and its contractor would each match.
+test("a draft from Claude never comes back: not in the rows, the totals, the counts elsewhere or Recent", async () => {
+  const { db } = fakeDb({
+    tasks: [task("live", "Fix gutters pulling off the back", "OPEN"), task("draft", "Fix gutters pulling off the back", "DRAFT"), task("done", "Fix gutters at the rear", "DONE")],
+  });
+  const tasks = group((await search(db, "fix gutters")).groups, "task");
+  assert.deepEqual(ids(tasks)?.sort(), ["done", "live"]);
+  assert.equal(tasks?.total, 2);
+  assert.deepEqual(ids(group((await search(db, "fix gutters", { type: "task" })).groups, "task"))?.sort(), ["done", "live"]);
+  const elsewhere = await search(db, "fix gutters", { type: "deal" });
+  assert.deepEqual(elsewhere.groups.map((g) => [g.type, g.total, g.rows.length]), [["task", 2, 0]]);
+
+  // Opened a moment ago (a partner looked at the draft's page): still not a Recent row.
+  const recent = await answerRecent({ id: "u1" }, db, async () => [
+    { kind: "TASK" as RecentKind, recordId: "draft" },
+    { kind: "TASK" as RecentKind, recordId: "live" },
+  ]);
+  assert.equal(recent.status, 200);
+  if (recent.status === 200) assert.deepEqual(recent.body.rows.map((r) => r.id), ["live"]);
+});
+
 test("the route source takes the Template filter from the shared where, not a copy of its own", () => {
   const source = readFileSync(join(__dirname, "..", "..", "..", "lib", "search-results.ts"), "utf8");
   assert.match(source, /paletteTaskWhere\(q\)/);
-  assert.match(source, /excludeTemplateTasks/);
+  assert.match(source, /listedTask/);
 });
 
 // ---------------------------------------------------------------------------
