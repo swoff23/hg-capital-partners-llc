@@ -49,7 +49,7 @@ Each chunk ships its own small migration.
 
 [missing-info.md](missing-info.md) brings every important blank to a partner: one Missing info row in Home's Needs you that opens a worklist of every gap (Required and Suggested), a line and in-place marks on each property, lease and contractor page, a dated row before each lease's New York notice deadline, and Make task to hand rows to Pieter. It was planned with Connor on Nov 15, 2026, and built the same day.
 
-[coming-soon.md](coming-soon.md) adds a Coming soon status to rental listings. Those homes show on the public Rentals page with a "Coming soon" or "Coming in January" pill, and each has Notify me, a small form for first name, email and an optional phone. The listing sheet lists who's waiting, and switching the listing to Available emails them, behind a ticked checkbox. It was planned with Connor on Nov 15, 2026, and waits for his "build it".
+[coming-soon.md](coming-soon.md) adds a Coming soon status to rental listings, shown on Rentals with a "Coming soon" or "Coming in January" pill, and a sign-up on each one (first name, email, optional phone). The listing sheet lists who signed up, with Copy emails and Download for Connor to email them from Gmail; the app sends no email. It was planned with Connor on Nov 15, 2026, simplified on Nov 20, and built on Nov 21.
 
 [staff-password-reset.md](staff-password-reset.md) lets Connor and Pieter use Forgot password: the same pages, link and limits contractors have, and a reset signs that partner out on every device. A login with no password still can't reset, so clearing it stays the way to turn a staff login off. It was planned with Connor on Nov 16, 2026, and built the same day.
 
