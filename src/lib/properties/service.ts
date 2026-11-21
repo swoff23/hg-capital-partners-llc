@@ -550,54 +550,10 @@ async function writeBuildingCapex(id: string, patch: BuildingCapexPatch, expecte
   revalidateProperty(id);
 }
 
-/* ---------------- Listings (real rows, whole-set replace) ---------------- */
+/* ---------------- Listings (real rows, one at a time from its sheet) ---------------- */
 
 // What a listing write reads from the sheet is in listing-clean.ts, where a test can reach it.
 export type { ListingInput };
-
-/**
- * Diff the submitted set against what's stored: missing rows are deleted
- * (photos too), existing ids updated in place, new rows created. Runs in one
- * transaction that also bumps Property.updatedAt (the version guard);
- * orphaned photo blobs are deleted only after the commit.
- */
-export async function replaceListings(propertyId: string, listings: ListingInput[], expectedVersion: string, by: Editor): Promise<void> {
-  const clean = listings.map(cleanListing);
-
-  const existing = await prisma.listing.findMany({ where: { propertyId }, select: { id: true, photos: { select: { url: true } } } });
-  const existingById = new Map(existing.map((e) => [e.id, e]));
-  const keepIds = new Set(clean.map((l) => l.id).filter(Boolean) as string[]);
-  const toDelete = existing.filter((e) => !keepIds.has(e.id));
-
-  const urlsToDelete: string[] = [];
-  for (const row of toDelete) urlsToDelete.push(...row.photos.map((p) => p.url));
-  for (const l of clean) {
-    if (!l.id) continue;
-    const before = existingById.get(l.id);
-    if (!before) continue;
-    const afterUrls = new Set(l.photos.map((p) => p.url));
-    for (const p of before.photos) if (!afterUrls.has(p.url)) urlsToDelete.push(p.url);
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await touchAtVersion(tx, propertyId, expectedVersion, by);
-    for (const row of toDelete) await tx.listing.delete({ where: { id: row.id } });
-    for (const { photos, ...l } of clean) {
-      if (l.id) {
-        await tx.listing.update({
-          where: { id: l.id },
-          data: { ...l, id: undefined, propertyId, photos: { deleteMany: {}, create: photos } },
-        });
-      } else {
-        await tx.listing.create({ data: { ...l, id: undefined, propertyId, photos: { create: photos } } });
-      }
-    }
-  });
-
-  await deleteBlobs(urlsToDelete);
-  revalidatePath(`/properties/${propertyId}`);
-  revalidatePath("/rentals");
-}
 
 /**
  * Save one listing from its sheet (forms 4.2): the fields and the photo set
@@ -632,11 +588,25 @@ export async function saveListing(propertyId: string, listing: ListingInput, exp
 }
 
 /** Delete one listing and its photos, after the confirm (forms 4.2). A listing already gone is not an error. */
-export async function deleteListing(propertyId: string, listingId: string, expectedVersion: string, by: Editor): Promise<void> {
+export async function deleteListing(
+  propertyId: string,
+  listingId: string,
+  expectedVersion: string,
+  by: Editor,
+  /** How many people the confirm said were waiting. Sign-ups don't move the version, so more now means the list grew. */
+  expectedWaiting = 0,
+): Promise<void> {
   const row = await prisma.listing.findFirst({ where: { id: listingId, propertyId }, select: { photos: { select: { url: true } } } });
   await prisma.$transaction(async (tx) => {
     await touchAtVersion(tx, propertyId, expectedVersion, by);
-    if (row) await tx.listing.delete({ where: { id: listingId } });
+    if (!row) return;
+    // The list goes with the listing: refuse when people signed up after the confirm was read.
+    const waiting = await tx.listingWaitlistEntry.count({ where: { listingId } });
+    if (waiting > expectedWaiting) {
+      revalidatePath(`/properties/${propertyId}`);
+      throw new Error("Someone just signed up for this home. Check the list, then delete again.");
+    }
+    await tx.listing.delete({ where: { id: listingId } });
   });
   await deleteBlobs((row?.photos ?? []).map((p) => p.url));
   revalidatePath(`/properties/${propertyId}`);

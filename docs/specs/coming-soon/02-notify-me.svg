@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="470" viewBox="0 0 900 470" font-family="Geist, -apple-system, system-ui, sans-serif">
 <title>Notify me: a centered dialog on laptop and tablet, a bottom sheet on phone, and the thank-you the same sheet turns into</title>
 <rect width="900" height="470" fill="#ffffff"/>
-<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Decisions 7, 8 and 12: the Notify me form and its thank-you</text>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Decisions 7 and 8: the Notify me form and its thank-you</text>
 
 <g transform="translate(32 56)">
 <text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Laptop 1280 and tablet 768: centered dialog</text>
@@ -17,7 +17,6 @@
 <text x="60" y="236" font-size="10" font-weight="500" fill="#c5ccd6">Phone <tspan fill="#8f99a8" font-weight="400">(optional)</tspan></text>
 <rect x="60" y="242" width="260" height="32" rx="6" fill="#101824" stroke="#3a4657"/>
 <rect x="60" y="292" width="260" height="36" rx="6" fill="#e8e1d4"/><text x="190" y="315" font-size="12" font-weight="500" fill="#101824" text-anchor="middle">Notify me</text>
-<text x="190" y="350" font-size="10" fill="#8f99a8" text-anchor="middle">We'll only use this to tell you about this home.</text>
 </g>
 
 <g transform="translate(444 56)">
@@ -31,7 +30,6 @@
 <rect x="14" y="212" width="172" height="30" rx="6" fill="#101824" stroke="#3a4657"/><text x="22" y="231" font-size="10" fill="#5d6878">Email</text>
 <rect x="14" y="250" width="172" height="30" rx="6" fill="#101824" stroke="#3a4657"/><text x="22" y="269" font-size="10" fill="#5d6878">Phone (optional)</text>
 <rect x="14" y="296" width="172" height="40" rx="6" fill="#e8e1d4"/><text x="100" y="321" font-size="12" font-weight="500" fill="#101824" text-anchor="middle">Notify me</text>
-<text x="100" y="356" font-size="8.5" fill="#8f99a8" text-anchor="middle">We'll only use this to tell you about this home.</text>
 <text x="100" y="384" font-size="9" fill="#5d6878" text-anchor="middle">Inputs at 16px; the sheet rides above the keyboard</text>
 </g>
 
@@ -41,11 +39,9 @@
 <rect x="16" y="40" width="160" height="120" rx="8" fill="#1f2a3a"/>
 <text x="96" y="104" font-size="10" fill="#5d6878" text-anchor="middle">The home's first photo</text>
 <text x="16" y="190" font-size="14" font-weight="500" fill="#f2efe9">You're on the list, Dana!</text>
-<text x="16" y="212" font-size="10" fill="#8f99a8">We'll email you when 56 Tamarack St,</text>
-<text x="16" y="226" font-size="10" fill="#8f99a8">Upper is ready.</text>
+<text x="16" y="212" font-size="10" fill="#8f99a8">We'll reach out when it's ready.</text>
 <rect x="16" y="252" width="160" height="36" rx="6" fill="none" stroke="#3a4657"/><text x="96" y="275" font-size="12" fill="#f2efe9" text-anchor="middle">Done</text>
-<text x="16" y="316" font-size="9" fill="#5d6878">No photo yet: the card's House tile.</text>
-<text x="16" y="330" font-size="9" fill="#5d6878">A short confirmation email goes out</text>
-<text x="16" y="344" font-size="9" fill="#5d6878">at the same time (decision 12).</text>
+<text x="16" y="316" font-size="9" fill="#5d6878">No photo: SpotArt request-sent.</text>
+<text x="16" y="330" font-size="9" fill="#5d6878">The app sends no email.</text>
 </g>
 </svg>

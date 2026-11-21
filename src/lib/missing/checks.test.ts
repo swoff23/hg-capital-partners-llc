@@ -158,7 +158,7 @@ test("house meters get the utility checks and nothing else", () => {
   assert.deepEqual(checks({ properties: [property({ units })] }), ["required:utility.waterAutopay"]);
 });
 
-test("a unit with no lease asks once, unless rehabbing, listed or marked vacant (D6)", () => {
+test("a unit with no lease asks once, unless rehabbing, listed Available or Coming soon, or marked vacant (D6)", () => {
   const units = [{ id: "u1", label: "Lower", lockboxCode: "1", utilities: doneUtilities }];
   const empty = run({ properties: [property({ units, leases: [] })] }).gaps;
   assert.deepEqual(
@@ -167,6 +167,9 @@ test("a unit with no lease asks once, unless rehabbing, listed or marked vacant 
   );
   assert.deepEqual(checks({ properties: [property({ units, leases: [], status: "Rehabbing" })] }), []);
   assert.deepEqual(checks({ properties: [property({ units, leases: [], listings: [{ unitLabel: " lower ", status: "AVAILABLE" }] })] }), []);
+  // Coming soon is listed too: the unit is empty while it's readied (docs/specs/coming-soon.md).
+  assert.deepEqual(checks({ properties: [property({ units, leases: [], listings: [{ unitLabel: "Lower", status: "COMING_SOON" }] })] }), []);
+  assert.deepEqual(checks({ properties: [property({ units, leases: [], listings: [{ unitLabel: "Lower", status: "LEASED" }] })] }), ["required:unit.lease"]);
   assert.deepEqual(checks({ properties: [property({ units, leases: [], listings: [{ unitLabel: "Lower", status: "HIDDEN" }] })] }), ["required:unit.lease"]);
   assert.deepEqual(checks({ properties: [property({ units: [{ ...units[0], vacantSince: "2026-11-01" }], leases: [] })] }), []);
   // A household that moved in after Vacant since, and has since left, makes the unit ask again.

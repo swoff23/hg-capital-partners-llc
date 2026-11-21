@@ -25,7 +25,7 @@ Production today (read-only counts, Nov 15): **177 required** gaps across 11 pro
 | D3 | Option C: a row offers its real answer first (Upload, Mark vacant, Done or NA); Doesn't apply in the ⋯ menu covers the rest, with who and when kept and an Undo |
 | D4 | Option B: every utility box needs an answer. National Grid and National Fuel: account number, autopay, leave on for landlord. Water: account number, autopay. Done and NA count as answered; blank, "Need to set up" and "Call to confirm" don't |
 | D5 | Option A: a lease end is a dated Needs you row that shows 30 days before New York's notice deadline (30, 60 or 90 days before the end, by how long they've lived there) |
-| D6 | Option A: a unit with no current lease counts as vacant when its property is Rehabbing or it has an Available listing; otherwise it asks once (Add lease or Mark vacant) |
+| D6 | Option A: a unit with no current lease counts as vacant when its property is Rehabbing or it has an Available or Coming soon listing ([coming-soon.md](coming-soon.md)); otherwise it asks once (Add lease or Mark vacant) |
 | D7 | Option A: a W-9 is required for a contractor who worked a job this calendar year (or, once QuickBooks is connected, was paid this year); suggested for every other active contractor |
 | D8 | Option A: a date that has passed counts as missing until the next one is set (the property tax due date); numbers count as done once filled |
 | D9 | Option B: one shared list for both partners, plus Make task, which turns chosen rows into one task with each gap as a checklist item that ticks itself |
@@ -56,7 +56,7 @@ Production counts are from a read-only query on Nov 15, 2026. "Real answer" is w
 | Property | Next property tax due date: blank, or passed (D8) | Set date | 11 of 11 |
 | Property | Rental registration expiry | Fill in | 11 of 11 |
 | Unit, house meter included | Each utility box (D4): Grid account, autopay, leave on; Fuel account, autopay, leave on; Water account, autopay | Done or NA pick; account by typing | 58 boxes on 26 of 31 units (Fuel leave on 24, Fuel autopay 11, Grid account 8, Grid autopay 6, Grid leave on 5, Fuel account 2, Water 1 and 1) |
-| Unit, rentable | No current or upcoming lease, property not Rehabbing, no Available listing for the unit (D6) | Add lease, Mark vacant | 1 (8 have no lease; 7 count as vacant) |
+| Unit, rentable | No current or upcoming lease, property not Rehabbing, no Available or Coming soon listing for the unit (D6) | Add lease, Mark vacant | 1 (8 have no lease; 7 count as vacant) |
 | Lease, current or upcoming | Signed PDF on the term in force | Upload | 21 of 21 |
 | Lease, current or upcoming | Rent: at least one term | Add term | 0 |
 | Lease, current or upcoming | Primary tenant's phone | Fill in | 1 |

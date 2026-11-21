@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
+import type { ListingStatus } from "@prisma/client";
 import { ArrowUpRight } from "lucide-react";
 import { Money } from "@/components/money";
 import { Eyebrow, publicContainer, publicLinkHover, publicType } from "@/components/public/ui";
 import { BRAND } from "@/lib/brand";
 import { prisma } from "@/lib/db";
-import { daysUntil, fmtDay, todayYmdEastern } from "@/lib/dates";
+import { toYmd, todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
+import { listingPill } from "@/lib/properties/listing-pill";
 import { cn } from "@/lib/utils";
+import { NotifyMe } from "./notify-me";
 import { PhotoCarousel } from "./photo-carousel";
 
 export const metadata: Metadata = {
@@ -27,9 +30,9 @@ type ListingCardData = {
   rent: string | null;
   facts: string;
   photos: string[];
-  leased: boolean;
-  /** The photo pill: "Leased", or "Available Nov 1" while the move-in date is ahead. */
-  status?: string;
+  status: ListingStatus;
+  /** The photo pill (lib/properties/listing-pill.ts): "Leased", "Available Nov 1", "Coming in January", "Coming soon". */
+  pill?: string;
 };
 
 /** "2 bd", but a word the editor typed ("Studio") stays as it is. */
@@ -42,7 +45,7 @@ function count(value: string | null, unit: string): string | null {
 export default async function RentalsPage() {
   const rows = await prisma.listing.findMany({
     // Never a listing at an archived property (lib/archive.ts).
-    where: { status: { in: ["AVAILABLE", "LEASED"] }, property: { archivedAt: null } },
+    where: { status: { in: ["AVAILABLE", "COMING_SOON", "LEASED"] }, property: { archivedAt: null } },
     orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
     include: {
       property: { select: { address: true } },
@@ -51,39 +54,51 @@ export default async function RentalsPage() {
   });
 
   const today = todayYmdEastern();
-  const listings: ListingCardData[] = rows.map((l) => {
-    const leased = l.status === "LEASED";
-    const ahead = (daysUntil(l.availableDate, today) ?? 0) > 0;
-    return {
-      id: l.id,
-      unitLabel: l.unitLabel,
-      address: l.property.address,
-      street: shortAddress(l.property.address) || l.property.address,
-      zillowUrl: l.zillowUrl,
-      rent: l.rent?.toString() ?? null,
-      facts: [count(l.beds, "bd"), count(l.baths, "ba"), l.sqft && `${l.sqft.toLocaleString("en-US")} sq ft`]
-        .filter(Boolean)
-        .join(" · "),
-      photos: l.photos.map((p) => p.url),
-      leased,
-      status: leased
-        ? "Leased"
-        : ahead
-          ? `Available ${fmtDay(l.availableDate, { year: "auto", now: today })}`
-          : undefined,
-    };
-  });
+  // Coming-soon homes go soonest first, undated last. The status order (Available, Coming soon, Leased)
+  // and today's newest-edit order inside the other two stay as the query gave them.
+  const soonest = (a: (typeof rows)[number], b: (typeof rows)[number]) => {
+    const [x, y] = [toYmd(a.availableDate), toYmd(b.availableDate)];
+    return x === y ? 0 : x === null ? 1 : y === null ? -1 : x < y ? -1 : 1;
+  };
+  const ordered = [
+    ...rows.filter((l) => l.status === "AVAILABLE"),
+    ...rows.filter((l) => l.status === "COMING_SOON").sort(soonest),
+    ...rows.filter((l) => l.status === "LEASED"),
+  ];
+  const listings: ListingCardData[] = ordered.map((l) => ({
+    id: l.id,
+    unitLabel: l.unitLabel,
+    address: l.property.address,
+    street: shortAddress(l.property.address) || l.property.address,
+    zillowUrl: l.zillowUrl,
+    rent: l.rent?.toString() ?? null,
+    facts: [count(l.beds, "bd"), count(l.baths, "ba"), l.sqft && `${l.sqft.toLocaleString("en-US")} sq ft`]
+      .filter(Boolean)
+      .join(" · "),
+    photos: l.photos.map((p) => p.url),
+    status: l.status,
+    pill: listingPill(l.status, l.availableDate, today),
+  }));
 
-  const available = listings.filter((l) => !l.leased).length;
+  const available = listings.filter((l) => l.status === "AVAILABLE").length;
+  const coming = listings.filter((l) => l.status === "COMING_SOON").length;
+  const availableFact = `${available} available`;
+  const comingFact = `${coming} coming soon`;
+  // Below 640 the line keeps one fact, so it stays on one line at 320.
+  const full = available > 0 && coming > 0 ? `${availableFact} · ${comingFact}` : available > 0 ? availableFact : coming > 0 ? comingFact : "None available";
+  const short = available > 0 ? availableFact : coming > 0 ? comingFact : "None available";
 
-  // Available first, then the ones already leased, in one grid: the photo's
-  // Leased pill marks them.
+  // Available first, then the coming-soon homes, then the ones already leased, in one grid: the photo's pill marks them.
   return (
     <main className={cn(publicContainer, "py-10 sm:py-12")}>
-      <Eyebrow>{available > 0 ? `Rentals · ${available} available` : "Rentals · None available"}</Eyebrow>
+      <Eyebrow>
+        {/* Two spans, so only one is ever shown or read out. */}
+        <span className="max-sm:hidden">Rentals · {full}</span>
+        <span className="sm:hidden">Rentals · {short}</span>
+      </Eyebrow>
       <h1 className={cn(publicType.heading, "mt-3 text-foreground")}>Apartments in Buffalo.</h1>
 
-      {available === 0 && (
+      {available === 0 && coming === 0 && (
         // No link until there's a Zillow profile URL (docs/todo-for-connor.md).
         <p className={cn(publicType.lead, "mt-3 max-w-xl text-muted-foreground")}>
           No openings right now. Check back soon. Our homes are also listed on Zillow.
@@ -108,11 +123,13 @@ export default async function RentalsPage() {
  * heading, so the card leaves it out.
  */
 function ListingCard({ listing: l }: { listing: ListingCardData }) {
+  const coming = l.status === "COMING_SOON";
+  const zillow = !!l.zillowUrl && l.status !== "LEASED";
   // The full-screen viewer's header: the street, and the rent while it's open ("56 Tamarack St · $1,450/mo").
   const viewerTitle = (
     <>
       {l.street}
-      {!l.leased && l.rent && (
+      {l.status !== "LEASED" && l.rent && (
         <>
           {" · "}
           <Money value={l.rent} />
@@ -123,12 +140,13 @@ function ListingCard({ listing: l }: { listing: ListingCardData }) {
   );
   return (
     <article className="flex min-w-0 flex-col gap-3">
-      <PhotoCarousel photos={l.photos} label={l.address} status={l.status} viewerTitle={viewerTitle} />
+      <PhotoCarousel photos={l.photos} label={l.address} status={l.pill} viewerTitle={viewerTitle} />
 
       <div className="grid gap-0.5">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className={cn(publicType.title, "min-w-0 text-foreground")}>{l.street}</h2>
-          {!l.leased && (
+          {/* The rent when it's entered; "Price on request" for Available only, nothing on a coming-soon card without one. */}
+          {l.status !== "LEASED" && (l.rent || l.status === "AVAILABLE") && (
             <p className={cn(publicType.title, "shrink-0 text-right text-foreground")}>
               {l.rent ? (
                 <>
@@ -144,20 +162,33 @@ function ListingCard({ listing: l }: { listing: ListingCardData }) {
         <p className={cn(publicType.meta, "text-muted-foreground")}>{l.unitLabel}</p>
         {/* No facts yet: nothing, since "Price on request" above already says to ask. */}
         {l.facts && <p className={cn(publicType.meta, "num text-muted-foreground")}>{l.facts}</p>}
-        {l.zillowUrl && !l.leased && (
-          <a
-            href={l.zillowUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(
-              publicType.meta,
-              "mt-2 inline-flex w-fit items-center gap-1 text-foreground pointer-coarse:min-h-11",
-              publicLinkHover,
+        {(coming || zillow) && (
+          // One row that fits at 320: Notify me (coming soon only), then View on Zillow.
+          <div className="mt-2 flex items-center gap-4">
+            {coming && (
+              <NotifyMe
+                listingId={l.id}
+                title={[l.street, l.unitLabel].filter(Boolean).join(", ")}
+                pill={l.pill ?? "Coming soon"}
+                photoUrl={l.photos[0] ?? null}
+              />
             )}
-          >
-            View on Zillow
-            <ArrowUpRight aria-hidden="true" className="size-4 stroke-[1.5]" />
-          </a>
+            {zillow && (
+              <a
+                href={l.zillowUrl!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  publicType.meta,
+                  "inline-flex w-fit items-center gap-1 text-foreground pointer-coarse:min-h-11",
+                  publicLinkHover,
+                )}
+              >
+                View on Zillow
+                <ArrowUpRight aria-hidden="true" className="size-4 stroke-[1.5]" />
+              </a>
+            )}
+          </div>
         )}
       </div>
     </article>
