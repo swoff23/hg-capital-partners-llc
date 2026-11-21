@@ -5,9 +5,10 @@ import type { Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import type { JobEmailState } from "@/lib/portal/job-emails";
 import {
+  anchorsStretch,
   buildActivity,
-  easternDay,
   entryIsFresh,
+  entryKinds,
   isImported,
   type ActivityEntry,
   type ActivityEvent,
@@ -61,8 +62,13 @@ interface Base {
   ids: string[];
   /** The `clientId`s of the sends behind the row: a message in flight gives way to its row, and stays gone if the row is deleted. */
   clientIds: string[];
-  /** The Buffalo day it happened, for the day headings. */
-  day: Ymd;
+  /**
+   * It stays in view and ends a stretch of changes (docs/specs/activity-collapse.md 3.1): a comment, a decision, what
+   * never folds, or the row the delivery line sits under.
+   */
+  anchor: boolean;
+  /** The kinds of change it stands for ("assignee", "due date"), for a collapsed line's words. */
+  kinds: string[];
   /** When it happened (ISO), for its time slot. */
   at: string;
   /** Anything in it is new to this viewer, whenever it was written (the New divider reads it against its baseline). */
@@ -95,7 +101,11 @@ export type ActivityRow =
    */
   | (Base & { type: "deleted"; author: string; deletedAt: string })
   | (Base & { type: "line" } & LineFields)
-  | (Base & { type: "run" } & LineFields & { members: (LineFields & { id: string; at: string })[] })
+  | (Base & { type: "run" } & LineFields & {
+        members: (LineFields & { id: string; at: string })[];
+        /** One sentence per kind when the run folds three kinds or more: it shows flat inside an opened stretch. */
+        sentences: string[] | null;
+      })
   | (Base & { type: "batch" } & LineFields)
   /** A status change and the note written with it: one entry, the note styled by its own visibility. */
   | (Base & { type: "decision"; status: TaskStatus | null; text: string; note: CommentFields | null })
@@ -259,7 +269,8 @@ export function shapeActivity(input: ShapeInput): ActivityRow[] {
         const id = e.data && typeof e.data === "object" ? (e.data as { clientId?: unknown }).clientId : null;
         return typeof id === "string" ? [id] : [];
       }),
-      day: easternDay(entry.at),
+      anchor: anchorsStretch(entry) || deliveries.has(i),
+      kinds: entryKinds(entry),
       at: entry.at.toISOString(),
       fresh: entryIsFresh(entry, viewerId),
       imported: entry.imported,
@@ -290,6 +301,7 @@ export function shapeActivity(input: ShapeInput): ActivityRow[] {
           media: [],
           files: [],
           members: entry.lines.map((l) => ({ ...lineFields(l), id: l.id, at: l.at.toISOString() })),
+          sentences: entry.sentences ?? null,
         };
       case "batch": {
         const own = filesOf(entry.events.map((e) => e.id));
@@ -306,7 +318,19 @@ export function shapeActivity(input: ShapeInput): ActivityRow[] {
   if (firstHg > 0) {
     const next = rows[firstHg];
     const label = input.movedOn ? `Moved from Asana · ${movedLabel(input.movedOn, today)}` : "Moved from Asana";
-    rows.splice(firstHg, 0, { id: `moved-${next.id}`, ids: [], clientIds: [], day: next.day, at: next.at, fresh: false, imported: false, delivery: null, type: "moved", label });
+    rows.splice(firstHg, 0, {
+      id: `moved-${next.id}`,
+      ids: [],
+      clientIds: [],
+      anchor: false,
+      kinds: ["Asana move"],
+      at: next.at,
+      fresh: false,
+      imported: false,
+      delivery: null,
+      type: "moved",
+      label,
+    });
   }
   return rows;
 }

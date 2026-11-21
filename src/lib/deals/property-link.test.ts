@@ -103,7 +103,8 @@ test("the log draws it as a line by whoever triggered it, never as a field chang
   const [entry] = buildDealLog([
     { id: "n1", source: "change", body: linkedLine("118 Congress St. Buffalo, NY 14213"), noteDate: at, createdAt: at, authorUserId: "u1", authorName: "Connor Swofford", editedAt: null, data: { event: "linked", propertyId: "p1" } },
   ]);
-  assert.deepEqual(entry, { type: "line", id: "n1", day: "2026-11-14", at: at.toISOString(), by: "Connor", text: "Linked to 118 Congress St." });
+  // It stays in view: a stretch of changes never collapses it (docs/specs/activity-collapse.md 3.1).
+  assert.deepEqual(entry, { type: "line", id: "n1", day: "2026-11-14", at: at.toISOString(), anchor: true, kinds: [], by: "Connor", text: "Linked to 118 Congress St." });
 });
 
 /* ---------------- The writes, on a fake transaction ---------------- */

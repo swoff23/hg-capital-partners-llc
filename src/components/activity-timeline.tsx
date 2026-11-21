@@ -2,10 +2,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
-import { ActivityNow, useActivityNow } from "@/components/activity-time";
+import { ActivityNow } from "@/components/activity-time";
 import { Avatar } from "@/components/avatar";
 import { StatusMark } from "@/components/status-badge";
-import { historyDay, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 /**
@@ -18,14 +17,13 @@ import { cn } from "@/lib/utils";
  * its own.
  *
  *   <ActivityTimeline now={now}>
- *     <ActivityDay day="2026-10-26" />
  *     <ActivityItem marker={{ status: "IN_PROGRESS" }}>Connor set status to In progress · …</ActivityItem>
  *     <ActivityItem marker={{ avatar: "Zack Reading", contractor: true }} align="card">…</ActivityItem>
  *   </ActivityTimeline>
  *
- * Children are list items: ActivityItem, ActivityDay, ActivityRun,
- * ActivityDivider, or a plain <li>. 12px between entries, 20px above a
- * heading and none above the first. In print the fold controls hide; the
+ * Children are list items: ActivityItem, ActivityRun, ActivityDivider, or a
+ * plain <li>, 12px apart. No day headings: each entry's time carries its day
+ * (docs/specs/activity-collapse.md 3.5). In print the fold controls hide; the
  * hairline and markers print.
  */
 export function ActivityTimeline({
@@ -33,7 +31,7 @@ export function ActivityTimeline({
   className,
   children,
 }: {
-  /** The page's now, for every ActivityTime and day heading under it (they agree with the server render). */
+  /** The page's now, for every ActivityTime under it (they agree with the server render). */
   now?: Date | string | number;
   className?: string;
   children: ReactNode;
@@ -149,44 +147,6 @@ export function ActivityItem({
 }
 
 /**
- * A day heading, or with `month` a month heading for older history: an h3
- * (the Section heading above is the h2) in text-meta 500 --muted-foreground, so a screen
- * reader can jump by day, beside the 8px ring (--background fill, --line-strong
- * edge). Give `day` and the label is historyDay's ("Today", "Yesterday",
- * "Tue", "Oct 20"; "September", "August 2025"), read against `today` or the
- * timeline's now; or pass the label as children.
- */
-export function ActivityDay({
-  day,
-  today,
-  month = false,
-  className,
-  children,
-}: {
-  /** The day it heads, or any day in the month it heads. */
-  day?: Ymd;
-  /** Buffalo's today; the timeline's now when left out. */
-  today?: Ymd;
-  month?: boolean;
-  className?: string;
-  children?: ReactNode;
-}) {
-  const now = useActivityNow();
-  const label = children ?? (day ? historyDay(day, today ?? todayYmdEastern(new Date(now)), { month }) : null);
-  const dateTime = day ? (month ? day.slice(0, 7) : day) : undefined;
-  return (
-    <li className={cn(ROW, "pt-2 first:pt-0", className)}>
-      <span aria-hidden="true" className="flex h-4.5 items-center justify-center pointer-coarse:h-5">
-        <Knockout>
-          <span className="size-2 rounded-full border border-line-strong bg-background" />
-        </Knockout>
-      </span>
-      <h3 className="min-w-0 text-meta font-medium text-muted-foreground">{dateTime ? <time dateTime={dateTime}>{label}</time> : label}</h3>
-    </li>
-  );
-}
-
-/**
  * A folded run (activity 2.2 c): one line standing for several events. The
  * whole line is a button with aria-expanded, ending in a 16px ChevronRight
  * that turns 90 degrees when open. Its time is plain text, so the button
@@ -198,6 +158,7 @@ export function ActivityDay({
  */
 export function ActivityRun({
   summary,
+  openSummary,
   time,
   marker = "dot",
   id,
@@ -207,6 +168,8 @@ export function ActivityRun({
 }: {
   /** The sentence: "Zack checked 14 items", "Connor assigned Zack and made 3 more changes". */
   summary: ReactNode;
+  /** What the line says while open, when that differs ("Hide 5 updates" for a collapsed stretch). */
+  openSummary?: ReactNode;
   /** The run's time as plain text, after " · ". */
   time?: ReactNode;
   marker?: ActivityMarker;
@@ -234,7 +197,7 @@ export function ActivityRun({
         "-my-1.75 min-h-8 py-1.75 pointer-coarse:my-0 pointer-coarse:min-h-11 pointer-coarse:py-3",
       )}
     >
-      {summary}
+      {open && openSummary !== undefined ? openSummary : summary}
       <span className="whitespace-nowrap">
         {time != null && (
           <>

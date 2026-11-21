@@ -32,7 +32,8 @@ Connor set the unit to Unit 2 · Mon
 
 My calls, made while writing this. Each is easy to change:
 
-- **Deal stage changes stay in view.** A stage change is a deal's Mark done, so it's an anchor (3.1).
+- **Deal stage changes stay in view.** A stage change is a deal's Mark done, so it's an anchor (3.1). So do archive, restore and the link to a property.
+- **The delivery line stays in view.** The row it sits under ("Emailed to Zack") is an anchor, so closing the loop is never hidden.
 - **Phones drop the kinds list.** At 375 the line reads "Show 4 updates", so it never wraps (3.4).
 - **One toggle deep.** Inside an opened stretch, nothing opens further (3.3).
 
@@ -44,8 +45,8 @@ An **anchor** never collapses and ends a stretch. Activity-comments 2.3 rule 4 a
 
 | Page | Anchors |
 |---|---|
-| Task page, job page | Comments (files-only and imported ones too), decision pairs, Mark done, Approve, Send back, a contractor's Start, creation, the next repeat, access changes, sync conflicts |
-| Deal log | Notes (typed here or from the sheet), Deal created, Convert to property, any change that includes the stage |
+| Task page, job page | Comments (files-only and imported ones too) and their deleted traces, decision pairs, Mark done, Approve, Send back, a contractor's Start, creation, the next repeat, access changes, sync conflicts, and the row the delivery line sits under |
+| Deal log | Notes (typed here or from the sheet), any change that includes the stage, archive and restore, and "Linked to" the property the deal became |
 
 A **stretch** is the run of rows between two anchors, counted after bursts merge (2.3 rules 1 to 3). One person's 14 ticks are still one row.
 
@@ -62,7 +63,7 @@ The "Moved from Asana" divider counts as a row. Inside a collapsed stretch it's 
 
 ### 3.3 The collapsed line
 
-It's the stock `ActivityRun` from `src/components/activity-timeline.tsx`: a chevron on the rail, the summary as its toggle, the time after it.
+It's `ActivityRun` from `src/components/activity-timeline.tsx`, the same line a folded burst uses: a dot on the rail, the summary as its toggle, then the time and the chevron. Its new `openSummary` prop swaps in "Hide 5 updates" while it's open.
 
 | | Laptop 1280, tablet 768 | Phone 375 and 320 |
 |---|---|---|
@@ -102,6 +103,7 @@ Day headings (`ActivityDay`) go from all three pages, and so do month headings (
 - **The tooltip** with a mouse keeps the full stamp: "Thu, Oct 30 at 2:14 PM".
 - **On touch**, older lines show only their day; the clock time is in a comment's menu header, as today (activity-comments 3.2).
 - **The deal log's sheet rule** (where the sheet's lines end and the app's begin) stays.
+- **The review banner and the job notice** use the same time, so an older Mark done there reads "Tue" instead of a bare clock time.
 
 ## 4. Reuse check
 
@@ -118,8 +120,8 @@ Day headings (`ActivityDay`) go from all three pages, and so do month headings (
 - `TaskActivity` (`src/app/(app)/tasks/[id]/activity.tsx`), `JobUpdates` (`src/app/(portal)/p/jobs/[id]/_components/job-updates.tsx`) and `DealLog` (`src/app/(app)/deals/[id]/deal-log.tsx`) render the collapsed lines and drop their day groups.
 
 **Removed**
-- `groupHeadings`, `groupByDay` and `MONTH_AFTER_DAYS` in the task lib, and `groupLog` with its own `MONTH_AFTER_DAYS` in the deal lib, if nothing else uses them.
-- `ActivityDay` in `activity-timeline.tsx` once the three pages stop using it.
+- `groupHeadings`, `groupByDay` and `MONTH_AFTER_DAYS` in the task lib, and `groupLog` with its own `MONTH_AFTER_DAYS` in the deal lib.
+- `ActivityDay` in `activity-timeline.tsx`, and the `month` option on `ActivityTime`, `activityTime` and `CommentCard`.
 
 **New:** nothing. No new component, field or migration.
 

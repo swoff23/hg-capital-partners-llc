@@ -1,6 +1,6 @@
 import type { TaskEventKind, TaskStatus, Visibility } from "@prisma/client";
 import { uploadCountPhrase } from "@/lib/attachments/media";
-import { daysUntil, toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
+import { toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { STATUS_LABEL } from "@/lib/task-scope";
 import { describeRepeat, parseRepeatRule } from "./repeat";
@@ -98,8 +98,12 @@ export type ActivityEntry<E extends ActivityEvent = ActivityEvent> =
   | (Base<E> & { type: "comment"; event: E })
   | (Base<E> & { type: "deleted"; event: E })
   | LineEntry<E>
-  /** Several events as one line, opening onto its members. */
-  | (Base<E> & { type: "run"; text: string; lines: LineEntry<E>[]; status?: TaskStatus; previousNotes?: string })
+  /**
+   * Several events as one line, opening onto its members. `sentences` is set when the run folds three or more kinds
+   * ("Connor assigned Zack and made 3 more changes"): one sentence per kind, for an opened stretch (collapseStretches),
+   * where a run shows flat instead of as a second toggle.
+   */
+  | (Base<E> & { type: "run"; text: string; lines: LineEntry<E>[]; status?: TaskStatus; previousNotes?: string; sentences?: string[] })
   /** Files posted together by one person: "Zack added 4 photos". */
   | (Base<E> & { type: "batch"; text: string })
   /** A status change and the note written with it. */
@@ -829,7 +833,8 @@ function burstEntries<E extends ActivityEvent>(burst: E[], names: ActivityNames,
     const [key, first] = list.find(([, evs]) => !evs.every(isDropOrGiveBack)) ?? list[0];
     const more = burst.length - first.length;
     const lead = sentence(key, first);
-    return [run(burst, { text: `${lead.text} and made ${more} more ${more === 1 ? "change" : "changes"}` })];
+    const folded = run(burst, { text: `${lead.text} and made ${more} more ${more === 1 ? "change" : "changes"}` });
+    return [{ ...folded, sentences: list.map(([k, evs]) => sentence(k, evs).text) } as ActivityEntry<E>];
   }
   return list.map(([key, evs]) => (evs.length === 1 ? line(evs[0]) : run(evs, sentence(key, evs))));
 }
@@ -910,35 +915,119 @@ export function foldStart(total: number, o: { shown?: number; firstNew?: number;
   return start;
 }
 
-/** Entries grouped under their day, in order. `dayOf` gives each entry's day. */
-export function groupByDay<T>(entries: readonly T[], dayOf: (t: T) => Ymd): { day: Ymd; entries: T[] }[] {
-  const groups: { day: Ymd; entries: T[] }[] = [];
-  for (const t of entries) {
-    const day = dayOf(t);
-    const last = groups[groups.length - 1];
-    if (last && last.day === day) last.entries.push(t);
-    else groups.push({ day, entries: [t] });
-  }
-  return groups;
-}
-
-/** Days after which history groups by month instead of day (activity 2.3 rule 8). */
-export const MONTH_AFTER_DAYS = 60;
+/* ---------------- Collapsed stretches (docs/specs/activity-collapse.md) ---------------- */
 
 /**
- * Entries under a day heading, or under a month heading once they are more
- * than 60 days back. `day` is the entry's day (for a month, any day in it);
- * consecutive entries of one day or month share a group.
+ * Whether an entry stays in view and ends a stretch (activity-collapse 3.1):
+ * comments and their traces, decisions, and what never folds (creation, the
+ * next repeat, access changes, sync conflicts, Mark done, Approve, Send back,
+ * a contractor's Start).
  */
-export function groupHeadings<T>(entries: readonly T[], dayOf: (t: T) => Ymd, today: Ymd): { month: boolean; day: Ymd; entries: T[] }[] {
-  const groups: { month: boolean; day: Ymd; entries: T[] }[] = [];
-  for (const t of entries) {
-    const day = dayOf(t);
-    const month = (daysUntil(day, today) ?? 0) < -MONTH_AFTER_DAYS;
-    const key = month ? day.slice(0, 7) : day;
-    const last = groups[groups.length - 1];
-    if (last && last.month === month && (month ? last.day.slice(0, 7) : last.day) === key) last.entries.push(t);
-    else groups.push({ month, day, entries: [t] });
+export function anchorsStretch(entry: ActivityEntry): boolean {
+  switch (entry.type) {
+    case "comment":
+    case "deleted":
+    case "decision":
+      return true;
+    case "line":
+      return neverFolds(entry.event);
+    default:
+      return false;
   }
-  return groups;
+}
+
+/** The word a collapsed line uses for a change: "assignee", "due date". */
+export function changeKind(e: Pick<ActivityEvent, "kind" | "data">): string {
+  switch (e.kind) {
+    case "ASSIGNED":
+      return "assignee";
+    case "STATUS":
+      return "status";
+    case "DUE":
+      return "due date";
+    case "SCHEDULED":
+      return "visit";
+    case "PROPERTY": {
+      const d = dataOf(e as ActivityEvent);
+      return "unitTo" in d || "unitFrom" in d ? "unit" : "property";
+    }
+    case "TITLE":
+      return "title";
+    case "NOTES":
+      return "notes";
+    case "ATTACHMENT":
+      return "files";
+    case "CHECKLIST":
+      return "checklist";
+    case "REPEAT":
+      return "repeat";
+    case "COMMENT":
+      return "comments";
+    default:
+      return "updates";
+  }
+}
+
+/** The kinds of change an entry stands for, in the order they happened, each once. */
+export function entryKinds(entry: ActivityEntry): string[] {
+  if (entry.type === "batch") return ["files"];
+  return [...new Set(entry.events.map(changeKind))];
+}
+
+/** How many rows of a stretch stay in view, newest first (activity-collapse 3.1). */
+export const STRETCH_KEEP = 2;
+
+/** A row as it is, or the older part of a stretch as one collapsed line. */
+export type Stretched<T> = { type: "row"; row: T } | { type: "collapsed"; id: string; rows: T[] };
+
+/**
+ * Rows into rows and collapsed lines (activity-collapse 3.1 and 3.2). A
+ * stretch is the rows between two anchors. Of 4 or more, all but the newest
+ * 2 collapse into one line; 3 or fewer stay as they are. `keepFrom` is the
+ * index of the first row a collapse may not cover (the first new one) and
+ * everything newer: a stretch it cuts collapses only what's older, and only
+ * when that's 2 rows or more. `newestFirst` reads and returns the rows newest
+ * first (the deal log); a collapsed line's rows keep that order.
+ */
+export function collapseStretches<T>(
+  rows: readonly T[],
+  o: { isAnchor: (t: T) => boolean; idOf: (t: T) => string; newestFirst?: boolean; keepFrom?: number },
+): Stretched<T>[] {
+  const n = rows.length;
+  const chrono = o.newestFirst ? [...rows].reverse() : rows;
+  const keep = o.keepFrom == null || o.keepFrom < 0 ? n : o.newestFirst ? n - 1 - o.keepFrom : o.keepFrom;
+  const out: Stretched<T>[] = [];
+  let stretch: { row: T; i: number }[] = [];
+  const flush = () => {
+    const older = stretch.filter((x) => x.i < keep).length;
+    const count = Math.min(stretch.length - STRETCH_KEEP, older);
+    const rest = count >= 2 ? stretch.slice(count) : stretch;
+    if (count >= 2) out.push({ type: "collapsed", id: `collapsed-${o.idOf(stretch[0].row)}`, rows: stretch.slice(0, count).map((x) => x.row) });
+    for (const x of rest) out.push({ type: "row", row: x.row });
+    stretch = [];
+  };
+  chrono.forEach((row, i) => {
+    if (o.isAnchor(row)) {
+      flush();
+      out.push({ type: "row", row });
+    } else stretch.push({ row, i });
+  });
+  flush();
+  if (!o.newestFirst) return out;
+  return out.reverse().map((x) => (x.type === "collapsed" ? { ...x, rows: [...x.rows].reverse() } : x));
+}
+
+/**
+ * A collapsed line's words (activity-collapse 3.3): "Show 5 updates", the
+ * kinds inside ("assignee, due date and Asana move", up to three, then "and
+ * more"; null when there are none to name), and "Hide 5 updates" for when it's open.
+ */
+export function stretchSummary(count: number, kinds: readonly string[]): { show: string; hide: string; kinds: string | null } {
+  const noun = `${count} ${count === 1 ? "update" : "updates"}`;
+  const named = [...new Set(kinds)];
+  let list: string | null = null;
+  if (named.length > 3) list = `${named.slice(0, 3).join(", ")} and more`;
+  else if (named.length > 1) list = `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`;
+  else if (named.length === 1) list = named[0];
+  return { show: `Show ${noun}`, hide: `Hide ${noun}`, kinds: list };
 }

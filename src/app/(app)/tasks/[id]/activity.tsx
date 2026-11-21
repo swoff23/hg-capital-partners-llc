@@ -1,9 +1,9 @@
 "use client";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { TaskStatus } from "@prisma/client";
-import { ActivityDay, ActivityDivider, ActivityItem, ActivityRun, ActivityTimeline } from "@/components/activity-timeline";
-import { ActivityTime } from "@/components/activity-time";
+import { ActivityDivider, ActivityItem, ActivityRun, ActivityTimeline } from "@/components/activity-timeline";
+import { ActivitySpan, ActivityTime } from "@/components/activity-time";
 import { CommentBody, CommentCard, CommentEditor, DeliveryLine, SendFailedLine } from "@/components/comment-card";
 import { isOfflineMessage, usePendingSends, type PendingSend } from "@/components/composer";
 import { FilesList } from "@/components/files-list";
@@ -14,8 +14,7 @@ import { useToast } from "@/components/toast";
 import { Button, TextLink } from "@/components/ui";
 import { callAction, conflictToastMessage } from "@/lib/action-result";
 import { sendRefusal } from "@/lib/composer-draft";
-import { todayYmdEastern, type Ymd } from "@/lib/dates";
-import { foldStart, firstNewIndex, groupHeadings, linkedUpdateId } from "@/lib/tasks/activity";
+import { collapseStretches, foldStart, firstNewIndex, linkedUpdateId, stretchSummary, type Stretched } from "@/lib/tasks/activity";
 import { cn } from "@/lib/utils";
 import { deleteTaskComment, editTaskComment, restoreTaskComment, updateTask } from "./actions";
 import type { ActivityRow, CommentFields, LineFields } from "./activity-rows";
@@ -27,11 +26,14 @@ const SHOWN = 15;
 /**
  * Activity, oldest first, on the shared timeline (components/activity-timeline.tsx):
  * comments as cards with the author's avatar on the rail, a status change
- * with its StatusMark, every other change as one muted line with a dot, a
- * burst of changes as one folded line that opens onto them, and a heading per
- * day (a month once it's older than 60 days). The latest 15 show; earlier
- * ones fold behind "Show N earlier updates", which never hides the New
- * divider or the update a link points at.
+ * with its StatusMark, every other change as one muted line with a dot, and a
+ * burst of changes as one folded line that opens onto them. No day headings:
+ * each time slot carries its day (docs/specs/activity-collapse.md 3.5).
+ * Between two anchors (a comment, a decision, what never folds), a stretch of
+ * 4 or more changes keeps its newest 2 in view and collapses the rest into
+ * "Show 5 updates: assignee, due date and Asana move" (3.1 to 3.3). The
+ * latest 15 rows after that show; earlier ones fold behind "Show N earlier
+ * updates". Neither fold hides the New divider or the update a link points at.
  *
  * The New divider sits above the first entry someone else wrote since you
  * last opened the task. It is read once, when the page mounts: a refresh (or
@@ -48,7 +50,6 @@ export function TaskActivity({
   notes,
   rows,
   now,
-  today,
   newSince,
 }: {
   taskId: string;
@@ -57,7 +58,6 @@ export function TaskActivity({
   rows: ActivityRow[];
   /** When the page was rendered (ISO), so every time reads the same on the server and in the browser. */
   now: string;
-  today: Ymd;
   /** When the viewer last opened the task before this visit (ISO): the New divider's baseline. */
   newSince: string | null;
 }) {
@@ -86,15 +86,21 @@ export function TaskActivity({
   }, []);
 
   const firstNew = firstNewIndex(rows, baseline);
-  const anchored = anchor ? rows.findIndex((r) => r.ids.includes(anchor)) : -1;
-  const folded = foldStart(rows.length, { shown: SHOWN, firstNew, anchored });
+  const items = useMemo(() => collapseStretches(rows, { isAnchor: (r) => r.anchor, idOf: (r) => r.id, keepFrom: firstNew }), [rows, firstNew]);
+  const rowsOf = (x: Stretched<ActivityRow>) => (x.type === "row" ? [x.row] : x.rows);
+  const firstNewId = firstNew >= 0 ? rows[firstNew].id : null;
+  const firstNewItem = firstNewId ? items.findIndex((x) => x.type === "row" && x.row.id === firstNewId) : -1;
+  const anchored = anchor ? items.findIndex((x) => rowsOf(x).some((r) => r.ids.includes(anchor))) : -1;
+  const folded = foldStart(items.length, { shown: SHOWN, firstNew: firstNewItem, anchored });
   const start = open ? 0 : folded;
   useEffect(() => {
-    if (anchor) document.getElementById(`update-${anchor}`)?.scrollIntoView({ block: "start" });
-  }, [anchor, folded]);
+    if (!anchor) return;
+    // A member of a run that shows flat inside an opened stretch has no element of its own: its row's does.
+    const holder = rows.find((r) => r.ids.includes(anchor));
+    (document.getElementById(`update-${anchor}`) ?? (holder ? document.getElementById(`update-${holder.id}`) : null))?.scrollIntoView({ block: "start" });
+  }, [anchor, folded, rows]);
 
-  const absolute = useMemo(() => new Map(rows.map((r, i) => [r.id, i])), [rows]);
-  const visible = rows.slice(start);
+  const visible = items.slice(start);
   const known = new Set(rows.flatMap((r) => r.clientIds));
   const inFlight = (sends?.sends ?? []).filter((s) => !known.has(s.clientId));
   // Once the page holds a message's own row, the one that stood in for it is done (and stays gone if that row is deleted).
@@ -104,9 +110,6 @@ export function TaskActivity({
   });
 
   if (rows.length === 0 && inFlight.length === 0) return <p className="text-body text-muted-foreground">No activity yet.</p>;
-
-  const groups = groupHeadings(visible, (r) => r.day, today);
-  const lastDay = groups.length ? groups[groups.length - 1].day : null;
 
   return (
     <>
@@ -131,19 +134,21 @@ export function TaskActivity({
             </p>
           </ActivityItem>
         )}
-        {groups.map((g) => (
-          <Fragment key={`${g.month ? "m" : "d"}:${g.day}:${g.entries[0].id}`}>
-            <ActivityDay day={g.day} today={today} month={g.month} />
-            {g.entries.map((r) => (
-              <Fragment key={r.id}>
-                {absolute.get(r.id) === firstNew && <ActivityDivider unread>New</ActivityDivider>}
+        {visible.map((x, i) =>
+          x.type === "collapsed" ? (
+            <CollapsedStretch
+              key={x.id}
+              rows={x.rows}
+              forceOpen={start + i === anchored}
+              render={(r) => (
                 <Row
+                  key={r.id}
                   row={r}
-                  month={g.month}
+                  flat
                   taskId={taskId}
                   editing={editing}
                   setEditing={setEditing}
-                  openRun={anchor !== null && r.ids.includes(anchor)}
+                  openRun={false}
                   onViewPrevious={(text, by) => setViewing({ text, by })}
                   deletedId={deletedId}
                   onDeleted={setDeletedId}
@@ -151,11 +156,27 @@ export function TaskActivity({
                   onRestored={setRestoredId}
                   onFocused={focused}
                 />
-              </Fragment>
-            ))}
-          </Fragment>
-        ))}
-        {inFlight.length > 0 && lastDay !== todayYmdEastern(new Date(inFlight[0].at)) && <ActivityDay day={todayYmdEastern(new Date(inFlight[0].at))} today={today} />}
+              )}
+            />
+          ) : (
+            <Fragment key={x.row.id}>
+              {x.row.id === firstNewId && <ActivityDivider unread>New</ActivityDivider>}
+              <Row
+                row={x.row}
+                taskId={taskId}
+                editing={editing}
+                setEditing={setEditing}
+                openRun={anchor !== null && x.row.ids.includes(anchor)}
+                onViewPrevious={(text, by) => setViewing({ text, by })}
+                deletedId={deletedId}
+                onDeleted={setDeletedId}
+                restoredId={restoredId}
+                onRestored={setRestoredId}
+                onFocused={focused}
+              />
+            </Fragment>
+          ),
+        )}
         {inFlight.map((s) => (
           <InFlight key={s.clientId} send={s} author={sends?.author ?? ""} />
         ))}
@@ -165,11 +186,40 @@ export function TaskActivity({
   );
 }
 
+/* ---------------- A collapsed stretch ---------------- */
+
+/**
+ * The older part of a stretch as one line (activity-collapse 3.3): "Show 5
+ * updates: assignee, due date and Asana move" (the kinds drop below 640px),
+ * the days it spans, and the rows under it while it's open. A link to one of
+ * its rows opens it.
+ */
+function CollapsedStretch({ rows, forceOpen, render }: { rows: ActivityRow[]; forceOpen: boolean; render: (row: ActivityRow) => ReactNode }) {
+  const count = rows.reduce((n, r) => n + (r.type === "run" && r.sentences ? r.sentences.length : 1), 0);
+  const words = stretchSummary(count, rows.flatMap((r) => r.kinds));
+  return (
+    <ActivityRun
+      key={forceOpen ? "open" : "closed"}
+      defaultOpen={forceOpen}
+      summary={
+        <>
+          {words.show}
+          {words.kinds && <span className="max-sm:hidden">: {words.kinds}</span>}
+        </>
+      }
+      openSummary={words.hide}
+      time={<ActivitySpan from={{ at: rows[0].at }} to={{ at: rows[rows.length - 1].at }} />}
+    >
+      {rows.map(render)}
+    </ActivityRun>
+  );
+}
+
 /* ---------------- Rows ---------------- */
 
 function Row({
   row,
-  month,
+  flat = false,
   taskId,
   editing,
   setEditing,
@@ -182,7 +232,8 @@ function Row({
   onFocused,
 }: {
   row: ActivityRow;
-  month: boolean;
+  /** Inside an opened stretch: a run shows as its sentences, never as a second toggle (activity-collapse 3.3). */
+  flat?: boolean;
   taskId: string;
   editing: string | null;
   setEditing: (id: string | null) => void;
@@ -201,7 +252,7 @@ function Row({
           row={row.comment}
           at={row.at}
           delivery={row.delivery}
-          month={month}
+         
           taskId={taskId}
           editing={editing === row.comment.id}
           setEditing={setEditing}
@@ -212,33 +263,41 @@ function Row({
         />
       );
     case "deleted":
-      return <DeletedLine row={row} month={month} focus={deletedId === row.id} onFocused={onFocused} />;
+      return <DeletedLine row={row} focus={deletedId === row.id} onFocused={onFocused} />;
     case "moved":
       return <ActivityDivider>{row.label}</ActivityDivider>;
     case "decision":
-      return <DecisionRowView row={row} month={month} />;
+      return <DecisionRowView row={row} />;
     case "batch":
       return (
         <ActivityItem id={`update-${row.id}`} marker="dot">
-          <LineText line={row} at={row.at} month={month} onViewPrevious={onViewPrevious} />
+          <LineText line={row} at={row.at} onViewPrevious={onViewPrevious} />
           <Attachments line={row} />
           {row.delivery && <DeliveryLine className="mt-1" state={row.delivery.state} to={row.delivery.to} at={row.delivery.at} />}
         </ActivityItem>
       );
     case "run":
+      if (flat) {
+        const sentences = row.sentences ?? [row.text];
+        return sentences.map((text, i) => (
+          <ActivityItem key={i} id={i === 0 ? `update-${row.id}` : undefined} marker={row.status && i === 0 ? { status: row.status } : "dot"}>
+            <LineText line={{ ...row, text, href: null, previous: i === 0 ? row.previous : null }} at={row.at} onViewPrevious={onViewPrevious} />
+          </ActivityItem>
+        ));
+      }
       return (
         <ActivityRun
           key={openRun ? "open" : "closed"}
           id={`update-${row.id}`}
           marker={row.status ? { status: row.status } : "dot"}
           summary={row.text}
-          time={<ActivityTime at={row.at} month={month} />}
+          time={<ActivityTime at={row.at} />}
           defaultOpen={openRun}
           after={row.previous !== null ? <ViewPrevious onPress={() => onViewPrevious(row.previous ?? "", row.by)} /> : undefined}
         >
           {row.members.map((m) => (
             <ActivityItem key={m.id} id={`update-${m.id}`} marker={m.status ? { status: m.status } : "dot"}>
-              <LineText line={m} at={m.at} month={month} onViewPrevious={onViewPrevious} />
+              <LineText line={m} at={m.at} onViewPrevious={onViewPrevious} />
               <Attachments line={m} />
             </ActivityItem>
           ))}
@@ -247,7 +306,7 @@ function Row({
     case "line":
       return (
         <ActivityItem id={`update-${row.id}`} marker={row.status ? { status: row.status } : "dot"}>
-          <LineText line={row} at={row.at} month={month} onViewPrevious={onViewPrevious} />
+          <LineText line={row} at={row.at} onViewPrevious={onViewPrevious} />
           <Attachments line={row} />
           {row.delivery && <DeliveryLine className="mt-1" state={row.delivery.state} to={row.delivery.to} at={row.delivery.at} />}
         </ActivityItem>
@@ -259,19 +318,17 @@ function Row({
 function LineText({
   line,
   at,
-  month,
   onViewPrevious,
 }: {
   line: LineFields;
   at: string;
-  month: boolean;
   onViewPrevious: (text: string, by: string) => void;
 }) {
   return (
     <p className="text-meta text-muted-foreground">
       {line.href ? <TextLink href={line.href}>{line.text}</TextLink> : line.text}
       <span aria-hidden="true">{" · "}</span>
-      <ActivityTime at={at} month={month} />
+      <ActivityTime at={at} />
       {line.viaAsana && <span>{" · via Asana"}</span>}
       {line.previous !== null && line.status === null && (
         <>
@@ -306,14 +363,14 @@ function Attachments({ line }: { line: LineFields }) {
 
 /* ---------------- A status change and its note ---------------- */
 
-function DecisionRowView({ row, month }: { row: Extract<ActivityRow, { type: "decision" }>; month: boolean }) {
+function DecisionRowView({ row }: { row: Extract<ActivityRow, { type: "decision" }> }) {
   const note = row.note;
   return (
     <ActivityItem id={`update-${row.id}`} marker={row.status ? { status: row.status as TaskStatus } : "dot"}>
       <p className="text-meta text-muted-foreground">
         {row.text}
         <span aria-hidden="true">{" · "}</span>
-        <ActivityTime at={row.at} month={month} />
+        <ActivityTime at={row.at} />
       </p>
       {note && (
         // No header of its own: the line above names who and when. Styled by the note's own visibility, and
@@ -340,7 +397,7 @@ function DecisionRowView({ row, month }: { row: Extract<ActivityRow, { type: "de
 }
 
 /** "Connor deleted a comment · now": a staff-only trace, timed from the delete. Takes focus when it is the card that was just deleted. */
-function DeletedLine({ row, month, focus, onFocused }: { row: Extract<ActivityRow, { type: "deleted" }>; month: boolean; focus: boolean; onFocused: () => void }) {
+function DeletedLine({ row, focus, onFocused }: { row: Extract<ActivityRow, { type: "deleted" }>; focus: boolean; onFocused: () => void }) {
   const line = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     if (!focus) return;
@@ -352,7 +409,7 @@ function DeletedLine({ row, month, focus, onFocused }: { row: Extract<ActivityRo
       <p ref={line} tabIndex={-1} className="text-meta text-muted-foreground outline-none">
         {row.author} deleted a comment
         <span aria-hidden="true">{" · "}</span>
-        <ActivityTime at={row.deletedAt} month={month} />
+        <ActivityTime at={row.deletedAt} />
       </p>
     </ActivityItem>
   );
@@ -364,7 +421,6 @@ function CommentRowView({
   row: c,
   at,
   delivery,
-  month,
   taskId,
   editing,
   setEditing,
@@ -376,7 +432,6 @@ function CommentRowView({
   row: CommentFields;
   at: string;
   delivery: ActivityRow["delivery"];
-  month: boolean;
   taskId: string;
   editing: boolean;
   setEditing: (id: string | null) => void;
@@ -427,7 +482,7 @@ function CommentRowView({
         <p className="text-meta text-muted-foreground">
           {c.author.split(" ")[0]} posted files that were later removed
           <span aria-hidden="true">{" · "}</span>
-          <ActivityTime at={at} month={month} />
+          <ActivityTime at={at} />
         </p>
       </ActivityItem>
     );
@@ -440,7 +495,7 @@ function CommentRowView({
       id={c.id}
       author={{ name: c.author, contractor: c.isContractor }}
       at={at}
-      month={month}
+     
       edited={c.edited}
       internal={c.internal}
       onItem={c.onItem}
