@@ -76,14 +76,12 @@ Three things only Connor can do. Each one unblocks a build.
 | Item | Status | Size | When | After | Source |
 |---|---|---|---|---|---|
 | The property hub | Needs a spec | L | Feb 1 to Mar 31 | | docs/uiux-review/README.md (move 2), docs/property-page-plan.md section 1 |
-| Resident maintenance requests | In progress | M | Feb 1 to Mar 15 | | docs/specs/maintenance-requests.md |
 | Rent records in the app (new) | Needs a spec | M | Feb 1 to Feb 28 | Leases | Connor, Nov 20; scripts/migrate/run.ts |
 | Rent roll from leases | Needs a spec | M | Feb 15 to Mar 15 | Leases, QuickBooks | docs/property-page-plan.md section 2 |
 | Monday note for the partners (new) | Needs a spec | S | Feb 1 to Feb 14 | QuickBooks | |
 | Move-in report by personal link | Needs a spec | S | Mar 1 to Mar 31 | Leases | docs/uiux-review/journeys.md |
 
 - **The property hub.** One record layout, built first on the property page: a summary strip with value, equity, LTV, cash flow and the next key date, tabs with counts and one timeline. It starts with two or three layouts for Connor to pick. Deals, tasks and contractors reuse it later.
-- **Resident maintenance requests.** Each current tenant gets their own link to report a repair with photos or video and permission to enter. It lands in Needs you as a task, both partners get an email, and the resident follows three steps (Received, Scheduled, Done) by email. Emergencies stay in the group chat. Planned with Connor on Nov 21 (docs/specs/maintenance-requests.md) and built the same day; waits for his commit. On launch day he presses Email request links on the Tenants list.
 - **Rent records in the app.** The Rent Record Keeping sheet, the history of who paid what and when, moves into the app. The first import left it behind on purpose until the money side was live. Each payment sits on its lease, so a unit shows its full rent history and the sheet can retire. It also becomes the check against QuickBooks that Financials Settings points to today. Connor's ask (Nov 20). Reuses: the lease records and `scripts/migrate/04-tenants.ts`'s dry-run-then-write import, and `LedgerLine` for the QuickBooks side.
 - **Rent roll from leases.** Expected rent per unit from its lease, next to what QuickBooks shows came in, month by month, with late or short months flagged. It extends the Rent roll page that already reads QuickBooks.
 - **Monday note for the partners.** One email each Monday for Connor and Pieter: what's late, what's due this week, jobs waiting for review, key dates coming up, and last week's money in and out. Reuses: the notifications cron and outbox behind the 8 am emails, and Home's Needs you queries.
@@ -117,7 +115,7 @@ Three things only Connor can do. Each one unblocks a build.
 | Stop using Asana, and check when its billing ends | Finish leaving Asana |
 | Answer the three reopened tenant contact calls | Tenant contact |
 | Emails for 14 contractors, and the office phone | Invite the contractors |
-| Commit maintenance requests, then Email request links on launch day | Maintenance requests |
+| Press Email maintenance request links on launch day | Maintenance requests |
 | Remove the two password variables, turn on Skew Protection | Tidy the secrets |
 | An address provider key, the Zillow link, playbook timing | The public site and playbooks |
 
@@ -136,6 +134,7 @@ Update a row's status when it changes, and move finished items to a short "Done"
 
 ## Done
 
+- **Resident maintenance requests** (Nov 21, `1d95153`). Each current tenant gets their own link to report a repair with photos or video, say whether we can come in, and note pets. It lands in Needs you as a task, both partners get an email, and the resident follows Received, Scheduled and Done by email and on their request page; internal comments stay private. The tenant sheet has Email link, Copy link, Send a new link and Turn off link, and the Tenants list has Email maintenance request links for launch day. Emergencies stay in the group chat. Spec: docs/specs/maintenance-requests.md.
 - **Coming soon rentals and a sign-up list** (Nov 21, `dfb4223`). A listing can be Coming soon: Rentals shows it with a "Coming soon" or "Coming in January" pill and Notify me (first name, email, optional phone). The listing sheet lists who signed up, with Copy emails for a Gmail blast and Download (.csv); the row shows "3 waiting". The app sends no email. Spec: docs/specs/coming-soon.md.
 - **Rehab draw tracker** (Nov 20, `8b29fea`). A Draws page shows available, submitted and funded across every open rehab, with each one's current draw and its requested amount. Each rehab follows its loan and keeps the lender's budget line by line, from Vontive's uploaded worksheet or typed lines; New draw builds a request line by line, capped at what each line has available, and each draw moves through Sent, Inspection, Approved and Funded with a next-step button. Needs you flags a draw stuck 10 days. Spec: docs/specs/rehab-draws.md.
 - **Shorter activity** (Nov 20, `bc996d0`). Older changes between comments collapse Linear style ("Show 5 updates: assignee, due date and Asana move"), the newest 2 stay in view, and day headings are gone, on the task page, the contractor's job page and the deal log. Spec: docs/specs/activity-collapse.md.

@@ -81,7 +81,7 @@ If Vercel Firewall or bot protection is ever switched on, let Anthropic's addres
 
 - [ ] Database certificate check (date to be set). Its own change: prove Supabase's certificate from a laptop with a read-only connection, then ship it behind one environment variable. A wrong setting fails every query, so the way back is a redeploy or a rollback. See fix 3 in [docs/specs/performance.md](specs/performance.md).
 - [ ] Send the link to HG's Zillow profile. Until then the Rentals page says "Our homes are also listed on Zillow." with no link.
-- [ ] Resident maintenance requests are built ([docs/specs/maintenance-requests.md](specs/maintenance-requests.md)). Once they're live, press Email request links on the Tenants list and tell each group chat that repairs go through the link from now on.
+- [ ] Resident maintenance requests are live ([docs/specs/maintenance-requests.md](specs/maintenance-requests.md)). On launch day, press Email maintenance request links on the Tenants list and tell each group chat that repairs go through the link from now on.
 
 ## Small calls (no rush)
 
