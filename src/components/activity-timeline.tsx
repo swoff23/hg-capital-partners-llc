@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 import { ActivityNow } from "@/components/activity-time";
 import { Avatar } from "@/components/avatar";
@@ -21,8 +21,8 @@ import { cn } from "@/lib/utils";
  *     <ActivityItem marker={{ avatar: "Zack Reading", contractor: true }} align="card">…</ActivityItem>
  *   </ActivityTimeline>
  *
- * Children are list items: ActivityItem, ActivityRun, ActivityDivider, or a
- * plain <li>, 12px apart. No day headings: each entry's time carries its day
+ * Children are list items: ActivityItem, ActivityRun, ActivityFold,
+ * ActivityDivider, or a plain <li>, 12px apart. No day headings: each entry's time carries its day
  * (docs/specs/activity-collapse.md 3.5). In print the fold controls hide; the
  * hairline and markers print.
  */
@@ -158,7 +158,6 @@ export function ActivityItem({
  */
 export function ActivityRun({
   summary,
-  openSummary,
   time,
   marker = "dot",
   id,
@@ -168,8 +167,6 @@ export function ActivityRun({
 }: {
   /** The sentence: "Zack checked 14 items", "Connor assigned Zack and made 3 more changes". */
   summary: ReactNode;
-  /** What the line says while open, when that differs ("Hide 5 updates" for a collapsed stretch). */
-  openSummary?: ReactNode;
   /** The run's time as plain text, after " · ". */
   time?: ReactNode;
   marker?: ActivityMarker;
@@ -197,7 +194,7 @@ export function ActivityRun({
         "-my-1.75 min-h-8 py-1.75 pointer-coarse:my-0 pointer-coarse:min-h-11 pointer-coarse:py-3",
       )}
     >
-      {open && openSummary !== undefined ? openSummary : summary}
+      {summary}
       <span className="whitespace-nowrap">
         {time != null && (
           <>
@@ -227,6 +224,58 @@ export function ActivityRun({
           toggle
         )}
       </ActivityItem>
+      {open && children}
+    </>
+  );
+}
+
+/**
+ * A collapsed stretch (docs/specs/activity-collapse.md 3.3), drawn the way
+ * Linear draws "Show 5 events": an up-down chevron on the rail where a dot
+ * would be, then the summary, no time, the whole row one button with
+ * aria-expanded. Open, the chevron turns inward, the line reads
+ * `openSummary` ("Hide 5 updates") and the rows (`children`) appear under
+ * it. With a mouse the row darkens on hover; 44px tall on touch.
+ */
+export function ActivityFold({
+  summary,
+  openSummary,
+  defaultOpen = false,
+  children,
+}: {
+  /** "Show 5 updates: assignee, due date and Asana move…". */
+  summary: ReactNode;
+  /** "Hide 5 updates". */
+  openSummary: ReactNode;
+  defaultOpen?: boolean;
+  /** The rows it holds, shown under it while it's open. */
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const Icon = open ? ChevronsDownUp : ChevronsUpDown;
+  return (
+    <>
+      <li className="grid">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className={cn(
+            ROW,
+            "group -my-1.75 min-h-8 rounded-sm py-1.75 text-left text-meta text-muted-foreground transition-colors hover:text-foreground",
+            "pointer-coarse:my-0 pointer-coarse:min-h-11 pointer-coarse:py-3",
+          )}
+        >
+          <span aria-hidden="true" className="flex justify-center">
+            <span className="flex h-4.5 items-center justify-center pointer-coarse:h-5">
+              <Knockout>
+                <Icon className="size-3.5 print:hidden" />
+              </Knockout>
+            </span>
+          </span>
+          <span className="min-w-0">{open ? openSummary : summary}</span>
+        </button>
+      </li>
       {open && children}
     </>
   );

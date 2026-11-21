@@ -349,6 +349,10 @@ export type ListPatch =
   | { kind: "status"; id: string; status: TaskStatus }
   /** Assigned from the row's Assignee cell; null for nobody. */
   | { kind: "assignee"; id: string; assignee: ListAssignee | null }
+  /** Moved to another building (or none): its short address and the unit it keeps. */
+  | { kind: "place"; id: string; propertyId: string | null; place: string | null; unitLabel: string | null }
+  /** A bulk edit (docs/specs/bulk-edit.md): one patch per task, shown at once. */
+  | { kind: "many"; patches: ListPatch[] }
   /** The row as it was, back in the list: Undo after a tick, once the refresh has dropped it. */
   | { kind: "restore"; task: ListTask };
 
@@ -369,6 +373,10 @@ export function applyPatch(tasks: ListTask[], patch: ListPatch): ListTask[] {
       return tasks.map((t) => (t.id === patch.id ? { ...t, status: patch.status, checked: patch.status === "DONE" } : t));
     case "assignee":
       return tasks.map((t) => (t.id === patch.id ? { ...t, assignee: patch.assignee } : t));
+    case "place":
+      return tasks.map((t) => (t.id === patch.id ? { ...t, propertyId: patch.propertyId, place: patch.place, unitLabel: patch.unitLabel } : t));
+    case "many":
+      return patch.patches.reduce(applyPatch, tasks);
     case "restore":
       return tasks.some((t) => t.id === patch.task.id) ? tasks.map((t) => (t.id === patch.task.id ? patch.task : t)) : [...tasks, patch.task];
   }
@@ -378,14 +386,19 @@ export function applyPatch(tasks: ListTask[], patch: ListPatch): ListTask[] {
 // Copy
 // ---------------------------------------------------------------------------
 
+/** A day as the reschedule toasts name it: "Mon Oct 27". */
+export function toastDay(y: Ymd): string {
+  const [yr, m, d] = y.split("-").map(Number);
+  const day = new Date(Date.UTC(yr, m - 1, d));
+  const part = (o: Intl.DateTimeFormatOptions) => day.toLocaleDateString("en-US", { timeZone: "UTC", ...o });
+  return `${part({ weekday: "short" })} ${part({ month: "short" })} ${d}`;
+}
+
 /** The reschedule toast: "Moved to Mon Oct 27", or "Date removed". */
 export function movedMessage(value: Ymd | null): string {
   const y = toYmd(value);
   if (!y) return "Date removed";
-  const [yr, m, d] = y.split("-").map(Number);
-  const day = new Date(Date.UTC(yr, m - 1, d));
-  const part = (o: Intl.DateTimeFormatOptions) => day.toLocaleDateString("en-US", { timeZone: "UTC", ...o });
-  return `Moved to ${part({ weekday: "short" })} ${part({ month: "short" })} ${d}`;
+  return `Moved to ${toastDay(y)}`;
 }
 
 /** "Moved 3 tasks to today". */

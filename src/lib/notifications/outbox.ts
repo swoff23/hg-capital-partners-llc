@@ -16,6 +16,7 @@ import {
   deliveryFor,
   easternDayStart,
   liveReminders,
+  jobKey,
   offItems,
   parseItems,
   reachedCapNow,
@@ -279,7 +280,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
     const due = toYmd(targetDate(task));
     const kept =
       delivery.audience === "contractor"
-        ? liveReminders(offItems(live.items, { hasAccess: !!accessRow, canceled: task.status === "CANCELED" }), {
+        ? liveReminders(offItems(live.items, { hasAccess: !!accessRow, canceled: task.status === "CANCELED", job: jobKey({ status: task.status, target: due, notes: task.description }) }), {
             status: task.status,
             due,
             today: todayYmdEastern(now),

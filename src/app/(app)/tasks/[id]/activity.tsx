@@ -2,8 +2,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { TaskStatus } from "@prisma/client";
-import { ActivityDivider, ActivityItem, ActivityRun, ActivityTimeline } from "@/components/activity-timeline";
-import { ActivitySpan, ActivityTime } from "@/components/activity-time";
+import { ActivityDivider, ActivityFold, ActivityItem, ActivityRun, ActivityTimeline } from "@/components/activity-timeline";
+import { ActivityTime } from "@/components/activity-time";
 import { CommentBody, CommentCard, CommentEditor, DeliveryLine, SendFailedLine } from "@/components/comment-card";
 import { isOfflineMessage, usePendingSends, type PendingSend } from "@/components/composer";
 import { FilesList } from "@/components/files-list";
@@ -189,16 +189,16 @@ export function TaskActivity({
 /* ---------------- A collapsed stretch ---------------- */
 
 /**
- * The older part of a stretch as one line (activity-collapse 3.3): "Show 5
- * updates: assignee, due date and Asana move" (the kinds drop below 640px),
- * the days it spans, and the rows under it while it's open. A link to one of
+ * The older part of a stretch as one line (activity-collapse 3.3), Linear's
+ * way: "Show 5 updates: assignee, due date and Asana move…" (the kinds drop
+ * below 640px), and the rows under it while it's open. A link to one of
  * its rows opens it.
  */
 function CollapsedStretch({ rows, forceOpen, render }: { rows: ActivityRow[]; forceOpen: boolean; render: (row: ActivityRow) => ReactNode }) {
   const count = rows.reduce((n, r) => n + (r.type === "run" && r.sentences ? r.sentences.length : 1), 0);
   const words = stretchSummary(count, rows.flatMap((r) => r.kinds));
   return (
-    <ActivityRun
+    <ActivityFold
       key={forceOpen ? "open" : "closed"}
       defaultOpen={forceOpen}
       summary={
@@ -208,10 +208,9 @@ function CollapsedStretch({ rows, forceOpen, render }: { rows: ActivityRow[]; fo
         </>
       }
       openSummary={words.hide}
-      time={<ActivitySpan from={{ at: rows[0].at }} to={{ at: rows[rows.length - 1].at }} />}
     >
       {rows.map(render)}
-    </ActivityRun>
+    </ActivityFold>
   );
 }
 

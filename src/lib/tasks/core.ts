@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma, type Task, type TaskAttachment, type TaskChecklistItem, type TaskEvent, type TaskEventKind, type TaskStatus, type Visibility } from "@prisma/client";
 import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
-import { notesFingerprint } from "@/lib/notifications/content";
+import { jobKey, notesFingerprint } from "@/lib/notifications/content";
 import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
 import { contractorMaySetDate } from "@/lib/portal/job-link-paths";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
@@ -353,6 +353,11 @@ export interface OutboxItem {
    * the status.
    */
   from?: string;
+  /**
+   * OFF ("took you off"): the job as the contractor knew it when they were taken off (notifications/content.ts
+   * jobKey), so giving it straight back says nothing unless the job changed meanwhile (offItems).
+   */
+  job?: string;
 }
 
 /** What a line carries beside its summary (OutboxItem's optional fields). */
@@ -376,7 +381,7 @@ const assignedSummary = (t: Pick<Task, "title" | "status" | "scheduledFor">, now
  * (src/lib/portal/job-emails.ts). The send run checks the switch again, so a
  * line still waiting when it goes off is dropped.
  */
-async function contractorGetsEmail(tx: Tx, contactId: string | null): Promise<boolean> {
+export async function contractorGetsEmail(tx: Tx, contactId: string | null): Promise<boolean> {
   if (!contactId) return false;
   const acct = await tx.portalAccount.findUnique({ where: { contactId }, select: JOB_EMAIL_SELECT });
   return jobEmailState(acct) === "on";
@@ -449,9 +454,9 @@ async function notify(
  * a first sign-in, their switch on). The send run delivers it though their
  * access is gone, and carries nothing else about the job.
  */
-async function notifyOff(tx: Tx, task: NotifyTask, contactId: string, p: Principal, summary: string, now: Date): Promise<void> {
+async function notifyOff(tx: Tx, task: NotifyTask, contactId: string, p: Principal, summary: string, now: Date, job?: string): Promise<void> {
   if (p.kind !== "staff" || !(await contractorGetsEmail(tx, contactId))) return;
-  await enqueue(tx, { contactId }, task.id, { kind: "OFF", actorLabel: p.label, summary, at: now.toISOString() }, now);
+  await enqueue(tx, { contactId }, task.id, { kind: "OFF", actorLabel: p.label, summary, at: now.toISOString(), ...(job ? { job } : {}) }, now);
 }
 
 /** Advisory-lock namespace for the 8 am reminders (portal uses 7301 to 7303). */
@@ -1304,7 +1309,11 @@ export async function patchTask(tx: Tx, taskId: string, patch: TaskPatch, p: Pri
     await syncAssigneeAccess(tx, taskId, newContactId, p, now);
     if (newContactId) await notify(tx, after, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(after, now), now);
     // The contractor taken off an open job hears so, so nobody makes the trip (docs/specs/contractor-job-emails.md 6).
-    if (before.assigneeContactId && isActiveStatus(before.status)) await notifyOff(tx, after, before.assigneeContactId, p, `took you off "${after.title}"`, now);
+    if (before.assigneeContactId && isActiveStatus(before.status)) {
+      // The job as they knew it, so giving it straight back says nothing unless it changed meanwhile (content.ts offItems).
+      const job = jobKey({ status: before.status, target: toYmd(targetDate(before)), notes: before.description });
+      await notifyOff(tx, after, before.assigneeContactId, p, `took you off "${after.title}"`, now, job);
+    }
   } else if (after.assigneeContactId) {
     // Same contractor: tell them about what they can see change.
     const targetBefore = toYmd(targetDate(before));

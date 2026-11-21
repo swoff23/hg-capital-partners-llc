@@ -84,6 +84,7 @@ export function DatePanel({
   repeat,
   onRepeat,
   layout = "together",
+  mixed = false,
 }: {
   value: Ymd | null;
   today: Ymd;
@@ -98,6 +99,8 @@ export function DatePanel({
   onRepeat?: (rule: RepeatRule | null) => void;
   /** "steps" is the phone sheet's two steps; "together" puts the picks under the calendar. */
   layout?: "together" | "steps";
+  /** Several tasks with different dates (the Tasks list's bulk Due date): no pick reads as current, not even No date. */
+  mixed?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const picks = useMemo(
@@ -200,7 +203,7 @@ export function DatePanel({
           <>
             {currentLine}
             <div className="p-1">
-              <QuickPickRows picks={picks} value={value} onPick={onPick} />
+              <QuickPickRows picks={picks} value={mixed ? undefined : value} onPick={onPick} />
               <button
                 type="button"
                 onClick={() => setView("calendar")}
@@ -244,7 +247,7 @@ export function DatePanel({
           {repeatOpen ? (
             <FoldedPicks picks={picks} onPress={() => setView("date")} />
           ) : (
-            <QuickPickRows picks={picks} value={value} onPick={onPick} />
+            <QuickPickRows picks={picks} value={mixed ? undefined : value} onPick={onPick} />
           )}
         </div>
       )}
@@ -278,7 +281,7 @@ function FoldedPicks({ picks, onPress }: { picks: QuickPick[]; onPress: () => vo
 }
 
 /** The quick picks as rows: icon, name, the day it lands on, its number key (a mouse), and a Check on the current value. */
-function QuickPickRows({ picks, value, onPick }: { picks: QuickPick[]; value: Ymd | null; onPick: (value: Ymd | null) => void }) {
+function QuickPickRows({ picks, value, onPick }: { picks: QuickPick[]; value: Ymd | null | undefined; onPick: (value: Ymd | null) => void }) {
   return (
     <>
       {picks.map((p) => {

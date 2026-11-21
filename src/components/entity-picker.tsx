@@ -369,7 +369,8 @@ export function AssigneePicker({
 
 /* ---------------- Property ---------------- */
 
-const NO_PROPERTY = "none";
+/** The "No property" row's key in `propertyRows`. */
+export const NO_PROPERTY = "none";
 
 /**
  * The property rows: "No property" pinned (left out where a property is

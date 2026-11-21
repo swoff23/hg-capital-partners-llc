@@ -1,8 +1,9 @@
 "use client";
 import { useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
-import { Section } from "@/components/ui";
+import { Section, textLinkClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import type { PickState } from "./task-picks";
 
 /**
  * A titled group of rows: "Overdue 2 [Move all to today]", "Zack Reading 3".
@@ -17,8 +18,15 @@ export function TaskSection({
   action,
   collapsible = false,
   as = "h3",
+  pick,
   children,
 }: {
+  /**
+   * Bulk edit (docs/specs/bulk-edit.md D7): while anything is picked, the heading ends with Select, or Deselect
+   * once every row of the group on screen is, as Photos' select mode does. `name` finishes what a screen reader
+   * hears: "Select all at 767 Prospect Avenue".
+   */
+  pick?: { state: PickState; name: string; onToggle: () => void; picking: boolean };
   title: string;
   count: number;
   /** Before the title, e.g. a contractor's avatar. */
@@ -44,7 +52,23 @@ export function TaskSection({
       as={as}
       // Closed, the rows' slot is empty: drop it so no gap hangs under the rule.
       className="[&>div:empty]:hidden"
-      actions={action}
+      actions={
+        pick?.picking ? (
+          <>
+            {action}
+            <button
+              type="button"
+              onClick={pick.onToggle}
+              aria-label={`${pick.state === "all" ? "Deselect" : "Select"} all ${pick.name}`}
+              className={cn(textLinkClass, "min-h-8 text-label pointer-coarse:min-h-11")}
+            >
+              {pick.state === "all" ? "Deselect" : "Select"}
+            </button>
+          </>
+        ) : (
+          action
+        )
+      }
       title={
         collapsible ? (
           <button

@@ -3,9 +3,13 @@ import { Prisma, type TaskStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { toYmd, type Ymd } from "@/lib/dates";
+import { logError } from "@/lib/log";
 import { isActiveStatus } from "@/lib/task-scope";
 import * as core from "./core";
+import { assignEach, moveDatesEach, setPropertyEach, setStatusEach, undoAssignEach, undoDatesEach, undoPropertyEach, undoStatusEach } from "./bulk-core";
+import type { AssignChange, AssignPick, DateMove, PropertyChange, StatusChange, StatusPick } from "./bulk-core";
 import { targetField, type DateChange } from "./list";
+import { deleteTask } from "./service";
 
 /**
  * Moving dates on several tasks at once: "Move all to today" on Today, and
@@ -29,11 +33,11 @@ import { targetField, type DateChange } from "./list";
 /** A batch makes several round trips per task; give a busy Overdue list room. */
 const TX = { timeout: 20_000, maxWait: 10_000 };
 
-function revalidate(rows: { id: string; propertyId: string | null; dealId: string | null }[]): void {
+function revalidate(rows: { id: string; propertyId: string | null; dealId: string | null }[], extraPropertyIds: (string | null)[] = []): void {
   revalidatePath("/tasks");
   revalidatePath("/");
   for (const r of rows) revalidatePath(`/tasks/${r.id}`);
-  for (const p of new Set(rows.map((r) => r.propertyId))) if (p) revalidatePath(`/properties/${p}`);
+  for (const p of new Set([...rows.map((r) => r.propertyId), ...extraPropertyIds])) if (p) revalidatePath(`/properties/${p}`);
   for (const d of new Set(rows.map((r) => r.dealId))) if (d) revalidatePath(`/deals/${d}`);
 }
 
@@ -94,4 +98,87 @@ export async function restoreTaskDates(changes: DateChange[], p: core.Principal)
     return rows;
   }, TX);
   revalidate(rows);
+}
+
+// ---------------------------------------------------------------------------
+// Bulk edit on the Tasks list (docs/specs/bulk-edit.md); the rules are bulk-core.ts
+// ---------------------------------------------------------------------------
+
+/** A status, assignee or property change on up to 400 tasks: room for each one's own rules and lines. */
+const BULK_TX = { timeout: 60_000, maxWait: 10_000 };
+
+export async function bulkSetStatus(
+  picks: StatusPick[],
+  to: TaskStatus,
+  opts: { waitingOn?: string | null; scheduledFor?: Ymd | null },
+  p: core.Principal,
+) {
+  const { rows, ...out } = await prisma.$transaction((tx) => setStatusEach(tx, picks, to, opts, p), BULK_TX);
+  revalidate(rows);
+  return out;
+}
+
+export async function undoBulkStatus(changes: StatusChange[], p: core.Principal) {
+  const { rows, done, skipped } = await prisma.$transaction((tx) => undoStatusEach(tx, changes, p), BULK_TX);
+  revalidate(rows);
+  return { done, skipped };
+}
+
+export async function bulkAssign(picks: AssignPick[], to: core.Assignee, p: core.Principal) {
+  const { rows, ...out } = await prisma.$transaction((tx) => assignEach(tx, picks, to, p), BULK_TX);
+  revalidate(rows);
+  return out;
+}
+
+export async function undoBulkAssign(changes: AssignChange[], p: core.Principal) {
+  const { rows, done, skipped } = await prisma.$transaction((tx) => undoAssignEach(tx, changes, p), BULK_TX);
+  revalidate(rows);
+  return { done, skipped };
+}
+
+/** One date for many (bulk-core.ts moveDatesEach). */
+export async function bulkMoveDates(ids: string[], jobs: string[], to: Ymd | null, p: core.Principal) {
+  const { rows, ...out } = await prisma.$transaction((tx) => moveDatesEach(tx, ids, new Set(jobs), to, p), BULK_TX);
+  revalidate(rows);
+  return out;
+}
+
+/** Its Undo: each date back unless someone changed it since (bulk-core.ts undoDatesEach). */
+export async function undoBulkMoveDates(moves: DateMove[], p: core.Principal) {
+  const { rows, done, skipped } = await prisma.$transaction((tx) => undoDatesEach(tx, moves, p), BULK_TX);
+  revalidate(rows);
+  return { done, skipped };
+}
+
+export async function bulkSetProperty(ids: string[], propertyId: string | null, p: core.Principal) {
+  const { rows, ...out } = await prisma.$transaction((tx) => setPropertyEach(tx, ids, propertyId, p), BULK_TX);
+  revalidate(rows, [propertyId]);
+  return out;
+}
+
+export async function undoBulkProperty(changes: PropertyChange[], p: core.Principal) {
+  const { rows, done, skipped } = await prisma.$transaction((tx) => undoPropertyEach(tx, changes, p), BULK_TX);
+  revalidate(rows, changes.map((c) => c.from.propertyId));
+  return { done, skipped };
+}
+
+/**
+ * Delete each task for good, files and all (service.deleteTask), one at a
+ * time: each is its own transaction, and its files go once it commits. One
+ * that fails is counted and the rest still go; one already gone counts as
+ * deleted, since that's what was asked.
+ */
+export async function bulkDeleteTasks(ids: string[], p: core.Principal): Promise<{ deleted: number; failed: number }> {
+  let deleted = 0;
+  let failed = 0;
+  for (const id of [...new Set(ids)]) {
+    try {
+      await deleteTask(id, p);
+      deleted += 1;
+    } catch (err) {
+      logError("tasks:bulk-delete", err, { taskId: id });
+      failed += 1;
+    }
+  }
+  return { deleted, failed };
 }

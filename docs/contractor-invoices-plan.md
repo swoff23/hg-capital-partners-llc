@@ -2,6 +2,8 @@
 
 **Status:** spec, agreed in grilling on 2026-10-23. Planning only: the build starts after the Nov 1 Asana cutover, and only after an explicit "build it".
 
+**Note (Nov 20, 2026).** Rehab costs, planned after the rehab draws MVP ([specs/rehab-draws.md](specs/rehab-draws.md), section 9), would tie invoices and materials receipts to a rehab and a budget line. That reopens I4 (no reconciling to properties) and I11 (contractor invoices only). Settle it when costs get their own planning pass.
+
 ---
 
 ## 1. Goal

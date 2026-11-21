@@ -25,6 +25,15 @@ export function unitLabels(units: unknown): string[] {
   return [...new Set(parseUnits(units).map((u) => u.label?.trim()).filter((l): l is string => !!l))];
 }
 
+/**
+ * A task's unit after it moves to a building with these unit labels: kept
+ * when the new building has a unit by that name, otherwise none. The task
+ * page's Property field and the Tasks list's bulk move both follow it.
+ */
+export function unitAfterMove(unitLabel: string | null, units: readonly string[]): string | null {
+  return unitLabel && units.includes(unitLabel) ? unitLabel : null;
+}
+
 /** Every building as an option, in street order (street, then house number as a number: 15 before 118). */
 export function shapePropertyOptions(rows: readonly PropertyRow[]): PropertyOption[] {
   return rows

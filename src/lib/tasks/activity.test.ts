@@ -533,7 +533,7 @@ test("Connor's task: older changes collapse across people and days, the newest 2
   assert.deepEqual(stretchSummary(hidden.length, hidden.flatMap(entryKinds)), {
     show: "Show 4 updates",
     hide: "Hide 4 updates",
-    kinds: "assignee and due date",
+    kinds: "assignee and due date\u2026",
   });
   assert.equal(out[1].type === "collapsed" && out[1].id, `collapsed-${hidden[0].id}`);
 });
@@ -594,10 +594,10 @@ test("newest first, a stretch keeps its newest 2 on top and collapses what's und
   );
 });
 
-test("a collapsed line names up to three kinds, then 'and more'", () => {
-  assert.equal(stretchSummary(2, ["due date", "due date"]).kinds, "due date");
-  assert.equal(stretchSummary(5, ["assignee", "due date", "Asana move"]).kinds, "assignee, due date and Asana move");
-  assert.equal(stretchSummary(6, ["assignee", "due date", "unit", "title"]).kinds, "assignee, due date, unit and more");
+test("a collapsed line names up to three kinds and ends in an ellipsis, as Linear's does", () => {
+  assert.equal(stretchSummary(2, ["due date", "due date"]).kinds, "due date\u2026");
+  assert.equal(stretchSummary(5, ["assignee", "due date", "Asana move"]).kinds, "assignee, due date and Asana move\u2026");
+  assert.equal(stretchSummary(6, ["assignee", "due date", "unit", "title"]).kinds, "assignee, due date, unit\u2026");
   assert.equal(stretchSummary(3, []).kinds, null);
   assert.equal(stretchSummary(1, ["title"]).show, "Show 1 update");
 });

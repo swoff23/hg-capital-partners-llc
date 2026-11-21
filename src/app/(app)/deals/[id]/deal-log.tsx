@@ -1,8 +1,8 @@
 "use client";
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
-import { ActivityDivider, ActivityItem, ActivityRun, ActivityTimeline } from "@/components/activity-timeline";
-import { ActivitySpan, ActivityTime } from "@/components/activity-time";
+import { ActivityDivider, ActivityFold, ActivityItem, ActivityRun, ActivityTimeline } from "@/components/activity-timeline";
+import { ActivityTime } from "@/components/activity-time";
 import { CommentBody, CommentCard, CommentEditor, SendFailedLine } from "@/components/comment-card";
 import { Composer, PendingSendsProvider, isOfflineMessage, usePendingSends, type PendingSend } from "@/components/composer";
 import { MenuItem, MenuSeparator } from "@/components/menu";
@@ -332,15 +332,13 @@ function NoteRow({
 }
 
 /**
- * The older part of a stretch of changes as one line (activity-collapse 3.3): "Show 3 updates: asking price and
- * tasks" (the kinds drop below 640px) and the days it spans; open, its rows under it, newest first.
+ * The older part of a stretch of changes as one line (activity-collapse 3.3), Linear's way: "Show 3 updates: asking
+ * price and tasks…" (the kinds drop below 640px); open, its rows under it, newest first.
  */
 function CollapsedChanges({ rows, forceOpen, render }: { rows: LogEntry[]; forceOpen: boolean; render: (entry: LogEntry) => ReactNode }) {
   const words = stretchSummary(rows.length, rows.flatMap((e) => e.kinds));
-  const newest = rows[0];
-  const oldest = rows[rows.length - 1];
   return (
-    <ActivityRun
+    <ActivityFold
       key={forceOpen ? "open" : "closed"}
       defaultOpen={forceOpen}
       summary={
@@ -350,10 +348,9 @@ function CollapsedChanges({ rows, forceOpen, render }: { rows: LogEntry[]; force
         </>
       }
       openSummary={words.hide}
-      time={<ActivitySpan from={{ at: oldest.at, day: oldest.day }} to={{ at: newest.at, day: newest.day }} />}
     >
       {rows.map(render)}
-    </ActivityRun>
+    </ActivityFold>
   );
 }
 

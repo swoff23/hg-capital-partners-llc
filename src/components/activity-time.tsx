@@ -124,34 +124,3 @@ export function ActivityTime({
   if (coarse) return time;
   return <Tooltip label={fullStamp(ms, current)}>{time}</Tooltip>;
 }
-
-/** One end of a span: its instant, or only its day. */
-export type ActivityWhen = { at?: Date | string | null; day?: Ymd | null };
-
-/**
- * A collapsed line's time (activity-collapse 3.3): the first row's day to the
- * last's ("Nov 3 to Sun"), or the one time when they share a day. With a
- * mouse the Tooltip gives both full stamps. Ends with no day are skipped.
- */
-export function ActivitySpan({ from, to, className }: { from: ActivityWhen; to: ActivityWhen; className?: string }) {
-  const current = useActivityNow();
-  const coarse = useCoarsePointer();
-  const dayOf = (w: ActivityWhen): Ymd | null => {
-    const ms = toMs(w.at);
-    return ms != null ? todayYmdEastern(new Date(ms)) : (w.day ?? null);
-  };
-  const a = dayOf(from);
-  const b = dayOf(to);
-  if (!a || !b || a === b) {
-    const one = b ? to : from;
-    return <ActivityTime at={one.at} day={one.day} className={className} />;
-  }
-  const today = todayYmdEastern(new Date(current));
-  const stamp = (w: ActivityWhen, d: Ymd) => (toMs(w.at) != null ? fullStamp(toMs(w.at)!, current) : fmtDay(d, { weekday: true, year: "auto", now: today }));
-  const label = (
-    <span className={cn("whitespace-nowrap", className)}>
-      <time dateTime={a}>{historyDay(a, today)}</time> to <time dateTime={b}>{historyDay(b, today)}</time>
-    </span>
-  );
-  return coarse ? label : <Tooltip label={`${stamp(from, a)} to ${stamp(to, b)}`}>{label}</Tooltip>;
-}

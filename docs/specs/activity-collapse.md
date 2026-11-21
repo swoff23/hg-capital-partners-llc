@@ -6,7 +6,7 @@ Connor's ask, Nov 19, 2026. Answers settled in chat on Nov 20. Builds the week o
 
 A task's Activity is a wall of one-line changes. In Connor's example, a task's creation and 7 changes by two people over four days take 12 rows, because only one person's changes within 30 minutes fold today, and every day gets a heading.
 
-- **Collapse like Linear.** Between two comments, older changes collapse into one line that says what's inside: "Show 4 updates: assignee, due date and Asana move". The newest 2 changes of each stretch stay in view.
+- **Collapse like Linear.** Between two comments, older changes collapse into one line that says what's inside: "Show 4 updates: assignee, due date and Asana move…", with Linear's up-down chevron on the rail. The newest 2 changes of each stretch stay in view.
 - **Comments never collapse.** They already sit in time order between the changes on all three pages. Nothing about that changes.
 - **No day headings.** Each line carries its own day in its time slot ("Mon", "Nov 10").
 - **The top fold stays.** "Show 12 earlier updates" counts rows after collapsing, so it shows only on long histories.
@@ -16,7 +16,7 @@ Connor's example, after:
 
 ```
 Connor created this task · Nov 3
-› Show 5 updates: assignee, due date and Asana move · Nov 3 to Sun
+⇕ Show 5 updates: assignee, due date and Asana move…
 Connor moved the due date from Mon, Nov 16 to Thu, Nov 19 · Mon
 Connor set the unit to Unit 2 · Mon
 ```
@@ -63,20 +63,19 @@ The "Moved from Asana" divider counts as a row. Inside a collapsed stretch it's 
 
 ### 3.3 The collapsed line
 
-It's `ActivityRun` from `src/components/activity-timeline.tsx`, the same line a folded burst uses: a dot on the rail, the summary as its toggle, then the time and the chevron. Its new `openSummary` prop swaps in "Hide 5 updates" while it's open.
+It's `ActivityFold` in `src/components/activity-timeline.tsx`, drawn the way Linear draws "Show 5 events" (Connor, Nov 20, after the first version's dot looked like every other change): an up-down chevron on the rail where a dot would be, then the summary, with no time. The whole row is one button. Open, the chevron turns inward and the line reads "Hide 5 updates".
 
 | | Laptop 1280, tablet 768 | Phone 375 and 320 |
 |---|---|---|
-| Closed | Show 4 updates: assignee, due date and Asana move | Show 4 updates |
-| Four or more kinds | Show 6 updates: assignee, due date, unit and more | Show 6 updates |
+| Closed | Show 4 updates: assignee, due date and Asana move… | Show 4 updates |
+| Four or more kinds | Show 6 updates: assignee, due date, unit… | Show 6 updates |
 | Open | Hide 4 updates | Hide 4 updates |
-| Time | Nov 3 to Sun | Nov 3 to Sun |
 
 - **The count** is the rows you'll see when it opens.
-- **The kinds** are listed in the order they first happen, up to three, then "and more". The words: assignee, status, due date, visit, unit or property, title, notes, files, checklist, repeat, Asana move. Deals use the field's label in lowercase (asking price, stage) and "tasks" for a task-added line.
-- **The time** is the span from the first row's day to the last's (3.5). One day shows that day alone. With a mouse, the tooltip gives both full stamps.
+- **The kinds** are listed in the order they first happen, up to three, and end in "…" as Linear's do. The words: assignee, status, due date, visit, unit or property, title, notes, files, checklist, repeat, Asana move. Deals use the field's label in lowercase (asking price, stage) and "tasks" for a task-added line.
+- **No time.** Linear's fold line has none; each row shows its own once it's open.
 - **Opened**, its rows appear under it in timeline order. A burst inside shows as its sentences, one per line, with no second chevron: "Connor assigned Zack and made 3 more changes" opens to its sentences. A same-kind burst ("Zack checked 14 items") stays one sentence, and the checklist shows the ticks. A deal change's field rows (old value, arrow, new value) show right under its sentence.
-- **It's a button** with `aria-expanded`. Focus stays on it when it toggles. On touch it's at least 44px tall (`pointer-coarse:min-h-11`, as the top fold does). No new motion.
+- **It's a button** with `aria-expanded`, the rail icon included. With a mouse the row darkens on hover. Focus stays on it when it toggles. On touch it's at least 44px tall (`pointer-coarse:min-h-11`, as the top fold does). No new motion.
 - **In print**, the line prints without its chevron and the rows inside stay folded, as the top fold does.
 
 ### 3.4 Order on each page
@@ -108,7 +107,7 @@ Day headings (`ActivityDay`) go from all three pages, and so do month headings (
 ## 4. Reuse check
 
 **Reused as is**
-- `ActivityRun`, `ActivityTimeline`, `ActivityDivider` and `ActivityTime` in `src/components/`.
+- `ActivityTimeline`, `ActivityRun` (bursts), `ActivityDivider` and `ActivityTime` in `src/components/`.
 - `CommentCard` and the pairing behind decision pairs.
 - `foldStart`, `firstNewIndex` and `linkedUpdateId` in `src/lib/tasks/activity.ts`; `LOG_SHOWN` in `src/lib/deals/record-log.ts`.
 - `historyDay` in `src/lib/dates.ts`.
@@ -123,7 +122,7 @@ Day headings (`ActivityDay`) go from all three pages, and so do month headings (
 - `groupHeadings`, `groupByDay` and `MONTH_AFTER_DAYS` in the task lib, and `groupLog` with its own `MONTH_AFTER_DAYS` in the deal lib.
 - `ActivityDay` in `activity-timeline.tsx`, and the `month` option on `ActivityTime`, `activityTime` and `CommentCard`.
 
-**New:** nothing. No new component, field or migration.
+**New:** `ActivityFold` in `activity-timeline.tsx`, the folded line with Linear's rail icon (`ChevronsUpDown` and `ChevronsDownUp` from lucide). No new field or migration.
 
 **References**
 - Linear, from Connor's screenshots (Nov 19): "Show 5 events: changed project, status, labels, related issues, and cycles…" between comments.
