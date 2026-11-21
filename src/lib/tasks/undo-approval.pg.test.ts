@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { todayYmdEastern } from "@/lib/dates";
 import { makeClient } from "@/lib/db-client";
+import { scratchRows } from "@/lib/scratch-rows";
 import { activeTask } from "@/lib/task-scope";
 import { buildActivity } from "./activity";
 import * as core from "./core";
@@ -18,7 +19,7 @@ import * as core from "./core";
  * is local time). Opt-in like job-batch.pg.test.ts, by the same guard: `npm
  * test` skips it unless HG_SCRATCH_DATABASE_URL names a local scratch
  * database (its name must contain "scratch"); it writes rows there and
- * leaves them.
+ * deletes them when it finishes (scratch-rows.ts).
  *
  * Since Nov 15 an approval emails nobody (rules.ts notifyAudience,
  * docs/specs/send-for-review.md). The Undo's refusal for an approval email
@@ -55,6 +56,8 @@ const skip = isLocalScratch(URL_ENV) ? false : "set HG_SCRATCH_DATABASE_URL to a
 const timeout = 30_000;
 
 let prisma: PrismaClient;
+/** What this run makes, deleted when it finishes so the scratch database stays as it was (scratch-rows.ts). */
+const made = scratchRows(() => prisma);
 let staff: core.Principal;
 let pieter: core.Principal;
 let zack: Extract<core.Principal, { kind: "contractor" }>;
@@ -63,23 +66,26 @@ let propertyId: string;
 before(async () => {
   if (skip) return;
   prisma = makeClient({ DATABASE_URL: URL_ENV });
+  await made.takeTurn(URL_ENV);
   const run = randomUUID().slice(0, 8);
-  const connor = await prisma.user.create({ data: { email: `connor-${run}@example.test`, name: "Connor", passwordHash: "scrypt$x" } });
-  const pieterUser = await prisma.user.create({ data: { email: `pieter-${run}@example.test`, name: "Pieter", passwordHash: "scrypt$x" } });
+  const connor = await made.user({ email: `connor-${run}@example.test`, name: "Connor", passwordHash: "scrypt$x" });
+  const pieterUser = await made.user({ email: `pieter-${run}@example.test`, name: "Pieter", passwordHash: "scrypt$x" });
   staff = { kind: "staff", userId: connor.id, label: "Connor" };
   pieter = { kind: "staff", userId: pieterUser.id, label: "Pieter" };
-  const contact = await prisma.contact.create({ data: { fullName: "Zack Outlaw" } });
+  const contact = await made.contact({ fullName: "Zack Outlaw" });
   // A login, so the next copy's "assigned you" is an email row for Zack (the approval itself emails nobody).
   await prisma.portalAccount.create({
     // Signed in once, so HG's changes email him (src/lib/portal/job-emails.ts).
     data: { contactId: contact.id, email: `zack-${run}@example.test`, passwordHash: "scrypt$x", mustChangePassword: false, status: "ACTIVE", lastSignInAt: new Date() },
   });
   zack = { kind: "contractor", contactId: contact.id, label: "Zack Outlaw" };
-  propertyId = (await prisma.property.create({ data: { address: `${run} Sherwood St, Buffalo, NY 14213` } })).id;
+  propertyId = (await made.property({ address: `${run} Sherwood St, Buffalo, NY 14213` })).id;
 });
 
 after(async () => {
-  if (!skip) await prisma.$disconnect();
+  if (skip) return;
+  await made.remove();
+  await prisma.$disconnect();
 });
 
 /** A weekly job of Zack's that he marked done, then Connor approved: the approval's STATUS line and the copy it made. */
@@ -257,7 +263,7 @@ test("only the reopen's Undo, or Approve again after Approve's Undo, gives an ar
   // Nov 3 low 4's residual as the task session ruled it, on the adapter: the drop and the reopen are written in one
   // transaction, and the give-back reads them back newest first (createdAt, then id) with the reopen's createdAt as the
   // adapter returns it, which a fake can't show. No login: Archive needs it removed.
-  const painter = await prisma.contact.create({ data: { fullName: "Rv Painter", trades: "Painting" } });
+  const painter = await made.contact({ fullName: "Rv Painter", trades: "Painting" });
   const job = (title: string) => prisma.$transaction((tx) => core.createTask(tx, { title, propertyId, assignee: { contactId: painter.id } }, staff));
   const status = (taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
     prisma.$transaction((tx) => core.setStatus(tx, taskId, to, staff, { expected }));
@@ -361,7 +367,7 @@ test("a reopen gives back only the contractor it dropped itself, not a drop Appr
   // line), then the job Canceled with no line (service.ts cancelOpenAutoTask's write, made here directly: service.ts
   // loads server-only). A reopen of the unassigned job drops nobody and marks nothing, so its Cancel inside the window
   // closes it unassigned.
-  const roofer = await prisma.contact.create({ data: { fullName: "Lw Roofer", trades: "Roofing" } });
+  const roofer = await made.contact({ fullName: "Lw Roofer", trades: "Roofing" });
   const status = (taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
     prisma.$transaction((tx) => core.setStatus(tx, taskId, to, staff, { expected }));
   const task = await prisma.$transaction((tx) => core.createTask(tx, { title: "Patch the roof", propertyId, assignee: { contactId: roofer.id } }, staff));
@@ -384,7 +390,7 @@ test("a reopen gives back only the contractor it dropped itself, not a drop Appr
 test("Connor's reopen, then Pieter's Cancel and its Undo: open and unassigned, and the timeline shows only Connor's reopen", { skip, timeout }, async () => {
   // Low 2 on the adapter's rows: Pieter's Cancel gave the job back (inside the reopen's window) and his Undo took it
   // off again, so his give-back and his drop go with his paired status lines, whichever came first.
-  const tiler = await prisma.contact.create({ data: { fullName: "Lw Tiler", trades: "Tile" } });
+  const tiler = await made.contact({ fullName: "Lw Tiler", trades: "Tile" });
   const as = (p: core.Principal, taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
     prisma.$transaction((tx) => core.setStatus(tx, taskId, to, p, { expected }));
   const task = await prisma.$transaction((tx) => core.createTask(tx, { title: "Regrout the shower", propertyId, assignee: { contactId: tiler.id } }, staff));
@@ -421,7 +427,7 @@ test("a give-back whose approval was undone isn't hidden with the later reopen's
   // again (the give-back, written with that approval's line), Restore, that approval's Undo (its line soft-deleted, no
   // drop), Cancel from Review, Archive, and a reopen to Review inside 2 minutes (a marked drop). The Cancel and the
   // reopen pair; the give-back was written with the undone approval, so it and the reopen's drop both stay.
-  const glazer = await prisma.contact.create({ data: { fullName: "Vf Glazer", trades: "Glazing" } });
+  const glazer = await made.contact({ fullName: "Vf Glazer", trades: "Glazing" });
   const status = (taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
     prisma.$transaction((tx) => core.setStatus(tx, taskId, to, staff, { expected }));
   const archive = (archivedAt: Date | null) => prisma.contact.update({ where: { id: glazer.id }, data: { archivedAt } });
@@ -451,12 +457,12 @@ test("flow B on real rows: three partners' reopens and Cancels end Done and unas
   // archived contractor's, Connor cancels it (which gives it back), Pieter reopens, Dana cancels (gives it back), and
   // Connor reopens and finishes it, all inside 2 minutes. Connor's Cancel and his reopen have others' moves between
   // them, so they aren't his there and back: every line stands, and the last say Done and unassigned.
-  const gutters = await prisma.contact.create({ data: { fullName: "Fb Gutters", trades: "Gutters" } });
+  const gutters = await made.contact({ fullName: "Fb Gutters", trades: "Gutters" });
   // No sign-in: job-batch.pg.test.ts counts the partners who have one while its emails are written, and may be running
   // alongside on the same database.
   const dana: core.Principal = {
     kind: "staff",
-    userId: (await prisma.user.create({ data: { email: `dana-${randomUUID().slice(0, 8)}@example.test`, name: "Dana" } })).id,
+    userId: (await made.user({ email: `dana-${randomUUID().slice(0, 8)}@example.test`, name: "Dana" })).id,
     label: "Dana",
   };
   const as = (p: core.Principal, taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
@@ -512,7 +518,7 @@ test("a reopen, then a Cancel that wrote no line, then Done inside 2 minutes: no
   // updateMany, which writes no line (service.ts loads server-only, so its statement runs here as written there). The
   // reopen is still the latest line, the toast's Undo is refused, and a close from Canceled starts where no reopen
   // left the job: it closes unassigned, with his access still revoked.
-  const insurer = await prisma.contact.create({ data: { fullName: "Fa Insurer", trades: "Insurance" } });
+  const insurer = await made.contact({ fullName: "Fa Insurer", trades: "Insurance" });
   const reminder: core.Principal = { kind: "system", label: "Property reminder" };
   const status = (taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
     prisma.$transaction((tx) => core.setStatus(tx, taskId, to, staff, { expected }));
@@ -547,11 +553,11 @@ test("G1 on real rows: someone's pick between a give-back and the drop after it 
   // archived: Connor reopens it (a drop), Pieter cancels it (the give-back), Connor reassigns it to another contractor,
   // Dana's picker (loaded before the archive) gives it to Zack again, and Pieter reopens it inside 2 minutes of his
   // Cancel (a drop). Pieter's Cancel and reopen pair, but the give-back and that drop are no there-and-back.
-  const caulker = await prisma.contact.create({ data: { fullName: "Gp Caulker", trades: "Caulking" } });
-  const mason = await prisma.contact.create({ data: { fullName: "Gp Mason", trades: "Masonry" } });
+  const caulker = await made.contact({ fullName: "Gp Caulker", trades: "Caulking" });
+  const mason = await made.contact({ fullName: "Gp Mason", trades: "Masonry" });
   const dana: core.Principal = {
     kind: "staff",
-    userId: (await prisma.user.create({ data: { email: `dana-${randomUUID().slice(0, 8)}@example.test`, name: "Dana" } })).id,
+    userId: (await made.user({ email: `dana-${randomUUID().slice(0, 8)}@example.test`, name: "Dana" })).id,
     label: "Dana",
   };
   const as = (p: core.Principal, taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
@@ -586,9 +592,9 @@ test("G1 on real rows: Pieter's own picks between his give-back and his reopen l
   // The task session's fifth review, flow B2, through the real setStatus, patchTask and addComment. Zack's Canceled job,
   // Zack archived: Connor reopens it (a drop), Pieter cancels it (the give-back), gives it to another contractor, then a
   // third, then Zack again from a tab loaded before the archive, adds an Internal comment, and reopens inside 2 minutes.
-  const caulker = await prisma.contact.create({ data: { fullName: "Gs Caulker", trades: "Caulking" } });
-  const mason = await prisma.contact.create({ data: { fullName: "Gs Mason", trades: "Masonry" } });
-  const tiler = await prisma.contact.create({ data: { fullName: "Gs Tiler", trades: "Tile" } });
+  const caulker = await made.contact({ fullName: "Gs Caulker", trades: "Caulking" });
+  const mason = await made.contact({ fullName: "Gs Mason", trades: "Masonry" });
+  const tiler = await made.contact({ fullName: "Gs Tiler", trades: "Tile" });
   const as = (p: core.Principal, taskId: string, to: Parameters<typeof core.setStatus>[2], expected: Parameters<typeof core.setStatus>[2]) =>
     prisma.$transaction((tx) => core.setStatus(tx, taskId, to, p, { expected }));
   const pick = (taskId: string, to: string, from: string) =>
@@ -632,7 +638,7 @@ test("G2 on real rows: a pick and its reversal don't pair across a drop and a gi
   // has been archived since a page loaded is picked for it, Pieter reopens it (a drop), Connor cancels it (the give-back),
   // and Pieter unassigns it, all inside 2 minutes. The drop and the give-back moved the job between his pick and his
   // unassign, so those two are no there-and-back, and the timeline ends on the unassign.
-  const tiler = await prisma.contact.create({ data: { fullName: "Gq Tiler", trades: "Tile" } });
+  const tiler = await made.contact({ fullName: "Gq Tiler", trades: "Tile" });
   const task = await prisma.$transaction((tx) => core.createTask(tx, { title: "Seal the grout", propertyId }, staff));
   await prisma.$transaction((tx) => core.setStatus(tx, task.id, "CANCELED", staff, { expected: "OPEN" }));
   await prisma.$executeRaw`UPDATE "TaskEvent" SET "createdAt" = "createdAt" - interval '7 days' WHERE "taskId" = ${task.id}`;

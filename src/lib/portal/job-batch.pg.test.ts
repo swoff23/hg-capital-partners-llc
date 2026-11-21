@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { makeClient } from "@/lib/db-client";
+import { scratchRows } from "@/lib/scratch-rows";
 import * as core from "@/lib/tasks/core";
 import { BatchAlreadyPosted, postBatchIn } from "./job-batch";
 import { markDoneIn, postUpdateIn } from "./job-send";
@@ -11,7 +12,8 @@ import { markDoneIn, postUpdateIn } from "./job-send";
  * The batch step's races on a real Postgres, which a fake transaction can't
  * show: row locks, and who waits on whom. Opt-in, so `npm test` skips it
  * unless HG_SCRATCH_DATABASE_URL names a local scratch database (its name
- * must contain "scratch"); it writes rows there and leaves them.
+ * must contain "scratch"); it writes rows there and deletes them when it finishes
+ * (scratch-rows.ts).
  *
  *   createdb -h localhost hg_batch_scratch
  *   DATABASE_URL=postgresql://<you>@localhost:5432/hg_batch_scratch npx prisma migrate deploy
@@ -53,6 +55,8 @@ const skip = isLocalScratch(URL_ENV) ? false : "set HG_SCRATCH_DATABASE_URL to a
 const timeout = 30_000;
 
 let prisma: PrismaClient;
+/** What this run makes, deleted when it finishes so the scratch database stays as it was (scratch-rows.ts). */
+const made = scratchRows(() => prisma);
 let staff: core.Principal;
 let zack: Extract<core.Principal, { kind: "contractor" }>;
 let propertyId: string;
@@ -62,22 +66,25 @@ before(async () => {
   // The app's own client (db-client.ts makeClient: node-postgres through @prisma/adapter-pg), so the races run on the
   // driver production runs, not the Rust engine a bare `new PrismaClient` gets (ADP-1).
   prisma = makeClient({ DATABASE_URL: URL_ENV });
+  await made.takeTurn(URL_ENV);
   const run = randomUUID().slice(0, 8);
   // Two partners with a sign-in, so each late or batch line goes to both (core notify).
-  const connor = await prisma.user.create({ data: { email: `connor-${run}@example.test`, name: "Connor", passwordHash: "scrypt$x" } });
-  await prisma.user.create({ data: { email: `pieter-${run}@example.test`, name: "Pieter", passwordHash: "scrypt$x" } });
+  const connor = await made.user({ email: `connor-${run}@example.test`, name: "Connor", passwordHash: "scrypt$x" });
+  await made.user({ email: `pieter-${run}@example.test`, name: "Pieter", passwordHash: "scrypt$x" });
   staff = { kind: "staff", userId: connor.id, label: "Connor" };
-  const contact = await prisma.contact.create({ data: { fullName: "Zack Outlaw" } });
+  const contact = await made.contact({ fullName: "Zack Outlaw" });
   await prisma.portalAccount.create({
     // Signed in once, so HG's changes email him (src/lib/portal/job-emails.ts).
     data: { contactId: contact.id, email: `zack-${run}@example.test`, passwordHash: "scrypt$x", mustChangePassword: false, status: "ACTIVE", lastSignInAt: new Date() },
   });
   zack = { kind: "contractor", contactId: contact.id, label: "Zack Outlaw" };
-  propertyId = (await prisma.property.create({ data: { address: `${run} Sherwood St, Buffalo, NY 14213` } })).id;
+  propertyId = (await made.property({ address: `${run} Sherwood St, Buffalo, NY 14213` })).id;
 });
 
 after(async () => {
-  if (!skip) await prisma.$disconnect();
+  if (skip) return;
+  await made.remove();
+  await prisma.$disconnect();
 });
 
 /** A job assigned to Zack in `status`, with `n` photos he uploaded and hasn't posted. */
@@ -298,7 +305,7 @@ test("a staff reopen holding the task row while a late send waits on it: the lat
 
 test("Mark done waits for the task row a batch post of the same photos holds, then counts them as posted (S2)", { skip, timeout }, async () => {
   const { taskId, files } = await jobWithFiles("IN_PROGRESS");
-  const template = await prisma.taskTemplate.create({ data: { name: `Two photos ${randomUUID().slice(0, 8)}`, finishPhotosRequired: 2 } });
+  const template = await made.taskTemplate({ name: `Two photos ${randomUUID().slice(0, 8)}`, finishPhotosRequired: 2 });
   await prisma.task.update({ where: { id: taskId }, data: { taskTemplateId: template.id } });
   // The batch post holds the task row after it linked both photos (a second tab, or a batch that landed).
   const hold = holdAfter("taskAttachment", "updateMany");
@@ -321,7 +328,7 @@ test("Mark done waits for the task row a batch post of the same photos holds, th
 
 test("Mark done waits for the task row a staff Remove holds, then counts what's left and refuses short (S2)", { skip, timeout }, async () => {
   const { taskId, files } = await jobWithFiles("IN_PROGRESS");
-  const template = await prisma.taskTemplate.create({ data: { name: `Two photos ${randomUUID().slice(0, 8)}`, finishPhotosRequired: 2 } });
+  const template = await made.taskTemplate({ name: `Two photos ${randomUUID().slice(0, 8)}`, finishPhotosRequired: 2 });
   await prisma.task.update({ where: { id: taskId }, data: { taskTemplateId: template.id } });
   const removed = await prisma.taskAttachment.findUniqueOrThrow({ where: { id: files[0] }, select: { id: true, taskId: true, asanaGid: true } });
   // Held after the Remove read the file under the task row it took first.

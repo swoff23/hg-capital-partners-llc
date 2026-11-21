@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { makeClient } from "@/lib/db-client";
+import { scratchRows } from "@/lib/scratch-rows";
 import { ResetTokenTaken, RESET_TOKEN_SELECT, findResetOwner, resetTokenOwner, saveStaffReset, usableReset } from "./reset-core";
 
 /**
@@ -11,7 +12,8 @@ import { ResetTokenTaken, RESET_TOKEN_SELECT, findResetOwner, resetTokenOwner, s
  * request reaches, and saveStaffReset's single use, rollback and sign-out
  * stamp. Opt-in like job-batch.pg.test.ts, by the same guard: `npm test`
  * skips it unless HG_SCRATCH_DATABASE_URL names a local scratch database (its
- * name must contain "scratch"). It writes rows there and leaves them.
+ * name must contain "scratch"). It writes rows there and deletes them when it
+ * finishes (scratch-rows.ts).
  *
  *   createdb -h localhost hg_reset_scratch
  *   DATABASE_URL=postgresql://<you>@localhost:5432/hg_reset_scratch npx prisma migrate deploy
@@ -43,22 +45,27 @@ const skip = isLocalScratch(URL_ENV) ? false : "set HG_SCRATCH_DATABASE_URL to a
 const timeout = 30_000;
 
 let prisma: PrismaClient;
+/** What this run makes, deleted when it finishes so the scratch database stays as it was (scratch-rows.ts). */
+const made = scratchRows(() => prisma);
 let run: string;
 
 before(async () => {
   if (skip) return;
   prisma = makeClient({ DATABASE_URL: URL_ENV });
+  await made.takeTurn(URL_ENV);
   run = randomUUID().slice(0, 8);
 });
 
 after(async () => {
-  if (!skip) await prisma.$disconnect();
+  if (skip) return;
+  await made.remove();
+  await prisma.$disconnect();
 });
 
 const soon = () => new Date(Date.now() + 30 * 60_000);
 
 async function partner(name: string, passwordHash: string | null = "old.hash") {
-  return prisma.user.create({ data: { email: `${name}-${run}@example.test`, name, passwordHash } });
+  return made.user({ email: `${name}-${run}@example.test`, name, passwordHash });
 }
 
 async function staffToken(userId: string, expiresAt = soon()) {
@@ -67,7 +74,7 @@ async function staffToken(userId: string, expiresAt = soon()) {
 
 test("a reset link has exactly one owner", { skip, timeout }, async () => {
   const connor = await partner("connor-owner");
-  const contact = await prisma.contact.create({ data: { fullName: `Zack ${run}` } });
+  const contact = await made.contact({ fullName: `Zack ${run}` });
   const zack = await prisma.portalAccount.create({
     data: { contactId: contact.id, email: `zack-owner-${run}@example.test`, passwordHash: "x.y", status: "ACTIVE" },
   });

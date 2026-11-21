@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { makeClient } from "@/lib/db-client";
+import { scratchRows } from "@/lib/scratch-rows";
 import { createLease } from "@/lib/tenants/core";
 import { createNextRepeat, createTask, patchTask, type Principal } from "./core";
 
@@ -41,6 +42,8 @@ function isLocalScratch(raw: string): boolean {
 const skip = isLocalScratch(URL_ENV) ? false : "set HG_SCRATCH_DATABASE_URL to a local scratch database to run this";
 
 let prisma: PrismaClient;
+/** This file's turn on the scratch database, and what it makes there, deleted when it finishes (scratch-rows.ts). */
+const made = scratchRows(() => prisma);
 const run = randomUUID().slice(0, 8);
 const propertyIds: string[] = [];
 const contactIds: string[] = [];
@@ -49,6 +52,7 @@ let staff: Principal;
 before(async () => {
   if (skip) return;
   prisma = makeClient({ DATABASE_URL: URL_ENV, NODE_ENV: "test" } as never);
+  await made.takeTurn(URL_ENV);
   const user = await prisma.user.create({ data: { email: `${run}@example.com`, name: `${run} Connor` } });
   staff = { kind: "staff", userId: user.id, label: "Connor" } as Principal;
 });
@@ -61,6 +65,7 @@ after(async () => {
   await prisma.property.deleteMany({ where: { id: { in: propertyIds } } });
   await prisma.contact.deleteMany({ where: { id: { in: contactIds } } });
   await prisma.user.deleteMany({ where: { email: `${run}@example.com` } });
+  await made.remove();
   await prisma.$disconnect();
 });
 

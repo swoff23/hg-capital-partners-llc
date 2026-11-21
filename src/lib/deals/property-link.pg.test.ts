@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { makeClient } from "@/lib/db-client";
+import { scratchRows } from "@/lib/scratch-rows";
 import { linkClosedDeal, linkProperty } from "./property-link";
 
 /**
@@ -12,7 +13,8 @@ import { linkClosedDeal, linkProperty } from "./property-link";
  * the unique `convertedPropertyId`, and two links racing for one pair.
  * Opt-in like job-batch.pg.test.ts, by the same guard: `npm test` skips it
  * unless HG_SCRATCH_DATABASE_URL names a local scratch database (its name
- * must contain "scratch"); it writes rows there and leaves them.
+ * must contain "scratch"); it writes rows there and deletes them when it finishes
+ * (scratch-rows.ts).
  *
  *   createdb -h localhost hg_link_scratch
  *   DATABASE_URL=postgresql://<you>@localhost:5432/hg_link_scratch npx prisma migrate deploy
@@ -44,6 +46,8 @@ const skip = isLocalScratch(URL_ENV) ? false : "set HG_SCRATCH_DATABASE_URL to a
 const timeout = 30_000;
 
 let prisma: PrismaClient;
+/** What this run makes, deleted when it finishes so the scratch database stays as it was (scratch-rows.ts). */
+const made = scratchRows(() => prisma);
 let connor: { id: string };
 let pieter: { id: string };
 const run = randomUUID().replace(/-/g, "").slice(0, 8);
@@ -52,20 +56,23 @@ let streets = 0;
 before(async () => {
   if (skip) return;
   prisma = makeClient({ DATABASE_URL: URL_ENV });
-  connor = await prisma.user.create({ data: { email: `connor-${run}@example.test`, name: "Connor", passwordHash: "scrypt$x" }, select: { id: true } });
-  pieter = await prisma.user.create({ data: { email: `pieter-${run}@example.test`, name: "Pieter", passwordHash: "scrypt$x" }, select: { id: true } });
+  await made.takeTurn(URL_ENV);
+  connor = await made.user({ email: `connor-${run}@example.test`, name: "Connor", passwordHash: "scrypt$x" });
+  pieter = await made.user({ email: `pieter-${run}@example.test`, name: "Pieter", passwordHash: "scrypt$x" });
 });
 
 after(async () => {
-  if (!skip) await prisma.$disconnect();
+  if (skip) return;
+  await made.remove();
+  await prisma.$disconnect();
 });
 
 /** A street no other test (or run) uses, so each case sees only its own rows: "Zq3f9a1c2b7 St". */
 const street = () => `Zq${run}${++streets}`;
 
 const closedDeal = (address: string, data: { status?: string; archivedAt?: Date } = {}) =>
-  prisma.deal.create({ data: { address, status: "CLOSED!", updatedByUserId: pieter.id, ...data } });
-const property = (address: string, data: { archivedAt?: Date } = {}) => prisma.property.create({ data: { address, ...data } });
+  made.deal({ address, status: "CLOSED!", updatedByUserId: pieter.id, ...data });
+const property = (address: string, data: { archivedAt?: Date } = {}) => made.property({ address, ...data });
 
 const linkOf = async (dealId: string) => (await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, select: { convertedPropertyId: true } })).convertedPropertyId;
 const linesOf = (dealId: string) => prisma.dealNote.findMany({ where: { dealId }, select: { body: true, source: true, authorUserId: true, data: true } });
@@ -170,7 +177,7 @@ test("a property another deal already points at is left alone, so the unique lin
   const s = street();
   const prop = await property(`90 ${s} St, Buffalo, NY 14213`);
   // Linked, then moved out of Closed: no longer a candidate, still the property's deal.
-  const old = await prisma.deal.create({ data: { address: `90 ${s} St (first try)`, status: "Pass", convertedPropertyId: prop.id } });
+  const old = await made.deal({ address: `90 ${s} St (first try)`, status: "Pass", convertedPropertyId: prop.id });
   const deal = await closedDeal(`90 ${s} Street, Buffalo, NY 14213`);
   assert.equal(await prisma.$transaction((tx) => linkClosedDeal(tx, deal.id, connor)), null);
   assert.equal(await prisma.$transaction((tx) => linkProperty(tx, prop.id, connor)), null);

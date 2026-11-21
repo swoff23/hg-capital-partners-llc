@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { makeClient } from "@/lib/db-client";
+import { scratchRows } from "@/lib/scratch-rows";
 import { jobKey, offItems, parseItems } from "@/lib/notifications/content";
 import { toYmd } from "@/lib/dates";
 import { assignEach, moveDatesEach, setPropertyEach, setStatusEach, undoAssignEach, undoDatesEach, undoPropertyEach, undoStatusEach } from "./bulk-core";
@@ -15,8 +16,8 @@ import { targetDate } from "./rules";
  * skipped while the rest change, approvals and repeat copies as one at a time,
  * and each Undo. Opt-in like undo-approval.pg.test.ts, by the same guard:
  * `npm test` skips it unless HG_SCRATCH_DATABASE_URL names a local scratch
- * database (its name must contain "scratch"); it writes rows there and leaves
- * them.
+ * database (its name must contain "scratch"); it writes rows there and deletes
+ * them when it finishes (scratch-rows.ts).
  *
  *   HG_SCRATCH_DATABASE_URL=postgresql://<you>@localhost:5432/hg_bulk_scratch npx tsx --test src/lib/tasks/bulk.pg.test.ts
  */
@@ -45,6 +46,8 @@ const skip = isLocalScratch(URL_ENV) ? false : "set HG_SCRATCH_DATABASE_URL to a
 const timeout = 60_000;
 
 let prisma: PrismaClient;
+/** What this run makes, deleted when it finishes so the scratch database stays as it was (scratch-rows.ts). */
+const made = scratchRows(() => prisma);
 let staff: core.Principal;
 let zack: Extract<core.Principal, { kind: "contractor" }>;
 let joseId: string;
@@ -54,26 +57,29 @@ let congress: string;
 before(async () => {
   if (skip) return;
   prisma = makeClient({ DATABASE_URL: URL_ENV });
+  await made.takeTurn(URL_ENV);
   const run = randomUUID().slice(0, 8);
-  const connor = await prisma.user.create({ data: { email: `connor-${run}@example.test`, name: "Connor", passwordHash: "scrypt$x" } });
+  const connor = await made.user({ email: `connor-${run}@example.test`, name: "Connor", passwordHash: "scrypt$x" });
   staff = { kind: "staff", userId: connor.id, label: "Connor" };
-  const contact = await prisma.contact.create({ data: { fullName: "Zack Outlaw" } });
+  const contact = await made.contact({ fullName: "Zack Outlaw" });
   // Signed in once with a login, so HG's changes email him (src/lib/portal/job-emails.ts).
   await prisma.portalAccount.create({
     data: { contactId: contact.id, email: `zack-${run}@example.test`, passwordHash: "scrypt$x", mustChangePassword: false, status: "ACTIVE", lastSignInAt: new Date() },
   });
   zack = { kind: "contractor", contactId: contact.id, label: "Zack Outlaw" };
-  joseId = (await prisma.contact.create({ data: { fullName: "Jose Aponte" } })).id;
+  joseId = (await made.contact({ fullName: "Jose Aponte" })).id;
   // Jose signs in too, so taking a job off him and giving it back queues his lines (the Undo email case).
   await prisma.portalAccount.create({
     data: { contactId: joseId, email: `jose-${run}@example.test`, passwordHash: "scrypt$x", mustChangePassword: false, status: "ACTIVE", lastSignInAt: new Date() },
   });
-  crescent = (await prisma.property.create({ data: { address: `${run} Crescent Ave, Buffalo, NY 14214`, units: [{ label: "Unit 3" }, { label: "Rear" }] } })).id;
-  congress = (await prisma.property.create({ data: { address: `${run} Congress St, Buffalo, NY 14213`, units: [{ label: "Rear" }, { label: "Front" }] } })).id;
+  crescent = (await made.property({ address: `${run} Crescent Ave, Buffalo, NY 14214`, units: [{ label: "Unit 3" }, { label: "Rear" }] })).id;
+  congress = (await made.property({ address: `${run} Congress St, Buffalo, NY 14213`, units: [{ label: "Rear" }, { label: "Front" }] })).id;
 });
 
 after(async () => {
-  if (!skip) await prisma.$disconnect();
+  if (skip) return;
+  await made.remove();
+  await prisma.$disconnect();
 });
 
 const make = (input: core.NewTaskInput) => prisma.$transaction((tx) => core.createTask(tx, input, staff));

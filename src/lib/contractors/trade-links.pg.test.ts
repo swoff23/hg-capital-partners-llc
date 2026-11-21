@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { ConflictError } from "@/lib/action-result";
 import { makeClient } from "@/lib/db-client";
+import { scratchRows } from "@/lib/scratch-rows";
 import { replaceContactTrades } from "./trade-links";
 import { tradeKey } from "./trade-map";
 import { TRADE_LINKS, tradeNames } from "./trades";
@@ -43,6 +44,8 @@ function isLocalScratch(raw: string): boolean {
 const skip = isLocalScratch(URL_ENV) ? false : "set HG_SCRATCH_DATABASE_URL to a local scratch database to run this";
 
 let prisma: PrismaClient;
+/** This file's turn on the scratch database, and what it makes there, deleted when it finishes (scratch-rows.ts). */
+const made = scratchRows(() => prisma);
 let contactId: string;
 /** Names this test makes up, so no other contact has them. */
 const tag = randomUUID().slice(0, 8);
@@ -56,6 +59,7 @@ const tradeExists = async (name: string) => (await prisma.trade.count({ where: {
 before(async () => {
   if (skip) return;
   prisma = makeClient({ DATABASE_URL: URL_ENV });
+  await made.takeTurn(URL_ENV);
   contactId = (await prisma.contact.create({ data: { fullName: `Trades Test ${tag}` }, select: { id: true } })).id;
 });
 
@@ -63,6 +67,7 @@ after(async () => {
   if (skip) return;
   await prisma.contact.deleteMany({ where: { id: contactId } });
   await prisma.trade.deleteMany({ where: { key: { in: [tradeKey(roof), tradeKey(gutter)] }, contacts: { none: {} } } });
+  await made.remove();
   await prisma.$disconnect();
 });
 

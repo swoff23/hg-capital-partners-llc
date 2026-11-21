@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { makeClient } from "@/lib/db-client";
+import { scratchRows } from "@/lib/scratch-rows";
 import { deliverResetEmail } from "@/lib/portal/reset-core";
 import { sentSince } from "./sent-count";
 
@@ -51,6 +52,8 @@ const BEFORE = new Date("2199-03-14T04:00:00.000Z");
 const at = (minutes: number) => new Date(DAY.getTime() + minutes * 60_000);
 
 let prisma: PrismaClient;
+/** This file's turn on the scratch database, and what it makes there, deleted when it finishes (scratch-rows.ts). */
+const made = scratchRows(() => prisma);
 /** Every outbox row has one recipient; a partner here. */
 let connorId: string;
 
@@ -62,14 +65,16 @@ async function clear() {
 before(async () => {
   if (skip) return;
   prisma = makeClient({ DATABASE_URL: URL_ENV });
+  await made.takeTurn(URL_ENV);
   await clear();
   const run = randomUUID().slice(0, 8);
-  connorId = (await prisma.user.create({ data: { email: `connor-${run}@example.test`, name: "Connor", passwordHash: "scrypt$x" } })).id;
+  connorId = (await made.user({ email: `connor-${run}@example.test`, name: "Connor", passwordHash: "scrypt$x" })).id;
 });
 
 after(async () => {
   if (skip) return;
   await clear();
+  await made.remove();
   await prisma.$disconnect();
 });
 

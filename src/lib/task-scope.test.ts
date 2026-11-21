@@ -78,6 +78,7 @@ test("every Task list, count and search query leaves Template rows out", () => {
     "lib/tasks/core.ts": "renames a unit label on the tasks of one property, as a write",
     "lib/portal/queries.ts": "a contractor's jobs, only through the access rows they were given",
     "lib/asana/import.ts": "the import reads its own CSV rows by id, Template rows included",
+    "lib/scratch-rows.ts": "a database test finds the tasks it made, to delete every one of them",
   };
   const found: string[] = [];
   const walk = (dir: string) => {

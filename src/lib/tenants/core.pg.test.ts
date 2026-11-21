@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { FieldError } from "@/lib/action-result";
 import { makeClient } from "@/lib/db-client";
+import { scratchRows } from "@/lib/scratch-rows";
 import { SUBSIDY_OVER_RENT } from "./fields";
 import {
   ALREADY_ON_LEASE,
@@ -56,6 +57,8 @@ function isLocalScratch(raw: string): boolean {
 const skip = isLocalScratch(URL_ENV) ? false : "set HG_SCRATCH_DATABASE_URL to a local scratch database to run this";
 
 let prisma: PrismaClient;
+/** This file's turn on the scratch database, and what it makes there, deleted when it finishes (scratch-rows.ts). */
+const made = scratchRows(() => prisma);
 const run = randomUUID().slice(0, 8);
 const propertyIds: string[] = [];
 const tenantIds: string[] = [];
@@ -76,9 +79,10 @@ async function refusal(p: Promise<unknown>): Promise<Record<string, string>> {
   assert.fail("expected a refusal");
 }
 
-before(() => {
+before(async () => {
   if (skip) return;
   prisma = makeClient({ DATABASE_URL: URL_ENV, NODE_ENV: "test" } as never);
+  await made.takeTurn(URL_ENV);
 });
 
 after(async () => {
@@ -87,6 +91,7 @@ after(async () => {
   const leftover = await prisma.tenant.findMany({ where: { fullName: { startsWith: run } }, select: { id: true } });
   await prisma.tenant.deleteMany({ where: { id: { in: [...tenantIds, ...leftover.map((t) => t.id)] } } });
   await prisma.property.deleteMany({ where: { id: { in: propertyIds } } });
+  await made.remove();
   await prisma.$disconnect();
 });
 

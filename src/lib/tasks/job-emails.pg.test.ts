@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { makeClient } from "@/lib/db-client";
+import { scratchRows } from "@/lib/scratch-rows";
 import { setJobEmailsIn } from "@/lib/portal/accounts-core";
 import * as core from "./core";
 
@@ -16,7 +17,8 @@ import * as core from "./core";
  *
  * Opt-in like undo-approval.pg.test.ts, by the same guard: `npm test` skips it
  * unless HG_SCRATCH_DATABASE_URL names a local scratch database (its name
- * must contain "scratch"); it writes rows there and leaves them.
+ * must contain "scratch"); it writes rows there and deletes them when it finishes
+ * (scratch-rows.ts).
  *
  *   createdb -h localhost hg_emails_scratch
  *   DATABASE_URL=postgresql://<you>@localhost:5432/hg_emails_scratch npx prisma migrate deploy
@@ -48,6 +50,8 @@ const skip = isLocalScratch(URL_ENV) ? false : "set HG_SCRATCH_DATABASE_URL to a
 const timeout = 30_000;
 
 let prisma: PrismaClient;
+/** What this run makes, deleted when it finishes so the scratch database stays as it was (scratch-rows.ts). */
+const made = scratchRows(() => prisma);
 let staff: Extract<core.Principal, { kind: "staff" }>;
 let zack: Extract<core.Principal, { kind: "contractor" }>;
 let accountId: string;
@@ -57,23 +61,26 @@ let propertyId: string;
 before(async () => {
   if (skip) return;
   prisma = makeClient({ DATABASE_URL: URL_ENV });
+  await made.takeTurn(URL_ENV);
   const run = randomUUID().slice(0, 8);
-  const connor = await prisma.user.create({ data: { email: `connor-${run}@example.test`, name: "Connor", passwordHash: "scrypt$x" } });
-  const pieter = await prisma.user.create({ data: { email: `pieter-${run}@example.test`, name: "Pieter", passwordHash: "scrypt$x" } });
+  const connor = await made.user({ email: `connor-${run}@example.test`, name: "Connor", passwordHash: "scrypt$x" });
+  const pieter = await made.user({ email: `pieter-${run}@example.test`, name: "Pieter", passwordHash: "scrypt$x" });
   staff = { kind: "staff", userId: connor.id, label: "Connor" };
   staffIds = [connor.id, pieter.id];
-  const contact = await prisma.contact.create({ data: { fullName: "Zack Quiet" } });
+  const contact = await made.contact({ fullName: "Zack Quiet" });
   // A new login as Create login leaves it: active, never signed in, and nothing said about the switch.
   const account = await prisma.portalAccount.create({
     data: { contactId: contact.id, email: `zack-${run}@example.test`, passwordHash: "scrypt$x", status: "ACTIVE" },
   });
   accountId = account.id;
   zack = { kind: "contractor", contactId: contact.id, label: "Zack Quiet" };
-  propertyId = (await prisma.property.create({ data: { address: `${run} Hush St, Buffalo, NY 14213` } })).id;
+  propertyId = (await made.property({ address: `${run} Hush St, Buffalo, NY 14213` })).id;
 });
 
 after(async () => {
-  if (!skip) await prisma.$disconnect();
+  if (skip) return;
+  await made.remove();
+  await prisma.$disconnect();
 });
 
 /** A job Connor makes and assigns to Zack: its "assigned you" is the email in question. */
