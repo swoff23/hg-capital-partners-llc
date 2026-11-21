@@ -207,11 +207,14 @@ test("every file that reaches tasks through another model or in raw SQL is on a 
     /\btask:\s*(\{\s*(select|include|NOT|is|isNot)\b|\{\s*propertyId,|\{\s*status:\s*[{"]|activeTask\b|closedTask\b|listedTask\b|draftTask\b)|\bassignedTasks:\s*\{|\btasks:\s*\{\s*(some|none|every|select|where)\b/;
   const RAW = /\b(FROM|JOIN|UPDATE|INTO)\s+"Task/;
   const KNOWN: Record<string, string> = {
+    "app/api/files/[kind]/[id]/route.ts": "a resident's file reads its task's request for the lease; a resident's request task is never a draft (createTask refuses one for anyone but a partner)",
     "lib/missing/queries.ts": "the task behind a Make task item, of items openMakeTaskItemsWhere returned (open tasks only)",
     "lib/notifications/outbox.ts": "the send run reads each row's task, and closes a row for a draft unsent (content.ts dueRowVerdict)",
     "lib/portal/job-links.ts": "a link reads its task's status, and opens only an active job",
     "lib/portal/queries.ts": "raw reads of the lines and files of jobs contractorCanOpen returned, joined to an unrevoked access row",
     "lib/properties/photo.ts": "the task title beside a photo takenHerePhotosWhere returned (never a draft's photo)",
+    "lib/residents/requests.ts": "a resident's own requests and a row lock on one's task by id; submitRequest makes that task, which is never a draft",
+    "lib/residents/updates.ts": "each resident request's task status for its update emails; that task is never a draft",
     "lib/tasks/assignee-people.ts": "who the assignee list draws on: a job puts someone on it, a draft alone doesn't",
     "lib/tasks/bulk-core.ts": "locks the picked rows by id, and hands on no draft; reads repeat lines of those rows",
     "lib/tasks/bulk.ts": "locks the picked rows by id; a move passes over a draft, and an Undo skips one",
