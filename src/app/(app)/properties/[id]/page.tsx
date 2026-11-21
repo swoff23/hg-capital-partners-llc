@@ -27,6 +27,8 @@ import { DocumentsSection, propertyDocuments } from "./documents-section";
 import { PropertyLoanSection } from "./edit-loan";
 import { PropertyInsuranceSection } from "./edit-insurance";
 import { UnitsSection } from "./edit-units";
+import { TenantsSection } from "./tenants-section";
+import { propertyTenants } from "@/lib/tenants/queries";
 import { ListingsSection, type EditableListing } from "./edit-listings";
 import { BuildingSystems } from "./building-capex";
 import { CapexForecastCard } from "./capex-outlook";
@@ -74,7 +76,7 @@ function taskAssignee(t: {
  * 1200 with a 320 rail from lg. The identity header (the address as the h1,
  * then beds, baths, square feet and units; the photo once one is set), the
  * four-fact strip, then the work
- * first (docs/specs/property-page.md): tasks, units and access, financials,
+ * first (docs/specs/property-page.md): tasks, units and access, tenants, financials,
  * CapEx and rental listings, beside the facts rail (details, loan, insurance)
  * and the property's documents and notes. Below lg it's one column in that
  * order, so on a phone the tasks and lockbox codes sit under the figures.
@@ -86,7 +88,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   preload(propertyDocuments(id));
   // One wave: the session check runs beside the reads and is awaited with them, so nothing is shown without it.
   const today = todayYmdEastern();
-  const [user, property, openTasks, sourceDeal, propertyListings, capexRules, entities, missingInfo, handed] = await Promise.all([
+  const [user, property, openTasks, sourceDeal, propertyListings, capexRules, entities, missingInfo, handed, tenants] = await Promise.all([
     requireUser(),
     getPropertyById(id),
     prisma.task.findMany({
@@ -105,6 +107,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
     // Its required blanks (docs/specs/missing-info.md, D2): the line under the header and the marks in each section.
     loadMissingInfo(today, { propertyId: id }),
     handedOff(),
+    // Its rows come from the property's units; getPropertyById is cached, so this shares the page's own read.
+    getPropertyById(id).then((p) => (p ? propertyTenants(id, p.units, today) : null)),
   ]);
   if (!property) notFound();
   const missing = ofPriority(missingInfo.gaps, "required");
@@ -217,6 +221,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
               // What names each unit, so removing one that's still in use asks first.
               unitRefs={countUnitRefs(openTasks, propertyListings)}
             />
+
+            {tenants && <TenantsSection propertyId={property.id} data={tenants} today={today} />}
 
             <PropertyFinancialsCard propertyId={property.id} />
 

@@ -1,5 +1,4 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { del } from "@vercel/blob";
 import type { Prisma, Property } from "@prisma/client";
@@ -10,19 +9,15 @@ import { NUMBER_MESSAGE, readNumber } from "@/lib/money";
 import { ROOMS_LIMIT, SQFT_LIMIT, amountLimit, badNumbersMessage, readAmount, readRate, readWholeNumber } from "@/lib/properties/numbers";
 import { entityName } from "@/lib/properties/entity";
 import { cleanListing, type ListingInput } from "@/lib/properties/listing-clean";
-import { fmtDay, ymdToDate } from "@/lib/dates";
+import { fmtDay, todayYmdEastern, ymdToDate } from "@/lib/dates";
 import { sameStreetAddress, streetKey } from "@/lib/normalize";
 import { containsText } from "@/lib/search";
 import {
   LOCKBOX_LOCATION_MAX,
   applySharedLockbox,
-  countUnitRecords,
   isHouseMeterRow,
-  lockboxPhotoPaths,
   parseBuildingCapex,
   parseUnits,
-  reconcileUnits,
-  renamedLabel,
   withUnitIds,
   type BuildingCapexEntry,
   type LockboxPhoto,
@@ -30,10 +25,11 @@ import {
 } from "@/lib/property-types";
 import { discardLockboxUploads, isLockboxPhotoPath } from "@/lib/properties/photo";
 import { rowConflict, isAtVersion, onConflict, staleFields } from "@/lib/properties/edits";
+import { writeUnitsTx } from "@/lib/properties/units-write";
 import { setPropertyArchived } from "@/lib/archive";
 import { linkProperty } from "@/lib/deals/property-link";
 import { logError } from "@/lib/log";
-import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, type Principal as TaskPrincipal } from "@/lib/tasks/service";
+import { cancelOpenAutoTask, revalidateTasks, upsertAutoTask, type Principal as TaskPrincipal } from "@/lib/tasks/service";
 
 /**
  * Property domain: every write to Property / PropertyAttachment / Listing
@@ -57,6 +53,8 @@ import { cancelOpenAutoTask, renameTaskUnits, revalidateTasks, upsertAutoTask, t
  *     the move-in form, and its tasks keep working
  *   - a new property links to its Closed deal when exactly one matches
  *     (lib/deals/property-link.ts), with a line in that deal's log
+ *   - a renamed unit's tasks, listings and leases follow it, and a unit with
+ *     current or upcoming tenants can't be deleted (units-write.ts)
  */
 
 /**
@@ -344,7 +342,9 @@ const TX_LIMITS = { timeout: 20_000, maxWait: 10_000 };
  * Save the whole units list. Each unit keeps a stable id (reconcileUnits),
  * so a renamed unit is told apart from a removed one and an added one: the
  * property's tasks and listings, which name a unit by its label, follow the
- * rename in the same transaction (G2C-001).
+ * rename in the same transaction (G2C-001), and so do its leases, by the
+ * unit's id. A list without a unit that has current or upcoming tenants is
+ * refused (units-write.ts).
  */
 export async function replaceUnits(
   id: string,
@@ -372,7 +372,10 @@ export async function saveUnit(id: string, unit: PropertyUnit, expectedVersion: 
   });
 }
 
-/** Delete one unit by its id, from its row's menu after the confirm (forms 4.2). A unit already gone is not an error. */
+/**
+ * Delete one unit by its id, from its row's menu after the confirm (forms 4.2). A unit already gone is not an error.
+ * One with current or upcoming tenants is refused: "Front has current tenants. End their lease first."
+ */
 export async function deleteUnit(id: string, unitId: string, expectedVersion: string, p: TaskPrincipal, by: Editor): Promise<void> {
   await writeUnits(id, expectedVersion, p, by, (stored) => stored.filter((u) => u.id !== unitId));
 }
@@ -399,67 +402,52 @@ async function writeUnitsAt(
   by: Editor,
   next: (stored: PropertyUnit[]) => PropertyUnit[],
 ): Promise<void> {
-  const renamed = await prisma.$transaction(async (tx) => {
-    const current = await tx.property.findUnique({
-      where: { id },
-      select: { units: true, unitCount: true, updatedAt: true, updatedByUserId: true, updatedByUser: { select: { name: true, email: true } } },
-    });
-    if (!current) throw new Error("This property is gone.");
-    if (!isAtVersion(current.updatedAt, expectedVersion)) throw rowConflict(current, ["units"], { actorId: by?.id });
-    const before = parseUnits(current.units);
-    // A unit's Vacant since (Missing info, D6) isn't on the unit sheet, so an edit that doesn't send it keeps what's stored.
-    const vacant = new Map(withUnitIds(before).map((u) => [u.id, u.vacantSince ?? null]));
-    // With ids, placeholders included, as the page showed them to the editor.
-    const clean: PropertyUnit[] = next(withUnitIds(before)).map((u) => ({
-      id: u.id?.trim() || null,
-      label: u.label?.trim() || null,
-      lockboxCode: u.lockboxCode?.trim() || null,
-      ...vacantField(u.vacantSince === undefined ? vacant.get(u.id) : u.vacantSince),
-      lockboxLocation: u.lockboxLocation?.trim().slice(0, LOCKBOX_LOCATION_MAX) || null,
-      lockboxPhoto: cleanLockboxPhoto(id, u.lockboxPhoto),
-      ...(u.lockboxShared === true && !isHouseMeterRow(u) ? { lockboxShared: true } : {}),
-      utilities: Object.fromEntries(Object.entries(u.utilities ?? {}).map(([k, v]) => [k, v?.trim() || null])),
-      equipment: (u.equipment ?? [])
-        .filter((e) => e.type && (e.model || e.installYear || e.comment))
-        .map((e) => ({
-          type: e.type.trim(),
-          model: e.model?.trim() || null,
-          installYear: e.installYear?.trim() || null,
-          comment: e.comment?.trim() || null,
-        })),
-    }));
-    const { units: stored, renames } = reconcileUnits(before, clean, randomUUID);
-    // The count is the unit records (propertyUnitCount); store it so the column never disagrees.
-    const unitCount = countUnitRecords(stored) || null;
-    const r = await tx.property.updateMany({
-      where: { id, updatedAt: current.updatedAt },
-      data: { units: stored as unknown as object, unitCount, ...stamp(by) },
-    });
-    if (r.count === 0) throw await conflictOf(id, ["units"], by, { db: tx });
-    const countChanged = unitCount !== current.unitCount;
-    // Lockbox photos this save stopped using: deleted once it has landed.
-    const kept = lockboxPhotoPaths(stored);
-    const dropped = [...lockboxPhotoPaths(before)].filter((path) => !kept.has(path));
-    if (renames.length === 0) return { listings: 0, tasks: [], countChanged, dropped };
-    // Listings name their unit by label too. Each is matched against the old labels, so a swap swaps.
-    const listings = await tx.listing.findMany({ where: { propertyId: id }, select: { id: true, unitLabel: true } });
-    let listingCount = 0;
-    for (const l of listings) {
-      const to = renamedLabel(renames, l.unitLabel);
-      if (!to) continue;
-      await tx.listing.update({ where: { id: l.id }, data: { unitLabel: to } });
-      listingCount++;
-    }
-    return { listings: listingCount, tasks: await renameTaskUnits(tx, id, renames, p), countChanged, dropped };
-  }, TX_LIMITS);
+  // The write itself, and the tasks, listings and leases that follow it, are units-write.ts, where a database test reaches them.
+  const written = await prisma.$transaction(
+    (tx) => writeUnitsTx(tx, id, expectedVersion, p, by, (stored) => cleanUnits(id, stored, next(stored)), { today: todayYmdEastern() }),
+    TX_LIMITS,
+  );
   // Best effort, after the save landed: a file that fails to delete is only clutter in Blob, which no unit points at.
-  if (renamed.dropped.length > 0) {
-    await discardLockboxUploads(id, renamed.dropped).catch((err: unknown) => logError("properties:lockbox-photo:discard", err, { propertyId: id }, { level: "warning" }));
+  if (written.dropped.length > 0) {
+    await discardLockboxUploads(id, written.dropped).catch((err: unknown) => logError("properties:lockbox-photo:discard", err, { propertyId: id }, { level: "warning" }));
   }
   revalidatePath(`/properties/${id}`);
-  if (renamed.countChanged) revalidatePath("/properties");
-  if (renamed.listings) revalidatePath("/rentals");
-  revalidateTasks(renamed.tasks);
+  if (written.countChanged) revalidatePath("/properties");
+  if (written.listings) revalidatePath("/rentals");
+  revalidateTasks(written.tasks);
+  // A lease's unit label shows on the Tenants list and its own page.
+  if (written.leases.length > 0) {
+    revalidatePath("/tenants", "layout");
+    for (const leaseId of written.leases) revalidatePath(`/tenants/${leaseId}`);
+  }
+}
+
+/**
+ * What the editor sent, as the units list keeps it: every field trimmed, and
+ * a lockbox photo only from this property's folder. `stored` is the list as
+ * the editor saw it, ids included, for what an edit doesn't send.
+ */
+function cleanUnits(propertyId: string, stored: readonly PropertyUnit[], edited: readonly PropertyUnit[]): PropertyUnit[] {
+  // A unit's Vacant since (Missing info, D6) isn't on the unit sheet, so an edit that doesn't send it keeps what's stored.
+  const vacant = new Map(stored.map((u) => [u.id, u.vacantSince ?? null]));
+  return edited.map((u) => ({
+    id: u.id?.trim() || null,
+    label: u.label?.trim() || null,
+    lockboxCode: u.lockboxCode?.trim() || null,
+    ...vacantField(u.vacantSince === undefined ? vacant.get(u.id) : u.vacantSince),
+    lockboxLocation: u.lockboxLocation?.trim().slice(0, LOCKBOX_LOCATION_MAX) || null,
+    lockboxPhoto: cleanLockboxPhoto(propertyId, u.lockboxPhoto),
+    ...(u.lockboxShared === true && !isHouseMeterRow(u) ? { lockboxShared: true } : {}),
+    utilities: Object.fromEntries(Object.entries(u.utilities ?? {}).map(([k, v]) => [k, v?.trim() || null])),
+    equipment: (u.equipment ?? [])
+      .filter((e) => e.type && (e.model || e.installYear || e.comment))
+      .map((e) => ({
+        type: e.type.trim(),
+        model: e.model?.trim() || null,
+        installYear: e.installYear?.trim() || null,
+        comment: e.comment?.trim() || null,
+      })),
+  }));
 }
 
 /** A unit's Vacant since, stored only while it's set, so a unit with none keeps the shape it always had. */

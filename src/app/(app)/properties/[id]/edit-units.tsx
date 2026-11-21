@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Meter } from "@/components/meter";
 import { Money } from "@/components/money";
-import { AddRow, Button, Section, Table, Td, Th, buttonClass, sheetWaitingFill, textLinkClass } from "@/components/ui";
+import { AddRow, Button, SaveError, Section, Table, Td, Th, buttonClass, sheetWaitingFill, textLinkClass } from "@/components/ui";
 import { useLazyModule, warmOnIntent } from "@/components/use-lazy-module";
 import { useRun } from "@/components/use-run";
 import { lockboxIsShared, type CapexRules, type PropertyUnit, type UnitUtilities } from "@/lib/property-types";
@@ -273,7 +273,14 @@ export function UnitsSection({
       {removing && (
         <ConfirmDialog
           title={removing.title}
-          body={removing.body}
+          // A refusal ("Front has current tenants. End their lease first.") shows here, where it can be read: under the
+          // page's scrim it couldn't be. SaveError is an alert, so a screen reader says it when it appears.
+          body={
+            <>
+              {removing.body}
+              {run.error && <SaveError className="mt-2">{run.error}</SaveError>}
+            </>
+          }
           onClose={() => setRemoving(null)}
           cancelLabel="Keep it"
           busy={run.pending}
@@ -284,7 +291,6 @@ export function UnitsSection({
           }
         />
       )}
-      {removing && run.error && <p className="mt-2 text-meta text-destructive">{run.error}</p>}
     </Section>
   );
 }

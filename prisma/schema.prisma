@@ -1332,7 +1332,8 @@ model Lease {
   property        Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   propertyId      String
   // The unit's id in Property.units; null on a property with no units. unitLabel
-  // follows renames through writeUnits, and stays as it read on a past lease.
+  // follows renames through writeUnits, past leases included, and keeps its last
+  // label once the unit is deleted.
   unitId          String?
   unitLabel       String?
   movesIn         DateTime? // UTC midnight of a Buffalo day; null: they live there now

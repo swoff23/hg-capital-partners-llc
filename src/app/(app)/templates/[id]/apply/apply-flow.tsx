@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ListChecks } from "lucide-react";
 import { ActionBar, actionBarButton } from "@/components/action-bar";
@@ -19,25 +19,39 @@ import { stableJson } from "@/lib/drafts";
 import { inlineEditCommit } from "@/lib/inline-edit";
 import { offersUnits, type PropertyOption } from "@/lib/picker-options-shape";
 import {
+  appliedLeaseLine,
   applyDraftKey,
   applyProblems,
   applyTokens,
+  createLeaseLabel,
   createTasksLabel,
   dueFromOffset,
   extractTokens,
+  fillInValue,
   fillNotes,
   hasApplyProblems,
+  homeResolves,
   isAddressToken,
+  isTenantNameToken,
+  isTenantPhoneToken,
+  leaseWhere,
+  moveOutLabel,
   notesOnlyTokens,
+  playbookKind,
+  prefillHousehold,
   rowTitle,
   sameToken,
   tasksToCreate,
   tokenInputType,
   tokenLabel,
+  UNTICK_LEASE,
+  UNTICK_LEASE_SHORT,
+  type HomeTenants,
+  type PlaybookLease,
   type TemplateItem,
 } from "@/lib/tasks/template-items";
 import { cn } from "@/lib/utils";
-import { applyPlaybook } from "../../actions";
+import { applyPlaybook, homeTenants } from "../../actions";
 
 type Row = {
   include: boolean;
@@ -55,6 +69,8 @@ type State = {
   anchor: Ymd | null;
   typed: Record<string, string>;
   rows: Row[];
+  /** The lease box (docs/specs/tenants.md section 9), ticked by default; kept in the draft so a restore doesn't tick it again. */
+  saveLease: boolean;
 };
 
 /**
@@ -67,6 +83,12 @@ type State = {
  * on the field that needs it. What's typed is a draft: it holds the
  * LeaveGuard, comes back after a reload ("Your unsaved changes are back"),
  * and a refresh never replaces it. Success goes to the new tasks.
+ *
+ * Tenants (docs/specs/tenants.md section 9): on any playbook but a move-in
+ * one, [Tenant] and a tenant phone prefill from the household living in the
+ * picked home. A move-in playbook offers a box that creates the upcoming
+ * lease, a move-out one a box that sets the household's Moves out; Apply
+ * writes it with the tasks, all or nothing.
  */
 export function ApplyFlow({
   templateId,
@@ -98,7 +120,9 @@ export function ApplyFlow({
 }) {
   const router = useRouter();
   const { toast } = useToast();
-  const { run, pending, error: refusal, reset: forgetRefusal } = useRun();
+  const { run, pending, error: refusal, fieldErrors, reset: forgetRefusal } = useRun();
+  const kind = playbookKind(anchorLabel);
+  const leaseErrorId = useId();
 
   const [initial] = useState<State>(() => ({
     propertyId: initialPropertyId ?? "",
@@ -106,6 +130,7 @@ export function ApplyFlow({
     anchor: today,
     typed: {},
     rows: items.map((i) => ({ include: true, assignee: initialAssignee(i, users, contractors) })),
+    saveLease: true,
   }));
   const [s, setS] = useState<State>(initial);
   const [tried, setTried] = useState(false);
@@ -127,7 +152,8 @@ export function ApplyFlow({
   }
 
   // A draft for a playbook with different tasks was dropped with its version key; the length check is a safety net.
-  useRestoredDraft(restored, { accept: (d) => d.rows.length === items.length, apply: setS, discard });
+  // A draft saved before the lease box keeps the box's default.
+  useRestoredDraft(restored, { accept: (d) => d.rows.length === items.length, apply: (d) => setS({ ...d, saveLease: d.saveLease ?? true }), discard });
 
   // Any edit lets go of a refusal: it was about what was there before.
   const patch = (p: Partial<State>) => {
@@ -140,15 +166,61 @@ export function ApplyFlow({
   };
 
   const property = properties.find((p) => p.id === s.propertyId);
+
+  // Who lives in the picked home today, asked again on each pick that names one household (a unit, or a building
+  // with one), the restored draft's included. Held with the home it answers for, so a stale answer never prefills.
+  // A move-in playbook's tenants are new, so it never asks.
+  const askProperty = kind !== "move-in" && property && homeResolves(property.units, s.unitLabel) ? property.id : null;
+  const askUnit = askProperty ? s.unitLabel : null;
+  const askedHome = askProperty ? `${askProperty}|${askUnit ?? ""}` : null;
+  const [living, setLiving] = useState<{ home: string; tenants: HomeTenants | null } | null>(null);
+  useEffect(() => {
+    if (!askProperty) return;
+    const asked = `${askProperty}|${askUnit ?? ""}`;
+    let live = true;
+    homeTenants(askProperty, askUnit).then(
+      (tenants) => live && setLiving({ home: asked, tenants }),
+      // Unanswered (offline, signed out): nothing prefills, and there's no move-out box.
+      () => live && setLiving({ home: asked, tenants: null }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [askProperty, askUnit]);
+  const household = askedHome !== null && living?.home === askedHome ? living.tenants : null;
+
   const tokens = extractTokens(items.flatMap((i) => [i.title, i.notes, ...(i.checklist ?? [])]));
   // [Address] fills from the property, so it has no field of its own (G1C-I08).
   const fillIns = tokens.filter((t) => !isAddressToken(t));
   // Used only in notes (tenant email, number): left blank, their line drops from the notes.
   const optional = notesOnlyTokens(items);
   const isOptional = (token: string) => optional.some((o) => sameToken(o, token));
-  const valueOf = (token: string) => s.typed[token] ?? (isAddressToken(token) && property ? property.label : "");
+  // What's typed, else a computed default ([Address], the household's names and phone) that never lands in `typed`.
+  const defaults = { address: property?.label, household: prefillHousehold(kind, household) };
+  const valueOf = (token: string) => fillInValue(token, s.typed, defaults);
   const values = Object.fromEntries(tokens.map((t) => [t, valueOf(t)]));
   const usesAnchor = items.some((i) => i.dueOffsetDays !== undefined);
+
+  // The lease box: on a move-in playbook once the home names one household and the tenant's name is filled in (a lease
+  // doesn't need a phone, tenants.md call 2); on a move-out one while a household lives there. The date is the playbook's.
+  const leaseDay = usesAnchor ? s.anchor : null;
+  const nameToken = fillIns.find(isTenantNameToken);
+  const phoneToken = fillIns.find(isTenantPhoneToken);
+  let leaseOffer: { label: string; plan: PlaybookLease } | null = null;
+  if (property && leaseDay && kind === "move-in" && nameToken && homeResolves(property.units, s.unitLabel)) {
+    const name = valueOf(nameToken).trim();
+    const phone = phoneToken ? valueOf(phoneToken).trim() : "";
+    if (name) {
+      leaseOffer = {
+        label: createLeaseLabel(name, leaseWhere(property.label, s.unitLabel), leaseDay, today),
+        plan: { kind, name, phone: phone || null, on: leaseDay },
+      };
+    }
+  } else if (property && leaseDay && kind === "move-out" && household) {
+    leaseOffer = { label: moveOutLabel(household.names, leaseDay, today), plan: { kind, on: leaseDay } };
+  }
+  // A refused lease write shows under the box, which is where the way through is.
+  const leaseError = leaseOffer ? fieldErrors?.lease : undefined;
 
   const titleOf = (i: number) => rowTitle(s.rows[i].title, items[i].title, values);
   const notesOf = (i: number) => fillNotes(items[i].notes, values, optional);
@@ -166,8 +238,10 @@ export function ApplyFlow({
   const stray = open.find((t) => !isAddressToken(t) && !fillIns.some((f) => sameToken(f, t)));
   const problems = applyProblems({ propertyId: s.propertyId, count, open: openFields });
   const blocked = hasApplyProblems(problems) || stray !== undefined;
-  // The line above the primary: the refusal from the server, or the list's problem once Create was pressed.
-  const barLine = refusal ?? (tried ? (problems.tasks ?? (stray ? `Replace [${stray}] in a task's title, or untick it.` : undefined)) : undefined);
+  // The line above the primary: the refusal from the server (unless it's the lease's, shown under its box), or the
+  // list's problem once Create was pressed.
+  const barLine =
+    (leaseError ? undefined : refusal) ?? (tried ? (problems.tasks ?? (stray ? `Replace [${stray}] in a task's title, or untick it.` : undefined)) : undefined);
 
   // After a press with something missing, focus goes to the first field that needs it (forms 2.0, Timing).
   useEffect(() => {
@@ -196,13 +270,20 @@ export function ApplyFlow({
             dueDate: dueOf(i),
             checklist: checklistOf(i),
           })),
+          lease: leaseOffer && s.saveLease ? leaseOffer.plan : null,
         }),
       {
         failure: "inline",
+        // A refused lease marks its box: focus goes there, as it does to a field that needs something.
+        failed: () => setFocusTick((n) => n + 1),
         succeeded: (done) => {
           clearDraft();
-          // The new tasks are the next step: the list opens on them, with what happened said once.
-          toast({ message: `${done.count} ${done.count === 1 ? "task" : "tasks"} created for ${property?.label ?? "the property"}` });
+          // The new tasks are the next step: the list opens on them, with what happened said once, and what
+          // happened to the lease as the toast's second clause, which a phone cuts first.
+          toast({
+            message: `${done.count} ${done.count === 1 ? "task" : "tasks"} created for ${property?.label ?? "the property"}`,
+            ...(done.lease ? { detail: appliedLeaseLine(done.lease, today) } : {}),
+          });
           router.push(`/tasks?property=${encodeURIComponent(done.propertyId)}`);
         },
       },
@@ -270,6 +351,39 @@ export function ApplyFlow({
               </FormField>
             ))}
           </FieldRow>
+        )}
+
+        {leaseOffer && (
+          // Full width under the fill-ins at every size; on a narrow phone the label may take a second line.
+          <div data-invalid={leaseError ? "true" : undefined} className="space-y-1">
+            <label className="relative flex w-fit cursor-pointer items-start gap-2 text-body text-foreground pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-3">
+              {/* As tall as the label's first line, so the box sits on it when the label wraps. */}
+              <span className="flex h-lh shrink-0 items-center">
+                <Checkbox
+                  checked={s.saveLease}
+                  aria-invalid={leaseError ? true : undefined}
+                  aria-describedby={leaseError ? leaseErrorId : undefined}
+                  onChange={(e) => patch({ saveLease: e.target.checked })}
+                />
+              </span>
+              <span className="min-w-0">{leaseOffer.label}</span>
+            </label>
+            {leaseError && (
+              // One line at every width: the refusal truncates and the way through after it never does, short on a phone.
+              <SaveError
+                id={leaseErrorId}
+                className="pl-6"
+                action={
+                  <>
+                    <span className="sm:hidden">{UNTICK_LEASE_SHORT}</span>
+                    <span className="hidden sm:inline">{UNTICK_LEASE}</span>
+                  </>
+                }
+              >
+                {leaseError}
+              </SaveError>
+            )}
+          </div>
         )}
       </div>
 

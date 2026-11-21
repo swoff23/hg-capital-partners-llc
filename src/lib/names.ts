@@ -10,3 +10,14 @@ export function firstName(name: string | null | undefined): string {
   if (nickname) return nickname[1];
   return s.split(/[\s(]+/)[0] ?? "";
 }
+
+/**
+ * A household in a short line, for a toast or a checkbox where the room is
+ * short: "Dana Lee", "Dana Lee and Sam Ortiz", "Dana Lee and 2 others".
+ * Names are trimmed and a blank one left out.
+ */
+export function shortNames(names: readonly string[]): string {
+  const n = names.map((s) => s.trim()).filter(Boolean);
+  if (n.length <= 2) return n.join(" and ");
+  return `${n[0]} and ${n.length - 1} others`;
+}

@@ -79,3 +79,20 @@ export async function readTaskHome(
 export async function homeOccupied(db: Reader, propertyId: string | null, unitLabel: string | null, now: Date = new Date()): Promise<boolean> {
   return !!(await readTaskHome(db, { propertyId, unitLabel, entryPermittedAt: null }, now))?.living;
 }
+
+/**
+ * Who lives in this home today, for a playbook's fill-ins (docs/specs/tenants.md
+ * section 9): their names, primary first, and the primary's phone as shown.
+ * Nothing else about the lease reaches the Apply page. Null when it's vacant
+ * or no unit names one.
+ */
+export async function livingTenants(
+  db: Reader,
+  propertyId: string | null,
+  unitLabel: string | null,
+  now: Date = new Date(),
+): Promise<{ names: string[]; phone: string | null } | null> {
+  const living = (await readTaskHome(db, { propertyId, unitLabel, entryPermittedAt: null }, now))?.living;
+  if (!living || living.tenants.length === 0) return null;
+  return { names: living.tenants.map((t) => t.name), phone: living.tenants[0].phone };
+}
