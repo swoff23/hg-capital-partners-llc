@@ -1,6 +1,6 @@
 # Rehab draws
 
-Planned with Connor on Nov 20, 2026, one question at a time (R1 to R11 below). He took every recommendation and asked to keep it "MVP and lightweight". The screen layouts get their own short round (section 6) before he says "build it". Nothing here gets built until then.
+Planned with Connor on Nov 20, 2026, one question at a time (R1 to R11 below), and its layouts picked the same day (L1 to L4, section 6). He took every recommendation and asked to keep it "MVP and lightweight". Nothing here gets built until he says "build it".
 
 ## 1. Summary
 
@@ -90,22 +90,34 @@ Planning-level sketch; the build settles names and indexes (Opus for the schema 
 
 Amounts are `Decimal(12, 2)`. `Property.rehabAmount` stays dormant; the rehab's lines replace it.
 
-## 6. Screens (layouts still to pick)
+## 6. Screens
 
-Before "build it", Connor picks from 2 or 3 low-fi layouts for each, drawn at laptop 1280x800, tablet 768x1024 and phone 375x667, each saying what drops on the phone:
+Picked with Connor on Nov 20, one at a time, each drawn as low-fi options at laptop and phone width. He took every recommendation.
 
-1. **The Draws page**: the four totals and the rows of rehabs.
-2. **A rehab's own view**: the line table with the draft column, unit groups, the draws list with stages, and where Approved and Funded ask for their amounts. Whether it's a page or a sheet over the list, as deals open, is part of this round.
-3. **The property page's Rehab section** and **New rehab** (upload or type).
+| # | Decision |
+|---|---|
+| L1 | **The Draws page** is the totals strip (`FactStrip`: Ready to draw, At the lender, Funded, Left) over one table of open rehabs: Rehab, Current draw, Ready, Left and a Funded meter. The current draw cell reads "Draw 4 · Inspection · 6 days", or "Waiting on us" in the warning color. A row opens the rehab. It's built like the Portfolio page. A separate "In progress" list of draws above the table was turned down: every open draw would show twice |
+| L2 | **A rehab is its own page** (`/draws/[id]`), laid out like the lease page: a BackLink to Draws, the rehab's figures (Holdback, Funded, At the lender, Ready, Left), then Budget and Draws sections in the main column, and a sticky Details rail with the lender, the properties as links, the loan's maturity and notes. Not a sheet over the list as deals open: 20 to 40 lines and a typed draft don't fit 672px, and the property pages link to it |
+| L3 | **The property page shows a Rehab section right after Tasks** while a rehab is open: the current draw with its stage and days, a Meter for funded of the holdback, ready and left, and Open rehab. A Rehabbing property with no rehab shows Add rehab there. A done rehab leaves the property page and stays under Done on Draws. Not in the rail under Loan: below laptop width the rail stacks under the whole main column |
+| L4 | **New rehab is a short sheet** (properties, prefilled when it starts from a property, and the lender). The rehab page then opens with an empty Budget offering Upload Vontive's worksheet or Add a line. An upload shows what it found (units, lines, holdback, past draws, and that past draws arrive as Funded without dates) before Add to rehab saves it. Typed lines use the same table's Add a line. Not one stepped sheet: 40 typed lines cramp it, and it would be a second place that edits a budget |
 
-Mobbin references from the research, to start from:
+**At each size.**
+
+- **Draws page.** Laptop 1280: everything above. Tablet 768: the strip stays four across; the table drops the Funded meter. Phone 375: the strip is FactStrip's own 2 by 2; each rehab is a two-line row (the name, then the current draw) with the meter under it, and its amounts live on the rehab page.
+- **Rehab page.** Laptop: the main column and the sticky rail. Tablet: the rail moves under the main column, as on the lease page, and the Budget table drops Funded, which the figures above still show. Phone: the figures cut to Ready and Left; each line shows its name and its draft amount, or what's left; tapping a line opens a small sheet for its draft amount.
+- **Property page.** The Rehab section keeps its place after Tasks at every size, so it's second on a phone.
+- **New rehab.** The sheet is Sheet's own: a centered dialog from md, a bottom sheet below it. On a phone the upload opens the Files app, so a worksheet saved from email works.
+
+**Color and charts.** No stacked bars: docs/specs/charts.md 2.9, ruling 1, allows no stacked categories and puts comparisons across properties in tables. Progress is the stock `Meter` (funded of the holdback, `--chart-1`). A line past its budget shows "Over by $X" in `--destructive` on that figure only, as charts.md plans for budget against actual. Stages are words, not colored chips, so they never echo the task `StatusMark` tones; only Waiting on us takes the warning color.
+
+Mobbin references behind the picks:
 
 - Stripe's balance summary, one bar split by status with amounts under it ([Mobbin](https://mobbin.com/screens/ec4bf8ef-b6b8-4fb7-b866-293ac767904e)), for the totals.
 - Copilot's category budgets, a thin bar per row with spent and budget ([Mobbin](https://mobbin.com/screens/8fcfa6a7-f247-4a53-ab29-bab4255199bd)), for budget lines on a phone.
 - Venmo's pending group above completed ([Mobbin](https://mobbin.com/screens/24ca4559-d881-4b58-966d-809e88350a06)) and Lightyear's two-step timeline ([Mobbin](https://mobbin.com/screens/bc40b4de-9e9e-41a4-a388-b2d5b7e22ddd)), for draws and their stages.
 - Klarna's set-budget sheet ([Mobbin](https://mobbin.com/screens/4f1479d5-a74e-4b75-8b14-ea8797ec9143)), for entering an amount.
 
-Every control comes from the stock components (docs/components.md); the stage control and the Needs you rows reuse what's there.
+Also the Snowflake cost table on Mobbin ([Mobbin](https://mobbin.com/screens/acf53a58-0fc7-49b7-93e0-f62c164ecc79)), a status column beside amounts, for L1; and the app's own Portfolio page (L1) and lease page (L2). Every control comes from the stock components (docs/components.md); the stage control and the Needs you rows reuse what's there.
 
 ## 7. Reuse check
 
@@ -113,6 +125,7 @@ Every control comes from the stock components (docs/components.md); the stage co
 
 - The property's `lender`, `loanNumber` and `loanMaturityDate` (prisma/schema.prisma, Property), and the Rehabbing status (`PROPERTY_STATUSES` in src/lib/config.ts; the `^rehab` match in src/lib/missing/checks.ts).
 - `Section`, `FormSheet`, `useRun` with Undo, `NumberInput kind="money"`, `fmtMoney` and `MoneyCents` (cents are needed).
+- `FactStrip` and `Table`, `Th`, `Td`, `RowCell`, as the Portfolio page uses them (L1); `Meter` for funded of the holdback; `StatusMenu` to move a draw's stage; `EmptyState` and `AddRow` for the empty Budget and typed lines; the lease page's grid, sticky rail and `BackLink` (L2); the documents section's drop target for the worksheet upload (L4).
 - The tenants feature as the template for a money record on a property: `src/lib/tenants/{core,service}.ts`, actions with zod, delete with a snapshot and Undo (docs/specs/lease-term-edits.md).
 - `exceljs`, already a dependency (scripts/migrate/_lib.ts), to read the worksheet.
 - Needs you's pure builders and their tests (src/lib/home/needs-you.ts).
