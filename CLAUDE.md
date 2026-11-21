@@ -58,7 +58,6 @@ HG should feel like a well-run property company, not a generic AI template. Calm
 ## Typography
 
 - **State toggles use one weight.** Active and inactive are both the same weight; the state shows through color and the pill or underline. Expose it with `aria-pressed` on pill toggles, or `aria-current="page"` on route tabs (links in a labeled `<nav>`), and style it from the attribute.
-- **Every Geist weight is safe.** It's a self-hosted variable font, so Safari, Chrome and Android render the same weights. There's no weight ban; use weight for hierarchy, never for state.
 
 ## Copy
 
@@ -77,15 +76,15 @@ The full standard, with a review checklist to run before a string ships, is [doc
 
 ## Enforce it in code
 
-- **Rules that can be lint rules should be.** `eslint.config.mjs` rejects em dashes and vague error copy (`hg/vague-copy`) in string literals, template strings and JSX text under `src/`; hex values, raw palette colors and old color names everywhere there (`hg/design-tokens`); and, outside the stock files in `src/components/ui/`, Tailwind and arbitrary text sizes (`hg/raw-type`) and white, black, Tailwind's shadows and backdrop blur (`hg/raw-effects`). App code imports `cn` from `@/lib/utils`, never the `cn` package. Filler words are a warning (`hg/filler-copy`) to read case by case. Comments, tests and a lone "—" for an empty value stay allowed.
-- **Lint runs in CI, not in the build.** Next 16's `next build` doesn't lint, so a violation fails CI on the push to main but still deploys. Run `npm run lint` before you push. CSS isn't linted. `src/lib/token-names.test.ts` catches old color names in CSS, tests and the docs; check the rest of CSS by hand.
+- **Rules that can be lint rules should be.** The list is `eslint.config.mjs`, and each lint error names what to use instead. Filler words are a warning (`hg/filler-copy`) to read case by case.
+- **Lint runs in CI, not in the build.** Next 16's `next build` doesn't lint, so a violation fails CI on the push to main but still deploys. Run `npm run check` before you push: typecheck, lint and the unit tests in one go. CSS isn't linted. `src/lib/token-names.test.ts` catches old color names in CSS, tests and the docs; check the rest of CSS by hand.
 
 ## Device check (definition of done for UI)
 
-- **Run `npm run test:devices` before handing off any UI work.** It makes a production build in `.next-devices` (a running `npm run dev` is untouched), signs in as the first local user with a password, loads every route in WebKit (Safari, and every iPhone browser) and Chromium (Chrome, Android) on iPhone SE, iPhone 17, Galaxy S24, iPad Mini and desktop, sweeps widths 320 to 1920 on desktop, and writes a screenshot grid to `device-report/index.html`. It needs the local Postgres with the import loaded (README, Local development). In a fresh checkout run `npx playwright install chromium webkit` first.
+- **Run `npm run test:devices` before handing off any UI work.** It makes a production build in `.next-devices` (a running `npm run dev` is untouched), signs in as the first local user with a password, loads every route in WebKit (Safari, and every iPhone browser) and Chromium (Chrome, Android) on iPhone SE, iPhone 17, Galaxy S24, iPad Mini and desktop, sweeps widths 320 to 1920 on desktop, and writes a screenshot grid to `device-report/index.html`. It needs the local Postgres with the import loaded (README, Local development). A fresh worktree gets its own packages, `.env` and database from `npm run setup:worktree`. In a fresh checkout run `npx playwright install chromium webkit` first.
 - **Run it in light and dark.** `npm run test:devices:dark` is the same check with every browser in dark mode, so the app takes its dark theme; it writes `device-report-dark/`. The commit gate reads the light run.
 - **Errors fail.** Crashes, console errors, failed requests, sideways scroll, inputs under 16px on iOS. Warnings report only: tap targets under 44px, wrapped rows of controls.
-- **Only new errors fail.** Errors that predate the check live in `tests/devices/known-issues.json`. Drop entries as they're fixed (`npm run test:devices:known` rewrites the file from a full run); never add a new one without Connor's OK.
+- **No known issues.** `tests/devices/known-issues.json` is empty, so every error fails. Never add an entry without Connor's OK.
 - **The sweep only sees each page's default state.** Open every dialog, menu and state you touched at 375 and 320 yourself, and eyeball the report for what it can't judge: awkward in-between layouts, spacing, clipped popovers.
 - **Commits are gated.** A Claude Code hook (`scripts/device-check-gate.mjs`) blocks `git commit` while UI files have changed since the last complete run, or while that run has new errors. People committing by hand run it themselves.
 - **A new dynamic route needs a sample.** Add a query to `SAMPLE_PARAMS` in `tests/devices/routes.ts` that finds a real row in the local DB.
@@ -93,6 +92,6 @@ The full standard, with a review checklist to run before a string ships, is [doc
 
 ## Landing work
 
-- **One branch to main at a time.** Before pushing, check for other sessions working this repo and say which files you're about to land. If one is mid-landing, let it go first.
+- **One branch to main at a time.** Before pushing, check for other sessions working this repo and say which files you're about to land. If one is mid-landing, let it go first. A docs-only push needs no heads-up.
 - **Commit on the branch, then merge `origin/main` into it.** Before merging, check main's new commits for overlap with your files, keep both sides' unrelated pieces, and say what overlapped.
-- **Check the merged code, then push.** `npm run typecheck`, `npm run lint`, `npm test`, and the full device check in light and dark for UI changes, then `git push origin HEAD:main`. Every push to main deploys to production in about two minutes.
+- **Check the merged code, then push.** `npm run check`, and the full device check in light and dark for UI changes, then `git push origin HEAD:main`. When the merge brought in only docs, the device check you already ran still stands. Every push to main deploys to production in about two minutes.

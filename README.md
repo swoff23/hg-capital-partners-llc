@@ -89,6 +89,8 @@ npm run dev                   # http://localhost:3000
 | `npm run typecheck` | `next typegen && tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm test` | All unit tests |
+| `npm run check` | Typecheck, lint and unit tests side by side; prints only what failed |
+| `npm run setup:worktree` | In a git worktree: packages, `.env` and its own database copied from `hg_seed` |
 | `npm run test:devices` | Device check: every route on phones, iPad and desktop, report in `device-report/` |
 | `npm run test:devices:known` | Same run, rewrites `tests/devices/known-issues.json` (owner's OK first) |
 | `npm run test:devices:dark` | The device check with the browsers in dark mode (`DEVICES_SCHEME=dark`), report in `device-report-dark/` |
