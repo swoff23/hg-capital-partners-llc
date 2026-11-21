@@ -151,7 +151,7 @@ Also the Snowflake cost table on Mobbin ([Mobbin](https://mobbin.com/screens/acf
 
 ## 9. Conflict to settle when costs are planned
 
-The contractor invoices plan (docs/contractor-invoices-plan.md, Oct 23) keeps an invoice as "a total plus the jobs it covers", says "the app isn't for reconciling to properties" (I4), and covers contractor invoices only (I11). Costs on budget lines need invoices, and materials receipts, tied to a rehab and a line. It doesn't touch this MVP. Decide it when costs get their own planning pass; that plan carries a note pointing here.
+The contractor invoices plan (Oct 23, now docs/specs/contractor-invoices/full-plan.md; the Nov 20 MVP in docs/contractor-invoices-plan.md lists a rehab link under Later) keeps an invoice as "a total plus the jobs it covers", says "the app isn't for reconciling to properties" (I4), and covers contractor invoices only (I11). Costs on budget lines need invoices, and materials receipts, tied to a rehab and a line. It doesn't touch this MVP. Decide it when costs get their own planning pass; that plan carries a note pointing here.
 
 ## 10. Build notes (Nov 20)
 

@@ -1,0 +1,204 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1419" height="1270" viewBox="0 0 1419 1270">
+<title>Entering an invoice yourself</title>
+<rect width="1419" height="1270" fill="#ffffff"/>
+<defs><clipPath id="c1"><rect x="0" y="0" width="1280" height="560"/></clipPath><clipPath id="c2"><rect x="0" y="0" width="768" height="700"/></clipPath><clipPath id="c3"><rect x="0" y="0" width="375" height="700"/></clipPath><clipPath id="c4"><rect x="0" y="0" width="1280" height="560"/></clipPath><clipPath id="c5"><rect x="0" y="0" width="768" height="700"/></clipPath><clipPath id="c6"><rect x="0" y="0" width="375" height="700"/></clipPath></defs>
+<text x="32" y="40" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="18" font-weight="600" fill="#152133">Entering an invoice yourself</text>
+<text x="32" y="62" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">New invoice, and Use as invoice on a job file. M6 said it lands in To pay once it has a contractor and a total, but fields save as you leave them, so it would jump mid-typing.</text>
+<text x="32" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">A. It's a To review invoice, and you approve it</text>
+<rect x="388.29200000000014" y="71" width="104" height="18" rx="9" fill="#152133"/>
+<text x="440.29200000000014" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#ffffff" text-anchor="middle">Recommended</text>
+<text x="32" y="104" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Same page as every invoice: fields save as you go, Approve moves it to To pay. One tap, no second partner, no staff email.</text>
+<text x="32" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">New invoice, partly filled</text>
+<g transform="translate(32.0,152.0) scale(0.55)"><g clip-path="url(#c1)"><rect x="0" y="0" width="1280" height="560" rx="0" fill="#ffffff"/>
+<text x="32" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / New</text>
+<text x="32" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<text x="32" y="86" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<rect x="32" y="104" width="560" height="340" rx="8" fill="#f2f0ec" stroke="#d5d1ca" stroke-width="1" stroke-dasharray="6 4"/>
+<g transform="translate(302.0,248.0) scale(0.8333)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></g>
+<text x="312.0" y="282.0" font-size="13" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Drop the invoice here</text>
+<text x="312.0" y="300.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">or choose a file</text>
+<text x="624" y="116" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="624" y="122" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="142.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="624" y="178" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<rect x="624" y="184" width="306.0" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="204.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<text x="942.0" y="178" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="942.0" y="184" width="306.0" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="952.0" y="204.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="624" y="240" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<rect x="624" y="246" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="266.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add job</text>
+<g transform="translate(1222,254.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="624" y="302" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Note</text>
+<rect x="624" y="308" width="624" height="56" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<rect x="0" y="500" width="1280" height="60" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="500" x2="1280" y2="500" stroke="#e7e5e0" stroke-width="1"/>
+<text x="1140" y="536" font-size="12" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Saved</text>
+<rect x="1173.3" y="514" width="74.7" height="32" rx="6" fill="#152133"/>
+<text x="1185.3" y="534.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text></g><rect x="0" y="0" width="1280" height="560" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<text x="776.0" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">New invoice, partly filled</text>
+<g transform="translate(776.0,152.0) scale(0.45)"><g clip-path="url(#c2)"><rect x="0" y="0" width="768" height="700" rx="0" fill="#ffffff"/>
+<text x="24" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / New</text>
+<text x="24" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<text x="24" y="86" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<rect x="24" y="104" width="720" height="120" rx="8" fill="#f2f0ec" stroke="#d5d1ca" stroke-width="1" stroke-dasharray="6 4"/>
+<g transform="translate(374.0,138.0) scale(0.8333)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></g>
+<text x="384.0" y="172.0" font-size="13" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Drop the invoice here</text>
+<text x="384.0" y="190.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">or choose a file</text>
+<text x="24" y="252" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="24" y="258" width="720" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="34" y="284.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="24" y="326" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<rect x="24" y="332" width="354.0" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="34" y="358.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<text x="390.0" y="326" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="390.0" y="332" width="354.0" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="400.0" y="358.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="24" y="400" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<rect x="24" y="406" width="720" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="34" y="432.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add job</text>
+<g transform="translate(718,420.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="24" y="474" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Note</text>
+<rect x="24" y="480" width="720" height="64" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<rect x="0" y="624" width="768" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="624" x2="768" y2="624" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="640" width="736" height="44" rx="6" fill="#152133"/>
+<text x="358.65" y="666.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text></g><rect x="0" y="0" width="768" height="700" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1161.6" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">New invoice, partly filled</text>
+<g transform="translate(1161.6,152.0) scale(0.6)"><g clip-path="url(#c3)"><rect x="0" y="0" width="375" height="700" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / New</text>
+<text x="16" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<text x="16" y="86" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<rect x="16" y="104" width="343" height="120" rx="8" fill="#f2f0ec" stroke="#d5d1ca" stroke-width="1" stroke-dasharray="6 4"/>
+<g transform="translate(177.5,138.0) scale(0.8333)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></g>
+<text x="187.5" y="172.0" font-size="13" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Drop the invoice here</text>
+<text x="187.5" y="190.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">or choose a file</text>
+<text x="16" y="252" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="16" y="258" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="284.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="16" y="326" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<rect x="16" y="332" width="165.5" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="358.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<text x="193.5" y="326" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="193.5" y="332" width="165.5" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="203.5" y="358.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="16" y="400" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<rect x="16" y="406" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="432.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add job</text>
+<g transform="translate(333,420.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="16" y="474" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Note</text>
+<rect x="16" y="480" width="343" height="64" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<rect x="0" y="624" width="375" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="624" x2="375" y2="624" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="640" width="343" height="44" rx="6" fill="#152133"/>
+<text x="162.15" y="666.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text></g><rect x="0" y="0" width="375" height="700" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="620.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">B. A form that saves on Add invoice</text>
+<text x="32" y="640.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Nothing saves until Add invoice; then it lands in To pay with a contractor and a total, or in To review without them.</text>
+<text x="32" y="664.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="679.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">New invoice, partly filled</text>
+<g transform="translate(32.0,688.0) scale(0.55)"><g clip-path="url(#c4)"><rect x="0" y="0" width="1280" height="560" rx="0" fill="#ffffff"/>
+<text x="32" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / New</text>
+<text x="32" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="32" y="104" width="560" height="340" rx="8" fill="#f2f0ec" stroke="#d5d1ca" stroke-width="1" stroke-dasharray="6 4"/>
+<g transform="translate(302.0,248.0) scale(0.8333)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></g>
+<text x="312.0" y="282.0" font-size="13" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Drop the invoice here</text>
+<text x="312.0" y="300.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">or choose a file</text>
+<text x="624" y="116" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="624" y="122" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="142.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="624" y="178" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<rect x="624" y="184" width="306.0" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="204.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<text x="942.0" y="178" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="942.0" y="184" width="306.0" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="952.0" y="204.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="624" y="240" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<rect x="624" y="246" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="266.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add job</text>
+<g transform="translate(1222,254.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="624" y="302" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Note</text>
+<rect x="624" y="308" width="624" height="56" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<rect x="0" y="500" width="1280" height="60" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="500" x2="1280" y2="500" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="1150.8568" y="514" width="97.14319999999998" height="32" rx="6" fill="#152133"/>
+<text x="1162.8568" y="534.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add invoice</text>
+<rect x="1076.6744" y="514" width="66.1824" height="32" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="1088.6744" y="534.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Cancel</text></g><rect x="0" y="0" width="1280" height="560" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="664.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<text x="776.0" y="679.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">New invoice, partly filled</text>
+<g transform="translate(776.0,688.0) scale(0.45)"><g clip-path="url(#c5)"><rect x="0" y="0" width="768" height="700" rx="0" fill="#ffffff"/>
+<text x="24" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / New</text>
+<text x="24" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="24" y="104" width="720" height="120" rx="8" fill="#f2f0ec" stroke="#d5d1ca" stroke-width="1" stroke-dasharray="6 4"/>
+<g transform="translate(374.0,138.0) scale(0.8333)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></g>
+<text x="384.0" y="172.0" font-size="13" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Drop the invoice here</text>
+<text x="384.0" y="190.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">or choose a file</text>
+<text x="24" y="252" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="24" y="258" width="720" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="34" y="284.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="24" y="326" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<rect x="24" y="332" width="354.0" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="34" y="358.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<text x="390.0" y="326" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="390.0" y="332" width="354.0" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="400.0" y="358.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="24" y="400" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<rect x="24" y="406" width="720" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="34" y="432.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add job</text>
+<g transform="translate(718,420.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="24" y="474" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Note</text>
+<rect x="24" y="480" width="720" height="64" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<rect x="0" y="624" width="768" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="624" x2="768" y2="624" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="640" width="364.0" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="176.90879999999999" y="666.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Cancel</text>
+<rect x="388.0" y="640" width="364.0" height="44" rx="6" fill="#152133"/>
+<text x="533.4284" y="666.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add invoice</text></g><rect x="0" y="0" width="768" height="700" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="664.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1161.6" y="679.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">New invoice, partly filled</text>
+<g transform="translate(1161.6,688.0) scale(0.6)"><g clip-path="url(#c6)"><rect x="0" y="0" width="375" height="700" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / New</text>
+<text x="16" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="16" y="104" width="343" height="120" rx="8" fill="#f2f0ec" stroke="#d5d1ca" stroke-width="1" stroke-dasharray="6 4"/>
+<g transform="translate(177.5,138.0) scale(0.8333)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></g>
+<text x="187.5" y="172.0" font-size="13" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Drop the invoice here</text>
+<text x="187.5" y="190.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">or choose a file</text>
+<text x="16" y="252" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="16" y="258" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="284.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="16" y="326" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<rect x="16" y="332" width="165.5" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="358.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<text x="193.5" y="326" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="193.5" y="332" width="165.5" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="203.5" y="358.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="16" y="400" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<rect x="16" y="406" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="432.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add job</text>
+<g transform="translate(333,420.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="16" y="474" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Note</text>
+<rect x="16" y="480" width="343" height="64" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<rect x="0" y="624" width="375" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="624" x2="375" y2="624" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="640" width="167.5" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="78.6588" y="666.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Cancel</text>
+<rect x="191.5" y="640" width="167.5" height="44" rx="6" fill="#152133"/>
+<text x="238.6784" y="666.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add invoice</text></g><rect x="0" y="0" width="375" height="700" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="1156.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#152133">Notes</text>
+<circle cx="40" cy="1174.0" r="8" fill="#c8a765"/>
+<text x="40" y="1178.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">1</text>
+<text x="56" y="1178.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">A: the row is made in To review when the first file drops or the first field saves, so the upload has an invoice to belong to.</text>
+<circle cx="40" cy="1194.0" r="8" fill="#c8a765"/>
+<text x="40" y="1198.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">2</text>
+<text x="56" y="1198.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">A: a half-entered invoice you walk away from waits in To review; Not an invoice clears it.</text>
+<circle cx="40" cy="1214.0" r="8" fill="#c8a765"/>
+<text x="40" y="1218.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">3</text>
+<text x="56" y="1218.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">B: a second way to edit the same fields, and the file needs a draft to upload into before Add invoice is tapped.</text>
+<circle cx="40" cy="1234.0" r="8" fill="#c8a765"/>
+<text x="40" y="1238.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">4</text>
+<text x="56" y="1238.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Both: a partner's own entry never needs the other partner, and never sends the staff email (M12).</text>
+</svg>

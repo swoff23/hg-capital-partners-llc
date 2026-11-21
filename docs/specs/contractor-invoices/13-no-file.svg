@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1419" height="1218" viewBox="0 0 1419 1218">
+<title>Invoices with no file</title>
+<rect width="1419" height="1218" fill="#ffffff"/>
+<defs><clipPath id="c1"><rect x="0" y="0" width="1280" height="520"/></clipPath><clipPath id="c2"><rect x="0" y="0" width="768" height="640"/></clipPath><clipPath id="c3"><rect x="0" y="0" width="375" height="640"/></clipPath><clipPath id="c4"><rect x="0" y="0" width="1280" height="520"/></clipPath><clipPath id="c5"><rect x="0" y="0" width="375" height="640"/></clipPath></defs>
+<text x="32" y="40" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="18" font-weight="600" fill="#152133">Invoices with no file</text>
+<text x="32" y="62" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">A contractor emails or texts an amount with no PDF, or sends a 'View invoice' link from Square or Jobber.</text>
+<text x="32" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">A. They still land, and a file can be added later</text>
+<rect x="387.82400000000007" y="71" width="104" height="18" rx="9" fill="#152133"/>
+<text x="439.82400000000007" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#ffffff" text-anchor="middle">Recommended</text>
+<text x="32" y="104" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">The email's text, links kept, sits where the file would. New invoice can be saved with no file. In To review, Add the invoice file sits under it.</text>
+<text x="32" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">An emailed invoice with no attachment</text>
+<g transform="translate(32.0,152.0) scale(0.55)"><g clip-path="url(#c1)"><rect x="0" y="0" width="1280" height="520" rx="0" fill="#ffffff"/>
+<text x="32" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="32" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice from Dave</text>
+<rect x="32" y="90" width="560" height="150" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(46,104) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>
+<text x="70" y="117" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">From the email Dave sent Nov 19</text>
+<text x="46" y="144" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Connor, Oxford leak is done.</text>
+<text x="46" y="164" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850, Zelle is fine.</text>
+<text x="46" y="184" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Thanks, Dave</text>
+<text x="46" y="210" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">View invoice on Square</text>
+<line x1="46" y1="213" x2="194.99040000000002" y2="213" stroke="#152133" stroke-width="1"/>
+<rect x="32" y="252" width="560" height="40" rx="8" fill="#f2f0ec" stroke="#d5d1ca" stroke-width="1" stroke-dasharray="6 4"/>
+<g transform="translate(46,264) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></g>
+<text x="70" y="277" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add the invoice file</text>
+<text x="624" y="102" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="624" y="108" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="128.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave Kim</text>
+<text x="624" y="164" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="624" y="170" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="190.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="624" y="226" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<rect x="624" y="232" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="252.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<g transform="translate(1222,240.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<rect x="0" y="460" width="1280" height="60" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="460" x2="1280" y2="460" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="1173.3" y="474" width="74.7" height="32" rx="6" fill="#152133"/>
+<text x="1185.3" y="494.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text></g><rect x="0" y="0" width="1280" height="520" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<text x="776.0" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">An emailed invoice with no attachment</text>
+<g transform="translate(776.0,152.0) scale(0.45)"><g clip-path="url(#c2)"><rect x="0" y="0" width="768" height="640" rx="0" fill="#ffffff"/>
+<text x="24" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="24" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice from Dave</text>
+<rect x="24" y="90" width="720" height="150" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(38,104) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>
+<text x="62" y="117" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">From the email Dave sent Nov 19</text>
+<text x="38" y="144" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Connor, Oxford leak is done.</text>
+<text x="38" y="164" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850, Zelle is fine.</text>
+<text x="38" y="184" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Thanks, Dave</text>
+<text x="38" y="210" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">View invoice on Square</text>
+<line x1="38" y1="213" x2="186.99040000000002" y2="213" stroke="#152133" stroke-width="1"/>
+<rect x="24" y="250" width="720" height="40" rx="8" fill="#f2f0ec" stroke="#d5d1ca" stroke-width="1" stroke-dasharray="6 4"/>
+<g transform="translate(38,262) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></g>
+<text x="62" y="275" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add the invoice file</text>
+<text x="24" y="318" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="24" y="324" width="720" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="34" y="350.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave Kim</text>
+<text x="24" y="392" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="24" y="398" width="720" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="34" y="424.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="24" y="466" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<rect x="24" y="472" width="720" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="34" y="498.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<g transform="translate(718,486.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<rect x="0" y="564" width="768" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="564" x2="768" y2="564" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="580" width="736" height="44" rx="6" fill="#152133"/>
+<text x="358.65" y="606.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text></g><rect x="0" y="0" width="768" height="640" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1161.6" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">An emailed invoice with no attachment</text>
+<g transform="translate(1161.6,152.0) scale(0.6)"><g clip-path="url(#c3)"><rect x="0" y="0" width="375" height="640" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="16" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice from Dave</text>
+<rect x="16" y="90" width="343" height="150" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(30,104) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>
+<text x="54" y="117" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">From the email Dave sent Nov 19</text>
+<text x="30" y="144" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Connor, Oxford leak is done.</text>
+<text x="30" y="164" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850, Zelle is fine.</text>
+<text x="30" y="184" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Thanks, Dave</text>
+<text x="30" y="210" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">View invoice on Square</text>
+<line x1="30" y1="213" x2="178.99040000000002" y2="213" stroke="#152133" stroke-width="1"/>
+<rect x="16" y="250" width="343" height="40" rx="8" fill="#f2f0ec" stroke="#d5d1ca" stroke-width="1" stroke-dasharray="6 4"/>
+<g transform="translate(30,262) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></g>
+<text x="54" y="275" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Add the invoice file</text>
+<text x="16" y="318" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="16" y="324" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="350.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave Kim</text>
+<text x="16" y="392" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="16" y="398" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="424.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="16" y="466" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<rect x="16" y="472" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="498.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<g transform="translate(333,486.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<rect x="0" y="564" width="375" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="564" x2="375" y2="564" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="580" width="343" height="44" rx="6" fill="#152133"/>
+<text x="162.15" y="606.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text></g><rect x="0" y="0" width="375" height="640" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="584.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">B. A file is required</text>
+<text x="32" y="604.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">An emailed invoice with no attachment isn't saved, and New invoice can't be approved without a file.</text>
+<text x="32" y="628.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="643.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">An emailed invoice with no attachment</text>
+<g transform="translate(32.0,652.0) scale(0.55)"><g clip-path="url(#c4)"><rect x="0" y="0" width="1280" height="520" rx="0" fill="#ffffff"/>
+<text x="32" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="32" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice from Dave</text>
+<rect x="32" y="90" width="1216" height="64" rx="8" fill="#f2f0ec"/>
+<text x="48" y="118" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave's email had no file, so it wasn't saved.</text>
+<text x="48" y="138" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">It stays in your inbox as today.</text></g><rect x="0" y="0" width="1280" height="520" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="628.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="776.0" y="643.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">An emailed invoice with no attachment</text>
+<g transform="translate(776.0,652.0) scale(0.6)"><g clip-path="url(#c5)"><rect x="0" y="0" width="375" height="640" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="16" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice from Dave</text>
+<rect x="16" y="90" width="343" height="64" rx="8" fill="#f2f0ec"/>
+<text x="32" y="118" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave's email had no file, so it wasn't saved.</text>
+<text x="32" y="138" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">It stays in your inbox as today.</text></g><rect x="0" y="0" width="375" height="640" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="1084.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#152133">Notes</text>
+<circle cx="40" cy="1102.0" r="8" fill="#c8a765"/>
+<text x="40" y="1106.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">1</text>
+<text x="56" y="1106.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">A: a texted amount goes in through New invoice with no file; the PDF can be dropped on later while it's in To review.</text>
+<circle cx="40" cy="1122.0" r="8" fill="#c8a765"/>
+<text x="40" y="1126.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">2</text>
+<text x="56" y="1126.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">A: the whole email text is kept (not cut at 'Forwarded message'), so a forward's invoice text and its links survive.</text>
+<circle cx="40" cy="1142.0" r="8" fill="#c8a765"/>
+<text x="40" y="1146.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">3</text>
+<text x="56" y="1146.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">A: once approved, fields and files are read-only; Back to review reopens them, as for every invoice.</text>
+<circle cx="40" cy="1162.0" r="8" fill="#c8a765"/>
+<text x="40" y="1166.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">4</text>
+<text x="56" y="1166.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">B: drawn as a description only; nothing appears in the app, since the email is dropped.</text>
+<circle cx="40" cy="1182.0" r="8" fill="#c8a765"/>
+<text x="40" y="1186.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">5</text>
+<text x="56" y="1186.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">A reply on a done job with no file stays a plain forward to you and Pieter in both, as today.</text>
+</svg>

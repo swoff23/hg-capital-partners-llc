@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1419" height="1102" viewBox="0 0 1419 1102">
+<title>What the invoice page's ⋯ menu holds</title>
+<rect width="1419" height="1102" fill="#ffffff"/>
+<defs><clipPath id="c1"><rect x="0" y="0" width="1280" height="320"/></clipPath><clipPath id="c2"><rect x="0" y="0" width="768" height="320"/></clipPath><clipPath id="c3"><rect x="0" y="0" width="375" height="320"/></clipPath><clipPath id="c4"><rect x="0" y="0" width="1280" height="320"/></clipPath><clipPath id="c5"><rect x="0" y="0" width="768" height="320"/></clipPath><clipPath id="c6"><rect x="0" y="0" width="375" height="320"/></clipPath><clipPath id="c7"><rect x="0" y="0" width="1280" height="320"/></clipPath><clipPath id="c8"><rect x="0" y="0" width="768" height="320"/></clipPath><clipPath id="c9"><rect x="0" y="0" width="375" height="320"/></clipPath></defs>
+<text x="32" y="40" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="18" font-weight="600" fill="#152133">What the invoice page's ⋯ menu holds</text>
+<text x="32" y="62" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">The record ⋯ on the title line (RecordMoreMenu): the stage's own move first, Copy link, then Not an invoice in red after a line.</text>
+<text x="32" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">To review</text>
+<text x="32" y="104" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Approve stays in the bar; the menu only clears junk.</text>
+<text x="32" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">To review</text>
+<g transform="translate(32.0,152.0) scale(0.55)"><g clip-path="url(#c1)"><rect x="0" y="0" width="1280" height="320" rx="0" fill="#ffffff"/>
+<text x="32" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="32" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="1216" y="38" width="32" height="32" rx="6" fill="#f2f0ec"/>
+<g transform="translate(1224.0,46.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="1131.16" y="79" width="118.83999999999999" height="81" rx="8" fill="#e7e5e0"/>
+<rect x="1129.16" y="76" width="118.83999999999999" height="81" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="1145.16" y="101.0" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Copy link</text>
+<line x1="1135.16" y1="116" x2="1242.0" y2="116" stroke="#e7e5e0" stroke-width="1"/>
+<text x="1145.16" y="142.0" font-size="13" font-weight="400" fill="#b91c1c" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Not an invoice</text>
+<rect x="0" y="260" width="1280" height="60" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="260" x2="1280" y2="260" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="1173.3" y="274" width="74.7" height="32" rx="6" fill="#152133"/>
+<text x="1185.3" y="294.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text></g><rect x="0" y="0" width="1280" height="320" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<text x="776.0" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">To review</text>
+<g transform="translate(776.0,152.0) scale(0.45)"><g clip-path="url(#c2)"><rect x="0" y="0" width="768" height="320" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="16" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="708" y="38" width="44" height="44" rx="6" fill="#f2f0ec"/>
+<g transform="translate(722.0,52.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="621.8" y="91" width="132.2" height="105" rx="8" fill="#e7e5e0"/>
+<rect x="619.8" y="88" width="132.2" height="105" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="635.8" y="119.0" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Copy link</text>
+<line x1="625.8" y1="140" x2="746.0" y2="140" stroke="#e7e5e0" stroke-width="1"/>
+<text x="635.8" y="172.0" font-size="15" font-weight="400" fill="#b91c1c" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Not an invoice</text>
+<rect x="0" y="244" width="768" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="244" x2="768" y2="244" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="260" width="736" height="44" rx="6" fill="#152133"/>
+<text x="358.65" y="286.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text></g><rect x="0" y="0" width="768" height="320" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1161.6" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">To review</text>
+<g transform="translate(1161.6,152.0) scale(0.6)"><g clip-path="url(#c3)"><rect x="0" y="0" width="375" height="320" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="16" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="315" y="38" width="44" height="44" rx="6" fill="#f2f0ec"/>
+<g transform="translate(329.0,52.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="228.8" y="91" width="132.2" height="105" rx="8" fill="#e7e5e0"/>
+<rect x="226.8" y="88" width="132.2" height="105" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="242.8" y="119.0" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Copy link</text>
+<line x1="232.8" y1="140" x2="353.0" y2="140" stroke="#e7e5e0" stroke-width="1"/>
+<text x="242.8" y="172.0" font-size="15" font-weight="400" fill="#b91c1c" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Not an invoice</text>
+<rect x="0" y="244" width="375" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="244" x2="375" y2="244" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="260" width="343" height="44" rx="6" fill="#152133"/>
+<text x="162.15" y="286.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text></g><rect x="0" y="0" width="375" height="320" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="392.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">To pay</text>
+<text x="32" y="412.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Back to review reopens the fields for a fix; Mark paid stays in the bar.</text>
+<text x="32" y="436.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="451.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">To pay</text>
+<g transform="translate(32.0,460.0) scale(0.55)"><g clip-path="url(#c4)"><rect x="0" y="0" width="1280" height="320" rx="0" fill="#ffffff"/>
+<text x="32" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To pay</text>
+<text x="32" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="1216" y="38" width="32" height="32" rx="6" fill="#f2f0ec"/>
+<g transform="translate(1224.0,46.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="1126.09" y="79" width="123.91" height="113" rx="8" fill="#e7e5e0"/>
+<rect x="1124.09" y="76" width="123.91" height="113" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="1140.09" y="101.0" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Back to review</text>
+<text x="1140.09" y="133.0" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Copy link</text>
+<line x1="1130.09" y1="148" x2="1242.0" y2="148" stroke="#e7e5e0" stroke-width="1"/>
+<text x="1140.09" y="174.0" font-size="13" font-weight="400" fill="#b91c1c" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Not an invoice</text>
+<rect x="0" y="260" width="1280" height="60" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="260" x2="1280" y2="260" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="1088.8" y="274" width="159.20000000000002" height="32" rx="6" fill="#152133"/>
+<text x="1100.8" y="294.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid · $850.00</text></g><rect x="0" y="0" width="1280" height="320" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="436.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<text x="776.0" y="451.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">To pay</text>
+<g transform="translate(776.0,460.0) scale(0.45)"><g clip-path="url(#c5)"><rect x="0" y="0" width="768" height="320" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To pay</text>
+<text x="16" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="708" y="38" width="44" height="44" rx="6" fill="#f2f0ec"/>
+<g transform="translate(722.0,52.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="615.95" y="91" width="138.05" height="149" rx="8" fill="#e7e5e0"/>
+<rect x="613.95" y="88" width="138.05" height="149" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="629.95" y="119.0" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Back to review</text>
+<text x="629.95" y="163.0" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Copy link</text>
+<line x1="619.95" y1="184" x2="746.0" y2="184" stroke="#e7e5e0" stroke-width="1"/>
+<text x="629.95" y="216.0" font-size="15" font-weight="400" fill="#b91c1c" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Not an invoice</text>
+<rect x="0" y="244" width="768" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="244" x2="768" y2="244" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="260" width="736" height="44" rx="6" fill="#152133"/>
+<text x="316.4" y="286.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid · $850.00</text></g><rect x="0" y="0" width="768" height="320" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="436.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1161.6" y="451.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">To pay</text>
+<g transform="translate(1161.6,460.0) scale(0.6)"><g clip-path="url(#c6)"><rect x="0" y="0" width="375" height="320" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To pay</text>
+<text x="16" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="315" y="38" width="44" height="44" rx="6" fill="#f2f0ec"/>
+<g transform="translate(329.0,52.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="222.95" y="91" width="138.05" height="149" rx="8" fill="#e7e5e0"/>
+<rect x="220.95" y="88" width="138.05" height="149" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="236.95" y="119.0" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Back to review</text>
+<text x="236.95" y="163.0" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Copy link</text>
+<line x1="226.95" y1="184" x2="353.0" y2="184" stroke="#e7e5e0" stroke-width="1"/>
+<text x="236.95" y="216.0" font-size="15" font-weight="400" fill="#b91c1c" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Not an invoice</text>
+<rect x="0" y="244" width="375" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="244" x2="375" y2="244" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="260" width="343" height="44" rx="6" fill="#152133"/>
+<text x="119.89999999999999" y="286.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid · $850.00</text></g><rect x="0" y="0" width="375" height="320" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="700.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">Paid</text>
+<text x="32" y="720.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">No bar: nothing left to do. Undo paid puts it back in To pay; Not an invoice is gone once it's paid.</text>
+<text x="32" y="744.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="759.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Paid</text>
+<g transform="translate(32.0,768.0) scale(0.55)"><g clip-path="url(#c7)"><rect x="0" y="0" width="1280" height="320" rx="0" fill="#ffffff"/>
+<text x="32" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / Paid</text>
+<text x="32" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="1216" y="38" width="32" height="32" rx="6" fill="#f2f0ec"/>
+<g transform="translate(1224.0,46.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="1158.46" y="79" width="91.53999999999999" height="72" rx="8" fill="#e7e5e0"/>
+<rect x="1156.46" y="76" width="91.53999999999999" height="72" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="1172.46" y="101.0" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Undo paid</text>
+<text x="1172.46" y="133.0" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Copy link</text>
+<text x="32" y="92" font-size="13" font-weight="500" fill="#1d7038" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 24 by Baselane transfer, Connor</text></g><rect x="0" y="0" width="1280" height="320" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="744.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<text x="776.0" y="759.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Paid</text>
+<g transform="translate(776.0,768.0) scale(0.45)"><g clip-path="url(#c8)"><rect x="0" y="0" width="768" height="320" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / Paid</text>
+<text x="16" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="708" y="38" width="44" height="44" rx="6" fill="#f2f0ec"/>
+<g transform="translate(722.0,52.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="653.3" y="91" width="100.7" height="96" rx="8" fill="#e7e5e0"/>
+<rect x="651.3" y="88" width="100.7" height="96" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="667.3" y="119.0" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Undo paid</text>
+<text x="667.3" y="163.0" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Copy link</text>
+<text x="16" y="92" font-size="13" font-weight="500" fill="#1d7038" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 24 by Baselane transfer, Connor</text></g><rect x="0" y="0" width="768" height="320" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="744.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1161.6" y="759.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Paid</text>
+<g transform="translate(1161.6,768.0) scale(0.6)"><g clip-path="url(#c9)"><rect x="0" y="0" width="375" height="320" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / Paid</text>
+<text x="16" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="315" y="38" width="44" height="44" rx="6" fill="#f2f0ec"/>
+<g transform="translate(329.0,52.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="260.3" y="91" width="100.7" height="96" rx="8" fill="#e7e5e0"/>
+<rect x="258.3" y="88" width="100.7" height="96" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="274.3" y="119.0" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Undo paid</text>
+<text x="274.3" y="163.0" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Copy link</text>
+<text x="16" y="92" font-size="13" font-weight="500" fill="#1d7038" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 24 by Baselane transfer, Connor</text></g><rect x="0" y="0" width="375" height="320" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="1008.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#152133">Notes</text>
+<circle cx="40" cy="1026.0" r="8" fill="#c8a765"/>
+<text x="40" y="1030.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">1</text>
+<text x="56" y="1030.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Not an invoice goes at once with a toast and Undo (like Archive), and hides the invoice from contractors.</text>
+<circle cx="40" cy="1046.0" r="8" fill="#c8a765"/>
+<text x="40" y="1050.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">2</text>
+<text x="56" y="1050.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Copy link copies the invoice page's address, as on every record page.</text>
+<circle cx="40" cy="1066.0" r="8" fill="#c8a765"/>
+<text x="40" y="1070.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">3</text>
+<text x="56" y="1070.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">On touch the ⋯ menu stays anchored under its button with 44px rows; it never becomes a sheet.</text>
+</svg>

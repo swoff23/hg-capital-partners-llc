@@ -1,0 +1,1138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1419" height="2624" viewBox="0 0 1419 2624">
+<title>Mark paid</title>
+<rect width="1419" height="2624" fill="#ffffff"/>
+<defs><clipPath id="c1"><rect x="0" y="0" width="1280" height="800"/></clipPath><clipPath id="c2"><rect x="0" y="0" width="768" height="1024"/></clipPath><clipPath id="c3"><rect x="0" y="0" width="375" height="667"/></clipPath><clipPath id="c4"><rect x="0" y="0" width="1280" height="800"/></clipPath><clipPath id="c5"><rect x="0" y="0" width="768" height="1024"/></clipPath><clipPath id="c6"><rect x="0" y="0" width="375" height="667"/></clipPath><clipPath id="c7"><rect x="0" y="0" width="1280" height="800"/></clipPath><clipPath id="c8"><rect x="0" y="0" width="768" height="1024"/></clipPath><clipPath id="c9"><rect x="0" y="0" width="375" height="667"/></clipPath><clipPath id="c10"><rect x="0" y="0" width="1280" height="800"/></clipPath><clipPath id="c11"><rect x="0" y="0" width="375" height="667"/></clipPath></defs>
+<text x="32" y="40" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="18" font-weight="600" fill="#152133">Mark paid</text>
+<text x="32" y="62" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Screen 3 of the invoices MVP: a FormSheet over the invoice page in To pay (docs/contractor-invoices-plan.md, M8, M9, 5.3)</text>
+<text x="32" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">A. Mark paid sheet</text>
+<rect x="181.436" y="71" width="104" height="18" rx="9" fill="#152133"/>
+<text x="233.436" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#ffffff" text-anchor="middle">Recommended</text>
+<text x="32" y="104" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">FormSheet as the app draws it today: date, method, check # or note; the total rides in the primary</text>
+<text x="32" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Centered dialog, 320 wide (min-w-80, sized to content)</text>
+<g transform="translate(32.0,152.0) scale(0.55)"><g clip-path="url(#c1)"><rect x="0" y="0" width="1280" height="800" rx="0" fill="#ffffff"/>
+<line x1="0" y1="56" x2="1280" y2="56" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="20" y="16" width="24" height="24" rx="5" fill="#152133"/>
+<text x="32.0" y="31.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="52" y="33" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="134.616" y="10" width="448" height="36" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(144.616,20.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="166.616" y="33.04" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<rect x="546.616" y="18.0" width="28" height="20" rx="6" fill="#f2f0ec" stroke="#d5d1ca" stroke-width="1"/>
+<text x="560.616" y="32.0" font-size="11" font-weight="500" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">⌘K</text>
+<rect x="0" y="56" width="64" height="744" rx="0" fill="#f8f7f3"/>
+<line x1="64" y1="56" x2="64" y2="800" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="24" y="104" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="138" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="172" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="206" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="240" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="274" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="308" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="8" y="334" width="48" height="32" rx="8" fill="#e7e5e0"/>
+<rect x="8" y="342" width="2" height="16" rx="0" fill="#152133"/>
+<rect x="24" y="342" width="16" height="16" rx="4" fill="none" stroke="#152133" stroke-width="1.5"/>
+<rect x="24" y="376" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="410" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<line x1="8" y1="744" x2="56" y2="744" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="32" cy="772" r="14" fill="#f2f0ec"/>
+<text x="32" y="776" font-size="10" font-weight="600" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">CS</text>
+<g transform="translate(96,96.28) scale(0.5833)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="114" y="106.68" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<text x="173.631136" y="106.68" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">/</text>
+<text x="184.631136" y="106.68" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="96" y="147.68" font-size="24" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="96" y="172" width="692" height="552" rx="6" fill="#f2f0ec"/>
+<rect x="96" y="172" width="692" height="36" rx="6" fill="#e7e5e0"/>
+<rect x="96" y="202" width="692" height="6" rx="0" fill="#e7e5e0"/>
+<text x="110" y="195" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="442.0" y="195" font-size="12" font-weight="400" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">1 / 1</text>
+<g transform="translate(758,182) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></g>
+<rect x="258.0909090909091" y="228" width="367.8181818181818" height="476" rx="0" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="284.8413223140496" y="271.4694214876033" font-size="12.539256198347108" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="284.8413223140496" y="286.5165289256198" font-size="8.359504132231404" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Plumbing and repairs</text>
+<text x="599.1586776859504" y="271.4694214876033" font-size="12.539256198347108" font-weight="600" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">INVOICE</text>
+<text x="599.1586776859504" y="286.5165289256198" font-size="8.359504132231404" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">#1043  ·  Nov 18, 2026</text>
+<text x="284.8413223140496" y="321.62644628099173" font-size="7.523553719008264" font-weight="600" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Bill to</text>
+<text x="284.8413223140496" y="335.001652892562" font-size="9.195454545454545" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="284.8413223140496" y="368.43966942148757" width="314.3173553719008" height="1" rx="0" fill="#d5d1ca"/>
+<text x="284.8413223140496" y="406.89338842975206" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2 · 15 Oxford Ave</text>
+<text x="599.1586776859504" y="406.89338842975206" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$650.00</text>
+<text x="284.8413223140496" y="428.6280991735537" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<text x="599.1586776859504" y="428.6280991735537" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$200.00</text>
+<text x="458.71900826446284" y="478.78512396694214" font-size="10.031404958677685" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="599.1586776859504" y="478.78512396694214" font-size="10.031404958677685" font-weight="600" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<rect x="96" y="172" width="692" height="552" rx="6" fill="none" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(828,173) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>
+<text x="850" y="185" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">From the email Zack sent Nov 18</text>
+<rect x="828" y="198" width="420" height="54" rx="6" fill="#f2f0ec"/>
+<text x="840" y="220" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Connor, here's the bill for the leak at 15 Oxford.</text>
+<text x="840" y="240" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Thanks, Zack</text>
+<text x="828" y="290.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="940" y="290.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<line x1="828" y1="304" x2="1248" y2="304" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="326.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<text x="940" y="326.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<line x1="828" y1="340" x2="1248" y2="340" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="362.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice date</text>
+<text x="940" y="362.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18, 2026</text>
+<line x1="828" y1="376" x2="1248" y2="376" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="398.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="940" y="398.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<line x1="828" y1="412" x2="1248" y2="412" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="434.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="940" y="434.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<line x1="940" y1="437.0" x2="1027.97464" y2="437.0" stroke="#d5d1ca" stroke-width="1"/>
+<text x="940" y="454.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<line x1="940" y1="457.0" x2="1055.83936" y2="457.0" stroke="#d5d1ca" stroke-width="1"/>
+<line x1="828" y1="468" x2="1248" y2="468" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="490.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<text x="940" y="490.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pay with the Oxford batch</text>
+<line x1="828" y1="504" x2="1248" y2="504" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="558" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">History</text>
+<line x1="828" y1="573" x2="1248" y2="573" stroke="#e7e5e0" stroke-width="1"/>
+<line x1="832" y1="600.0" x2="832" y2="660.0" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="832" cy="600.0" r="3.5" fill="#d5d1ca"/>
+<text x="846" y="604.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Came in by email from Zack</text>
+<text x="1026.51" y="604.5" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<circle cx="832" cy="630.0" r="3.5" fill="#d5d1ca"/>
+<text x="846" y="634.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor added 2 jobs</text>
+<text x="979.84" y="634.5" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<circle cx="832" cy="660.0" r="3.5" fill="#d5d1ca"/>
+<text x="846" y="664.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter approved it</text>
+<text x="962.03" y="664.5" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<rect x="64" y="740" width="1216" height="60" rx="0" fill="#f8f7f3"/>
+<line x1="64" y1="740" x2="1280" y2="740" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="1008" y="752" width="240" height="36" rx="8" fill="#152133"/>
+<text x="1128.0" y="775.04" font-size="14" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid</text>
+<rect x="960" y="752" width="36" height="36" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(970.0,762.0) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="0" y="0" width="1280" height="800" fill="#0a0e17" fill-opacity="0.45"/>
+<defs><filter id="sh04b12" x="-30%" y="-30%" width="160%" height="180%"><feGaussianBlur stdDeviation="12"/></filter></defs>
+<rect x="480.0" y="232" width="320" height="361" rx="14" fill="#152133" fill-opacity="0.14" filter="url(#sh04b12)"/>
+<rect x="480.0" y="220" width="320" height="361" rx="14" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="496.0" y="249.76" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Mark #1043 paid</text>
+<g transform="translate(768.0,236.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<line x1="480.0" y1="268" x2="800.0" y2="268" stroke="#e7e5e0" stroke-width="1"/>
+<text x="496.0" y="296" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid on</text>
+<rect x="496.0" y="308" width="288" height="36" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="508.0" y="331.04" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">11/21/2026</text>
+<g transform="translate(758.0,318.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></g>
+<text x="496.0" y="372" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Method</text>
+<rect x="496.0" y="384" width="288" height="36" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="506.0" y="407.04" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Baselane transfer</text>
+<g transform="translate(760.0,395.0) scale(0.5833)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g>
+<text x="496.0" y="448" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Check # or note</text>
+<text x="599.1296" y="448" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">(optional)</text>
+<rect x="496.0" y="460" width="288" height="36" rx="8" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<line x1="507.0" y1="471" x2="507.0" y2="485" stroke="#152133" stroke-width="1.5"/>
+<line x1="480.0" y1="512" x2="800.0" y2="512" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="610.4" y="528" width="173.6" height="36" rx="8" fill="#152133"/>
+<text x="697.1999999999999" y="551.04" font-size="14" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid · $850.00</text>
+<rect x="528.9728" y="528" width="73.4272" height="36" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="565.6864" y="551.04" font-size="14" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Cancel</text></g><rect x="0" y="0" width="1280" height="800" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<text x="776.0" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">The same dialog at touch sizes</text>
+<g transform="translate(776.0,152.0) scale(0.45)"><g clip-path="url(#c2)"><rect x="0" y="0" width="768" height="1024" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="768" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="768" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16.0) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14.0" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="98" y="31.0" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="180.616" y="4.0" width="448" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(190.616,16.0) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="216.616" y="31.759999999999998" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<g transform="translate(24,91.84) scale(0.5833)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="42" y="103.04" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<text x="105.756608" y="103.04" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">/</text>
+<text x="116.756608" y="103.04" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="24" y="153.16" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="24" y="178" width="720" height="64" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="34" y="188" width="44" height="44" rx="6" fill="#f2f0ec"/>
+<g transform="translate(47.0,201.0) scale(0.7500)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></g>
+<text x="88" y="208.0" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="88" y="224.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">PDF · 182 KB · Zack</text>
+<text x="730" y="214.5" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Open</text>
+<g transform="translate(24,263) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>
+<text x="46" y="275" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">From the email Zack sent Nov 18</text>
+<rect x="24" y="288" width="720" height="54" rx="6" fill="#f2f0ec"/>
+<text x="36" y="310" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Connor, here's the bill for the leak at 15 Oxford.</text>
+<text x="36" y="330" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Thanks, Zack</text>
+<text x="24" y="384.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="136" y="384.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<line x1="24" y1="402" x2="744" y2="402" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="428.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<text x="136" y="428.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<line x1="24" y1="446" x2="744" y2="446" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="472.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice date</text>
+<text x="136" y="472.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18, 2026</text>
+<line x1="24" y1="490" x2="744" y2="490" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="516.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="136" y="516.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<line x1="24" y1="534" x2="744" y2="534" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="560.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="136" y="560.5" font-size="15" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<line x1="136" y1="563.0" x2="237.50920000000002" y2="563.0" stroke="#d5d1ca" stroke-width="1"/>
+<text x="136" y="582.5" font-size="15" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<line x1="136" y1="585.0" x2="269.6608" y2="585.0" stroke="#d5d1ca" stroke-width="1"/>
+<line x1="24" y1="600" x2="744" y2="600" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="626.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<text x="136" y="626.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pay with the Oxford batch</text>
+<line x1="24" y1="644" x2="744" y2="644" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="698" font-size="17" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">History</text>
+<line x1="24" y1="713" x2="744" y2="713" stroke="#e7e5e0" stroke-width="1"/>
+<line x1="28" y1="745.0" x2="28" y2="825.0" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="28" cy="745.0" r="3.5" fill="#d5d1ca"/>
+<text x="42" y="749.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Came in by email from Zack</text>
+<text x="249.04999999999998" y="749.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<circle cx="28" cy="785.0" r="3.5" fill="#d5d1ca"/>
+<text x="42" y="789.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor added 2 jobs</text>
+<text x="195.20000000000002" y="789.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<circle cx="28" cy="825.0" r="3.5" fill="#d5d1ca"/>
+<text x="42" y="829.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter approved it</text>
+<text x="174.64999999999998" y="829.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<rect x="0" y="952" width="768" height="72" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="952" x2="768" y2="952" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="84" y="964" width="660" height="48" rx="8" fill="#152133"/>
+<text x="414.0" y="993.76" font-size="16" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid</text>
+<rect x="24" y="964" width="48" height="48" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(40.0,980.0) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="0" y="0" width="768" height="1024" fill="#0a0e17" fill-opacity="0.45"/>
+<defs><filter id="sh04b12" x="-30%" y="-30%" width="160%" height="180%"><feGaussianBlur stdDeviation="12"/></filter></defs>
+<rect x="224.0" y="320" width="320" height="407" rx="14" fill="#152133" fill-opacity="0.14" filter="url(#sh04b12)"/>
+<rect x="224.0" y="308" width="320" height="407" rx="14" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="240.0" y="342.12" font-size="17" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Mark #1043 paid</text>
+<g transform="translate(508.0,328.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<line x1="224.0" y1="364" x2="544.0" y2="364" stroke="#e7e5e0" stroke-width="1"/>
+<text x="240.0" y="393" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid on</text>
+<rect x="240.0" y="406" width="288" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(250.0,420.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></g>
+<text x="274.0" y="433.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 21, 2026</text>
+<text x="240.0" y="479" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Method</text>
+<rect x="240.0" y="492" width="288" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="250.0" y="519.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Baselane transfer</text>
+<g transform="translate(504.0,507.0) scale(0.5833)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g>
+<text x="240.0" y="565" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Check # or note</text>
+<text x="350.9088" y="565" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">(optional)</text>
+<rect x="240.0" y="578" width="288" height="44" rx="8" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<line x1="251.0" y1="589" x2="251.0" y2="611" stroke="#152133" stroke-width="1.5"/>
+<line x1="224.0" y1="638" x2="544.0" y2="638" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="333.6" y="654" width="194.4" height="44" rx="8" fill="#152133"/>
+<text x="430.8" y="681.76" font-size="16" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid · $850.00</text>
+<rect x="245.68320000000003" y="654" width="79.9168" height="44" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="285.64160000000004" y="681.76" font-size="16" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Cancel</text></g><rect x="0" y="0" width="768" height="1024" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1161.6" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Bottom sheet; X is the way out, Cancel drops</text>
+<g transform="translate(1161.6,152.0) scale(0.6)"><g clip-path="url(#c3)"><rect x="0" y="0" width="375" height="667" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="375" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="375" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16.0) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14.0" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<rect x="102" y="4.0" width="257" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(112,16.0) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="138" y="31.759999999999998" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<g transform="translate(16,83.84) scale(0.5833)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="34" y="95.04" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<text x="97.756608" y="95.04" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">/</text>
+<text x="108.756608" y="95.04" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="16" y="145.16" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="16" y="170" width="343" height="64" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="26" y="180" width="44" height="44" rx="6" fill="#f2f0ec"/>
+<g transform="translate(39.0,193.0) scale(0.7500)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></g>
+<text x="80" y="200.0" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="80" y="216.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">PDF · 182 KB · Zack</text>
+<text x="345" y="206.5" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Open</text>
+<g transform="translate(16,255) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>
+<text x="38" y="267" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">From the email Zack sent Nov 18</text>
+<rect x="16" y="280" width="343" height="54" rx="6" fill="#f2f0ec"/>
+<text x="28" y="302" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Connor, here's the bill for the leak at 15 Oxford.</text>
+<text x="28" y="322" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Thanks, Zack</text>
+<text x="16" y="376.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="128" y="376.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<line x1="16" y1="394" x2="359" y2="394" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="420.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<text x="128" y="420.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<line x1="16" y1="438" x2="359" y2="438" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="464.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice date</text>
+<text x="128" y="464.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18, 2026</text>
+<line x1="16" y1="482" x2="359" y2="482" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="508.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="128" y="508.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<line x1="16" y1="526" x2="359" y2="526" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="552.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="128" y="552.5" font-size="15" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<line x1="128" y1="555.0" x2="229.50920000000002" y2="555.0" stroke="#d5d1ca" stroke-width="1"/>
+<text x="128" y="574.5" font-size="15" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<line x1="128" y1="577.0" x2="261.6608" y2="577.0" stroke="#d5d1ca" stroke-width="1"/>
+<line x1="16" y1="592" x2="359" y2="592" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="618.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<text x="128" y="618.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pay with the Oxford batch</text>
+<line x1="16" y1="636" x2="359" y2="636" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="690" font-size="17" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">History</text>
+<line x1="16" y1="705" x2="359" y2="705" stroke="#e7e5e0" stroke-width="1"/>
+<line x1="20" y1="737.0" x2="20" y2="817.0" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="20" cy="737.0" r="3.5" fill="#d5d1ca"/>
+<text x="34" y="741.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Came in by email from Zack</text>
+<text x="241.04999999999998" y="741.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<circle cx="20" cy="777.0" r="3.5" fill="#d5d1ca"/>
+<text x="34" y="781.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor added 2 jobs</text>
+<text x="187.20000000000002" y="781.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<circle cx="20" cy="817.0" r="3.5" fill="#d5d1ca"/>
+<text x="34" y="821.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter approved it</text>
+<text x="166.64999999999998" y="821.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<rect x="0" y="595" width="375" height="72" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="595" x2="375" y2="595" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="76" y="607" width="283" height="48" rx="8" fill="#152133"/>
+<text x="217.5" y="636.76" font-size="16" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid</text>
+<rect x="16" y="607" width="48" height="48" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(32.0,623.0) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="0" y="0" width="375" height="667" fill="#0a0e17" fill-opacity="0.45"/>
+<rect x="0" y="260" width="375" height="421" rx="14" fill="#ffffff"/>
+<text x="16" y="294.12" font-size="17" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Mark #1043 paid</text>
+<g transform="translate(339.0,280.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<line x1="0" y1="316" x2="375" y2="316" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="345" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid on</text>
+<rect x="16" y="358" width="343" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(26,372.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></g>
+<text x="50" y="385.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 21, 2026</text>
+<text x="16" y="431" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Method</text>
+<rect x="16" y="444" width="343" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="471.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Baselane transfer</text>
+<g transform="translate(335,459.0) scale(0.5833)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g>
+<text x="16" y="517" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Check # or note</text>
+<text x="126.9088" y="517" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">(optional)</text>
+<rect x="16" y="530" width="343" height="44" rx="8" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<line x1="27" y1="541" x2="27" y2="563" stroke="#152133" stroke-width="1.5"/>
+<line x1="0" y1="590" x2="375" y2="590" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="606" width="343" height="44" rx="8" fill="#152133"/>
+<text x="187.5" y="633.76" font-size="16" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid · $850.00</text></g><rect x="0" y="0" width="375" height="667" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="660.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">After Mark paid</text>
+<text x="32" y="680.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">The page moves to Paid, the toast says who heard, Undo for 5 seconds</text>
+<text x="32" y="704.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="719.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Toast bottom left over the bar, 5 seconds; Undo puts it back in To pay</text>
+<g transform="translate(32.0,728.8) scale(0.55)"><g clip-path="url(#c4)"><rect x="0" y="0" width="1280" height="800" rx="0" fill="#ffffff"/>
+<line x1="0" y1="56" x2="1280" y2="56" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="20" y="16" width="24" height="24" rx="5" fill="#152133"/>
+<text x="32.0" y="31.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="52" y="33" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="134.616" y="10" width="448" height="36" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(144.616,20.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="166.616" y="33.04" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<rect x="546.616" y="18.0" width="28" height="20" rx="6" fill="#f2f0ec" stroke="#d5d1ca" stroke-width="1"/>
+<text x="560.616" y="32.0" font-size="11" font-weight="500" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">⌘K</text>
+<rect x="0" y="56" width="64" height="744" rx="0" fill="#f8f7f3"/>
+<line x1="64" y1="56" x2="64" y2="800" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="24" y="104" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="138" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="172" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="206" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="240" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="274" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="308" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="8" y="334" width="48" height="32" rx="8" fill="#e7e5e0"/>
+<rect x="8" y="342" width="2" height="16" rx="0" fill="#152133"/>
+<rect x="24" y="342" width="16" height="16" rx="4" fill="none" stroke="#152133" stroke-width="1.5"/>
+<rect x="24" y="376" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="410" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<line x1="8" y1="744" x2="56" y2="744" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="32" cy="772" r="14" fill="#f2f0ec"/>
+<text x="32" y="776" font-size="10" font-weight="600" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">CS</text>
+<g transform="translate(96,96.28) scale(0.5833)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="114" y="106.68" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<text x="173.631136" y="106.68" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">/</text>
+<text x="184.631136" y="106.68" font-size="13" font-weight="500" fill="#1d7038" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<text x="96" y="147.68" font-size="24" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="96" y="172" width="692" height="552" rx="6" fill="#f2f0ec"/>
+<rect x="96" y="172" width="692" height="36" rx="6" fill="#e7e5e0"/>
+<rect x="96" y="202" width="692" height="6" rx="0" fill="#e7e5e0"/>
+<text x="110" y="195" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="442.0" y="195" font-size="12" font-weight="400" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">1 / 1</text>
+<g transform="translate(758,182) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></g>
+<rect x="258.0909090909091" y="228" width="367.8181818181818" height="476" rx="0" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="284.8413223140496" y="271.4694214876033" font-size="12.539256198347108" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="284.8413223140496" y="286.5165289256198" font-size="8.359504132231404" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Plumbing and repairs</text>
+<text x="599.1586776859504" y="271.4694214876033" font-size="12.539256198347108" font-weight="600" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">INVOICE</text>
+<text x="599.1586776859504" y="286.5165289256198" font-size="8.359504132231404" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">#1043  ·  Nov 18, 2026</text>
+<text x="284.8413223140496" y="321.62644628099173" font-size="7.523553719008264" font-weight="600" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Bill to</text>
+<text x="284.8413223140496" y="335.001652892562" font-size="9.195454545454545" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="284.8413223140496" y="368.43966942148757" width="314.3173553719008" height="1" rx="0" fill="#d5d1ca"/>
+<text x="284.8413223140496" y="406.89338842975206" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2 · 15 Oxford Ave</text>
+<text x="599.1586776859504" y="406.89338842975206" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$650.00</text>
+<text x="284.8413223140496" y="428.6280991735537" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<text x="599.1586776859504" y="428.6280991735537" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$200.00</text>
+<text x="458.71900826446284" y="478.78512396694214" font-size="10.031404958677685" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="599.1586776859504" y="478.78512396694214" font-size="10.031404958677685" font-weight="600" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<rect x="96" y="172" width="692" height="552" rx="6" fill="none" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(828,173) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>
+<text x="850" y="185" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">From the email Zack sent Nov 18</text>
+<rect x="828" y="198" width="420" height="54" rx="6" fill="#f2f0ec"/>
+<text x="840" y="220" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Connor, here's the bill for the leak at 15 Oxford.</text>
+<text x="840" y="240" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Thanks, Zack</text>
+<text x="828" y="290.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="940" y="290.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<line x1="828" y1="304" x2="1248" y2="304" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="326.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<text x="940" y="326.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<line x1="828" y1="340" x2="1248" y2="340" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="362.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice date</text>
+<text x="940" y="362.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18, 2026</text>
+<line x1="828" y1="376" x2="1248" y2="376" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="398.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="940" y="398.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<line x1="828" y1="412" x2="1248" y2="412" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="434.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="940" y="434.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<line x1="940" y1="437.0" x2="1027.97464" y2="437.0" stroke="#d5d1ca" stroke-width="1"/>
+<text x="940" y="454.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<line x1="940" y1="457.0" x2="1055.83936" y2="457.0" stroke="#d5d1ca" stroke-width="1"/>
+<line x1="828" y1="468" x2="1248" y2="468" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="490.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<text x="940" y="490.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pay with the Oxford batch</text>
+<line x1="828" y1="504" x2="1248" y2="504" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="558" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">History</text>
+<line x1="828" y1="573" x2="1248" y2="573" stroke="#e7e5e0" stroke-width="1"/>
+<line x1="832" y1="600.0" x2="832" y2="690.0" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="832" cy="600.0" r="3.5" fill="#d5d1ca"/>
+<text x="846" y="604.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Came in by email from Zack</text>
+<text x="1026.51" y="604.5" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<circle cx="832" cy="630.0" r="3.5" fill="#d5d1ca"/>
+<text x="846" y="634.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor added 2 jobs</text>
+<text x="979.84" y="634.5" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<circle cx="832" cy="660.0" r="3.5" fill="#d5d1ca"/>
+<text x="846" y="664.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter approved it</text>
+<text x="962.03" y="664.5" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<circle cx="832" cy="690.0" r="3.5" fill="#d5d1ca"/>
+<text x="846" y="694.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor marked it paid</text>
+<text x="987.51" y="694.5" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 21</text>
+<rect x="64" y="740" width="1216" height="60" rx="0" fill="#f8f7f3"/>
+<line x1="64" y1="740" x2="1280" y2="740" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="1212" y="752" width="36" height="36" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(1222.0,762.0) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<g transform="translate(96,762.0) scale(0.6667)" fill="none" stroke="#1d7038" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></g>
+<text x="120" y="775.04" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 21 by Baselane transfer, Connor</text>
+<defs><filter id="sh04b4" x="-30%" y="-30%" width="160%" height="180%"><feGaussianBlur stdDeviation="4"/></filter></defs>
+<rect x="16" y="676" width="336.8224" height="40" rx="10" fill="#152133" fill-opacity="0.16" filter="url(#sh04b4)"/>
+<rect x="16" y="672" width="336.8224" height="40" rx="10" fill="#152133"/>
+<text x="30" y="697.04" font-size="14" font-weight="400" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Marked paid</text>
+<text x="112.74" y="697.04" font-size="14" font-weight="400" fill="#c0bdb7" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">· Zack gets an email</text>
+<text x="267.48" y="697.04" font-size="14" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Undo</text>
+<line x1="267.48" y1="700.04" x2="300.8224" y2="700.04" stroke="#ffffff" stroke-width="1"/>
+<g transform="translate(324.8224,684.0) scale(0.6667)" fill="none" stroke="#c0bdb7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g></g><rect x="0" y="0" width="1280" height="800" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="704.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<text x="776.0" y="719.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Bottom left, as wide as its words; no X on touch</text>
+<g transform="translate(776.0,728.8) scale(0.45)"><g clip-path="url(#c5)"><rect x="0" y="0" width="768" height="1024" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="768" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="768" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16.0) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14.0" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="98" y="31.0" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="180.616" y="4.0" width="448" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(190.616,16.0) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="216.616" y="31.759999999999998" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<g transform="translate(24,91.84) scale(0.5833)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="42" y="103.04" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<text x="105.756608" y="103.04" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">/</text>
+<text x="116.756608" y="103.04" font-size="14" font-weight="500" fill="#1d7038" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<text x="24" y="153.16" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="24" y="178" width="720" height="64" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="34" y="188" width="44" height="44" rx="6" fill="#f2f0ec"/>
+<g transform="translate(47.0,201.0) scale(0.7500)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></g>
+<text x="88" y="208.0" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="88" y="224.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">PDF · 182 KB · Zack</text>
+<text x="730" y="214.5" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Open</text>
+<g transform="translate(24,263) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>
+<text x="46" y="275" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">From the email Zack sent Nov 18</text>
+<rect x="24" y="288" width="720" height="54" rx="6" fill="#f2f0ec"/>
+<text x="36" y="310" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Connor, here's the bill for the leak at 15 Oxford.</text>
+<text x="36" y="330" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Thanks, Zack</text>
+<text x="24" y="384.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="136" y="384.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<line x1="24" y1="402" x2="744" y2="402" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="428.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<text x="136" y="428.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<line x1="24" y1="446" x2="744" y2="446" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="472.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice date</text>
+<text x="136" y="472.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18, 2026</text>
+<line x1="24" y1="490" x2="744" y2="490" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="516.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="136" y="516.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<line x1="24" y1="534" x2="744" y2="534" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="560.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="136" y="560.5" font-size="15" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<line x1="136" y1="563.0" x2="237.50920000000002" y2="563.0" stroke="#d5d1ca" stroke-width="1"/>
+<text x="136" y="582.5" font-size="15" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<line x1="136" y1="585.0" x2="269.6608" y2="585.0" stroke="#d5d1ca" stroke-width="1"/>
+<line x1="24" y1="600" x2="744" y2="600" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="626.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<text x="136" y="626.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pay with the Oxford batch</text>
+<line x1="24" y1="644" x2="744" y2="644" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="698" font-size="17" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">History</text>
+<line x1="24" y1="713" x2="744" y2="713" stroke="#e7e5e0" stroke-width="1"/>
+<line x1="28" y1="745.0" x2="28" y2="865.0" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="28" cy="745.0" r="3.5" fill="#d5d1ca"/>
+<text x="42" y="749.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Came in by email from Zack</text>
+<text x="249.04999999999998" y="749.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<circle cx="28" cy="785.0" r="3.5" fill="#d5d1ca"/>
+<text x="42" y="789.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor added 2 jobs</text>
+<text x="195.20000000000002" y="789.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<circle cx="28" cy="825.0" r="3.5" fill="#d5d1ca"/>
+<text x="42" y="829.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter approved it</text>
+<text x="174.64999999999998" y="829.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<circle cx="28" cy="865.0" r="3.5" fill="#d5d1ca"/>
+<text x="42" y="869.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor marked it paid</text>
+<text x="204.05" y="869.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 21</text>
+<rect x="0" y="952" width="768" height="72" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="952" x2="768" y2="952" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="696" y="964" width="48" height="48" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(712.0,980.0) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<g transform="translate(24,980.0) scale(0.6667)" fill="none" stroke="#1d7038" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></g>
+<text x="48" y="993.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 21 by Baselane transfer, Connor</text>
+<defs><filter id="sh04b4" x="-30%" y="-30%" width="160%" height="180%"><feGaussianBlur stdDeviation="4"/></filter></defs>
+<rect x="16" y="888" width="333.2256" height="52" rx="10" fill="#152133" fill-opacity="0.16" filter="url(#sh04b4)"/>
+<rect x="16" y="884" width="333.2256" height="52" rx="10" fill="#152133"/>
+<text x="30" y="915.76" font-size="16" font-weight="400" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Marked paid</text>
+<text x="124.56" y="915.76" font-size="16" font-weight="400" fill="#c0bdb7" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">· Zack gets an email</text>
+<text x="299.12" y="915.76" font-size="16" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Undo</text>
+<line x1="299.12" y1="918.76" x2="337.2256" y2="918.76" stroke="#ffffff" stroke-width="1"/></g><rect x="0" y="0" width="768" height="1024" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="704.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1161.6" y="719.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Full width over the bar; no X on touch</text>
+<g transform="translate(1161.6,728.8) scale(0.6)"><g clip-path="url(#c6)"><rect x="0" y="0" width="375" height="667" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="375" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="375" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16.0) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14.0" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<rect x="102" y="4.0" width="257" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(112,16.0) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="138" y="31.759999999999998" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<g transform="translate(16,83.84) scale(0.5833)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="34" y="95.04" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<text x="97.756608" y="95.04" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">/</text>
+<text x="108.756608" y="95.04" font-size="14" font-weight="500" fill="#1d7038" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<text x="16" y="145.16" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="16" y="170" width="343" height="64" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="26" y="180" width="44" height="44" rx="6" fill="#f2f0ec"/>
+<g transform="translate(39.0,193.0) scale(0.7500)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></g>
+<text x="80" y="200.0" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="80" y="216.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">PDF · 182 KB · Zack</text>
+<text x="345" y="206.5" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Open</text>
+<g transform="translate(16,255) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>
+<text x="38" y="267" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">From the email Zack sent Nov 18</text>
+<rect x="16" y="280" width="343" height="54" rx="6" fill="#f2f0ec"/>
+<text x="28" y="302" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Connor, here's the bill for the leak at 15 Oxford.</text>
+<text x="28" y="322" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Thanks, Zack</text>
+<text x="16" y="376.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="128" y="376.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<line x1="16" y1="394" x2="359" y2="394" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="420.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<text x="128" y="420.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<line x1="16" y1="438" x2="359" y2="438" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="464.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice date</text>
+<text x="128" y="464.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18, 2026</text>
+<line x1="16" y1="482" x2="359" y2="482" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="508.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="128" y="508.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<line x1="16" y1="526" x2="359" y2="526" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="552.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="128" y="552.5" font-size="15" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<line x1="128" y1="555.0" x2="229.50920000000002" y2="555.0" stroke="#d5d1ca" stroke-width="1"/>
+<text x="128" y="574.5" font-size="15" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<line x1="128" y1="577.0" x2="261.6608" y2="577.0" stroke="#d5d1ca" stroke-width="1"/>
+<line x1="16" y1="592" x2="359" y2="592" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="618.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<text x="128" y="618.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pay with the Oxford batch</text>
+<line x1="16" y1="636" x2="359" y2="636" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="690" font-size="17" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">History</text>
+<line x1="16" y1="705" x2="359" y2="705" stroke="#e7e5e0" stroke-width="1"/>
+<line x1="20" y1="737.0" x2="20" y2="857.0" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="20" cy="737.0" r="3.5" fill="#d5d1ca"/>
+<text x="34" y="741.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Came in by email from Zack</text>
+<text x="241.04999999999998" y="741.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<circle cx="20" cy="777.0" r="3.5" fill="#d5d1ca"/>
+<text x="34" y="781.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor added 2 jobs</text>
+<text x="187.20000000000002" y="781.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<circle cx="20" cy="817.0" r="3.5" fill="#d5d1ca"/>
+<text x="34" y="821.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter approved it</text>
+<text x="166.64999999999998" y="821.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<circle cx="20" cy="857.0" r="3.5" fill="#d5d1ca"/>
+<text x="34" y="861.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor marked it paid</text>
+<text x="196.05" y="861.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 21</text>
+<rect x="0" y="595" width="375" height="72" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="595" x2="375" y2="595" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="311" y="607" width="48" height="48" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(327.0,623.0) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<g transform="translate(16,623.0) scale(0.6667)" fill="none" stroke="#1d7038" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></g>
+<text x="40" y="636.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 21, Baselane transfer</text>
+<defs><filter id="sh04b4" x="-30%" y="-30%" width="160%" height="180%"><feGaussianBlur stdDeviation="4"/></filter></defs>
+<rect x="16" y="531" width="343" height="52" rx="10" fill="#152133" fill-opacity="0.16" filter="url(#sh04b4)"/>
+<rect x="16" y="527" width="343" height="52" rx="10" fill="#152133"/>
+<text x="30" y="558.76" font-size="16" font-weight="400" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Marked paid</text>
+<text x="124.56" y="558.76" font-size="16" font-weight="400" fill="#c0bdb7" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">· Zack gets an email</text>
+<text x="308.8944" y="558.76" font-size="16" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Undo</text>
+<line x1="308.8944" y1="561.76" x2="347.0" y2="561.76" stroke="#ffffff" stroke-width="1"/></g><rect x="0" y="0" width="375" height="667" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="1237.6" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">Method open</text>
+<text x="32" y="1257.6" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Select: seven methods, Baselane transfer picked by default</text>
+<text x="32" y="1281.6" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="1296.6" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">A popover under the field; the pick has the check</text>
+<g transform="translate(32.0,1305.6) scale(0.55)"><g clip-path="url(#c7)"><rect x="0" y="0" width="1280" height="800" rx="0" fill="#ffffff"/>
+<line x1="0" y1="56" x2="1280" y2="56" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="20" y="16" width="24" height="24" rx="5" fill="#152133"/>
+<text x="32.0" y="31.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="52" y="33" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="134.616" y="10" width="448" height="36" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(144.616,20.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="166.616" y="33.04" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<rect x="546.616" y="18.0" width="28" height="20" rx="6" fill="#f2f0ec" stroke="#d5d1ca" stroke-width="1"/>
+<text x="560.616" y="32.0" font-size="11" font-weight="500" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">⌘K</text>
+<rect x="0" y="56" width="64" height="744" rx="0" fill="#f8f7f3"/>
+<line x1="64" y1="56" x2="64" y2="800" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="24" y="104" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="138" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="172" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="206" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="240" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="274" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="308" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="8" y="334" width="48" height="32" rx="8" fill="#e7e5e0"/>
+<rect x="8" y="342" width="2" height="16" rx="0" fill="#152133"/>
+<rect x="24" y="342" width="16" height="16" rx="4" fill="none" stroke="#152133" stroke-width="1.5"/>
+<rect x="24" y="376" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="410" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<line x1="8" y1="744" x2="56" y2="744" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="32" cy="772" r="14" fill="#f2f0ec"/>
+<text x="32" y="776" font-size="10" font-weight="600" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">CS</text>
+<g transform="translate(96,96.28) scale(0.5833)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="114" y="106.68" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<text x="173.631136" y="106.68" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">/</text>
+<text x="184.631136" y="106.68" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="96" y="147.68" font-size="24" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="96" y="172" width="692" height="552" rx="6" fill="#f2f0ec"/>
+<rect x="96" y="172" width="692" height="36" rx="6" fill="#e7e5e0"/>
+<rect x="96" y="202" width="692" height="6" rx="0" fill="#e7e5e0"/>
+<text x="110" y="195" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="442.0" y="195" font-size="12" font-weight="400" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">1 / 1</text>
+<g transform="translate(758,182) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></g>
+<rect x="258.0909090909091" y="228" width="367.8181818181818" height="476" rx="0" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="284.8413223140496" y="271.4694214876033" font-size="12.539256198347108" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="284.8413223140496" y="286.5165289256198" font-size="8.359504132231404" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Plumbing and repairs</text>
+<text x="599.1586776859504" y="271.4694214876033" font-size="12.539256198347108" font-weight="600" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">INVOICE</text>
+<text x="599.1586776859504" y="286.5165289256198" font-size="8.359504132231404" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">#1043  ·  Nov 18, 2026</text>
+<text x="284.8413223140496" y="321.62644628099173" font-size="7.523553719008264" font-weight="600" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Bill to</text>
+<text x="284.8413223140496" y="335.001652892562" font-size="9.195454545454545" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="284.8413223140496" y="368.43966942148757" width="314.3173553719008" height="1" rx="0" fill="#d5d1ca"/>
+<text x="284.8413223140496" y="406.89338842975206" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2 · 15 Oxford Ave</text>
+<text x="599.1586776859504" y="406.89338842975206" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$650.00</text>
+<text x="284.8413223140496" y="428.6280991735537" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<text x="599.1586776859504" y="428.6280991735537" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$200.00</text>
+<text x="458.71900826446284" y="478.78512396694214" font-size="10.031404958677685" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="599.1586776859504" y="478.78512396694214" font-size="10.031404958677685" font-weight="600" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<rect x="96" y="172" width="692" height="552" rx="6" fill="none" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(828,173) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>
+<text x="850" y="185" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">From the email Zack sent Nov 18</text>
+<rect x="828" y="198" width="420" height="54" rx="6" fill="#f2f0ec"/>
+<text x="840" y="220" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Connor, here's the bill for the leak at 15 Oxford.</text>
+<text x="840" y="240" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Thanks, Zack</text>
+<text x="828" y="290.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="940" y="290.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<line x1="828" y1="304" x2="1248" y2="304" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="326.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<text x="940" y="326.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<line x1="828" y1="340" x2="1248" y2="340" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="362.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice date</text>
+<text x="940" y="362.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18, 2026</text>
+<line x1="828" y1="376" x2="1248" y2="376" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="398.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="940" y="398.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<line x1="828" y1="412" x2="1248" y2="412" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="434.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="940" y="434.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<line x1="940" y1="437.0" x2="1027.97464" y2="437.0" stroke="#d5d1ca" stroke-width="1"/>
+<text x="940" y="454.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<line x1="940" y1="457.0" x2="1055.83936" y2="457.0" stroke="#d5d1ca" stroke-width="1"/>
+<line x1="828" y1="468" x2="1248" y2="468" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="490.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<text x="940" y="490.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pay with the Oxford batch</text>
+<line x1="828" y1="504" x2="1248" y2="504" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="558" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">History</text>
+<line x1="828" y1="573" x2="1248" y2="573" stroke="#e7e5e0" stroke-width="1"/>
+<line x1="832" y1="600.0" x2="832" y2="660.0" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="832" cy="600.0" r="3.5" fill="#d5d1ca"/>
+<text x="846" y="604.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Came in by email from Zack</text>
+<text x="1026.51" y="604.5" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<circle cx="832" cy="630.0" r="3.5" fill="#d5d1ca"/>
+<text x="846" y="634.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor added 2 jobs</text>
+<text x="979.84" y="634.5" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<circle cx="832" cy="660.0" r="3.5" fill="#d5d1ca"/>
+<text x="846" y="664.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter approved it</text>
+<text x="962.03" y="664.5" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<rect x="64" y="740" width="1216" height="60" rx="0" fill="#f8f7f3"/>
+<line x1="64" y1="740" x2="1280" y2="740" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="1008" y="752" width="240" height="36" rx="8" fill="#152133"/>
+<text x="1128.0" y="775.04" font-size="14" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid</text>
+<rect x="960" y="752" width="36" height="36" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(970.0,762.0) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="0" y="0" width="1280" height="800" fill="#0a0e17" fill-opacity="0.45"/>
+<defs><filter id="sh04b12" x="-30%" y="-30%" width="160%" height="180%"><feGaussianBlur stdDeviation="12"/></filter></defs>
+<rect x="480.0" y="232" width="320" height="361" rx="14" fill="#152133" fill-opacity="0.14" filter="url(#sh04b12)"/>
+<rect x="480.0" y="220" width="320" height="361" rx="14" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="496.0" y="249.76" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Mark #1043 paid</text>
+<g transform="translate(768.0,236.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<line x1="480.0" y1="268" x2="800.0" y2="268" stroke="#e7e5e0" stroke-width="1"/>
+<text x="496.0" y="296" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid on</text>
+<rect x="496.0" y="308" width="288" height="36" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="508.0" y="331.04" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">11/21/2026</text>
+<g transform="translate(758.0,318.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></g>
+<text x="496.0" y="372" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Method</text>
+<rect x="496.0" y="384" width="288" height="36" rx="8" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<text x="506.0" y="407.04" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Baselane transfer</text>
+<g transform="translate(760.0,395.0) scale(0.5833)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g>
+<text x="496.0" y="448" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Check # or note</text>
+<text x="599.1296" y="448" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">(optional)</text>
+<rect x="496.0" y="460" width="288" height="36" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<line x1="480.0" y1="512" x2="800.0" y2="512" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="610.4" y="528" width="173.6" height="36" rx="8" fill="#152133"/>
+<text x="697.1999999999999" y="551.04" font-size="14" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid · $850.00</text>
+<rect x="528.9728" y="528" width="73.4272" height="36" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="565.6864" y="551.04" font-size="14" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Cancel</text>
+<defs><filter id="sh04b6" x="-30%" y="-30%" width="160%" height="180%"><feGaussianBlur stdDeviation="6"/></filter></defs>
+<rect x="496.0" y="432" width="288" height="232" rx="10" fill="#152133" fill-opacity="0.12" filter="url(#sh04b6)"/>
+<rect x="496.0" y="426" width="288" height="232" rx="10" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="500.0" y="430" width="280" height="32" rx="6" fill="#e7e5e0"/>
+<text x="508.0" y="451.04" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Baselane transfer</text>
+<g transform="translate(756.0,438.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></g>
+<text x="508.0" y="483.04" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Check</text>
+<text x="508.0" y="515.04" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zelle</text>
+<text x="508.0" y="547.04" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Venmo</text>
+<text x="508.0" y="579.04" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Cash</text>
+<text x="508.0" y="611.04" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Card</text>
+<text x="508.0" y="643.04" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Other</text></g><rect x="0" y="0" width="1280" height="800" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="1281.6" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<text x="776.0" y="1296.6" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">A popover with 44px touch rows, no highlight on open</text>
+<g transform="translate(776.0,1305.6) scale(0.45)"><g clip-path="url(#c8)"><rect x="0" y="0" width="768" height="1024" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="768" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="768" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16.0) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14.0" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="98" y="31.0" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="180.616" y="4.0" width="448" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(190.616,16.0) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="216.616" y="31.759999999999998" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<g transform="translate(24,91.84) scale(0.5833)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="42" y="103.04" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<text x="105.756608" y="103.04" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">/</text>
+<text x="116.756608" y="103.04" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="24" y="153.16" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="24" y="178" width="720" height="64" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="34" y="188" width="44" height="44" rx="6" fill="#f2f0ec"/>
+<g transform="translate(47.0,201.0) scale(0.7500)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></g>
+<text x="88" y="208.0" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="88" y="224.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">PDF · 182 KB · Zack</text>
+<text x="730" y="214.5" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Open</text>
+<g transform="translate(24,263) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>
+<text x="46" y="275" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">From the email Zack sent Nov 18</text>
+<rect x="24" y="288" width="720" height="54" rx="6" fill="#f2f0ec"/>
+<text x="36" y="310" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Connor, here's the bill for the leak at 15 Oxford.</text>
+<text x="36" y="330" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Thanks, Zack</text>
+<text x="24" y="384.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="136" y="384.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<line x1="24" y1="402" x2="744" y2="402" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="428.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<text x="136" y="428.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<line x1="24" y1="446" x2="744" y2="446" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="472.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice date</text>
+<text x="136" y="472.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18, 2026</text>
+<line x1="24" y1="490" x2="744" y2="490" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="516.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="136" y="516.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<line x1="24" y1="534" x2="744" y2="534" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="560.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="136" y="560.5" font-size="15" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<line x1="136" y1="563.0" x2="237.50920000000002" y2="563.0" stroke="#d5d1ca" stroke-width="1"/>
+<text x="136" y="582.5" font-size="15" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<line x1="136" y1="585.0" x2="269.6608" y2="585.0" stroke="#d5d1ca" stroke-width="1"/>
+<line x1="24" y1="600" x2="744" y2="600" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="626.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<text x="136" y="626.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pay with the Oxford batch</text>
+<line x1="24" y1="644" x2="744" y2="644" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="698" font-size="17" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">History</text>
+<line x1="24" y1="713" x2="744" y2="713" stroke="#e7e5e0" stroke-width="1"/>
+<line x1="28" y1="745.0" x2="28" y2="825.0" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="28" cy="745.0" r="3.5" fill="#d5d1ca"/>
+<text x="42" y="749.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Came in by email from Zack</text>
+<text x="249.04999999999998" y="749.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<circle cx="28" cy="785.0" r="3.5" fill="#d5d1ca"/>
+<text x="42" y="789.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor added 2 jobs</text>
+<text x="195.20000000000002" y="789.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<circle cx="28" cy="825.0" r="3.5" fill="#d5d1ca"/>
+<text x="42" y="829.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter approved it</text>
+<text x="174.64999999999998" y="829.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<rect x="0" y="952" width="768" height="72" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="952" x2="768" y2="952" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="84" y="964" width="660" height="48" rx="8" fill="#152133"/>
+<text x="414.0" y="993.76" font-size="16" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid</text>
+<rect x="24" y="964" width="48" height="48" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(40.0,980.0) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="0" y="0" width="768" height="1024" fill="#0a0e17" fill-opacity="0.45"/>
+<defs><filter id="sh04b12" x="-30%" y="-30%" width="160%" height="180%"><feGaussianBlur stdDeviation="12"/></filter></defs>
+<rect x="224.0" y="320" width="320" height="407" rx="14" fill="#152133" fill-opacity="0.14" filter="url(#sh04b12)"/>
+<rect x="224.0" y="308" width="320" height="407" rx="14" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="240.0" y="342.12" font-size="17" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Mark #1043 paid</text>
+<g transform="translate(508.0,328.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<line x1="224.0" y1="364" x2="544.0" y2="364" stroke="#e7e5e0" stroke-width="1"/>
+<text x="240.0" y="393" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid on</text>
+<rect x="240.0" y="406" width="288" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(250.0,420.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></g>
+<text x="274.0" y="433.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 21, 2026</text>
+<text x="240.0" y="479" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Method</text>
+<rect x="240.0" y="492" width="288" height="44" rx="8" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<text x="250.0" y="519.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Baselane transfer</text>
+<g transform="translate(504.0,507.0) scale(0.5833)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g>
+<text x="240.0" y="565" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Check # or note</text>
+<text x="350.9088" y="565" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">(optional)</text>
+<rect x="240.0" y="578" width="288" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<line x1="224.0" y1="638" x2="544.0" y2="638" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="333.6" y="654" width="194.4" height="44" rx="8" fill="#152133"/>
+<text x="430.8" y="681.76" font-size="16" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid · $850.00</text>
+<rect x="245.68320000000003" y="654" width="79.9168" height="44" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="285.64160000000004" y="681.76" font-size="16" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Cancel</text>
+<defs><filter id="sh04b6" x="-30%" y="-30%" width="160%" height="180%"><feGaussianBlur stdDeviation="6"/></filter></defs>
+<rect x="240.0" y="548" width="288" height="316" rx="10" fill="#152133" fill-opacity="0.12" filter="url(#sh04b6)"/>
+<rect x="240.0" y="542" width="288" height="316" rx="10" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="252.0" y="573.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Baselane transfer</text>
+<g transform="translate(500.0,560.0) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></g>
+<text x="252.0" y="617.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Check</text>
+<text x="252.0" y="661.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zelle</text>
+<text x="252.0" y="705.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Venmo</text>
+<text x="252.0" y="749.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Cash</text>
+<text x="252.0" y="793.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Card</text>
+<text x="252.0" y="837.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Other</text></g><rect x="0" y="0" width="768" height="1024" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="1281.6" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1161.6" y="1296.6" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">A view inside the sheet, never a second sheet</text>
+<g transform="translate(1161.6,1305.6) scale(0.6)"><g clip-path="url(#c9)"><rect x="0" y="0" width="375" height="667" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="375" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="375" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16.0) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14.0" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<rect x="102" y="4.0" width="257" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(112,16.0) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="138" y="31.759999999999998" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<g transform="translate(16,83.84) scale(0.5833)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="34" y="95.04" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<text x="97.756608" y="95.04" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">/</text>
+<text x="108.756608" y="95.04" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="16" y="145.16" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="16" y="170" width="343" height="64" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="26" y="180" width="44" height="44" rx="6" fill="#f2f0ec"/>
+<g transform="translate(39.0,193.0) scale(0.7500)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></g>
+<text x="80" y="200.0" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="80" y="216.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">PDF · 182 KB · Zack</text>
+<text x="345" y="206.5" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Open</text>
+<g transform="translate(16,255) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>
+<text x="38" y="267" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">From the email Zack sent Nov 18</text>
+<rect x="16" y="280" width="343" height="54" rx="6" fill="#f2f0ec"/>
+<text x="28" y="302" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Connor, here's the bill for the leak at 15 Oxford.</text>
+<text x="28" y="322" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Thanks, Zack</text>
+<text x="16" y="376.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="128" y="376.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<line x1="16" y1="394" x2="359" y2="394" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="420.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<text x="128" y="420.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<line x1="16" y1="438" x2="359" y2="438" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="464.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice date</text>
+<text x="128" y="464.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18, 2026</text>
+<line x1="16" y1="482" x2="359" y2="482" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="508.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="128" y="508.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<line x1="16" y1="526" x2="359" y2="526" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="552.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="128" y="552.5" font-size="15" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<line x1="128" y1="555.0" x2="229.50920000000002" y2="555.0" stroke="#d5d1ca" stroke-width="1"/>
+<text x="128" y="574.5" font-size="15" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<line x1="128" y1="577.0" x2="261.6608" y2="577.0" stroke="#d5d1ca" stroke-width="1"/>
+<line x1="16" y1="592" x2="359" y2="592" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="618.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<text x="128" y="618.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pay with the Oxford batch</text>
+<line x1="16" y1="636" x2="359" y2="636" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="690" font-size="17" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">History</text>
+<line x1="16" y1="705" x2="359" y2="705" stroke="#e7e5e0" stroke-width="1"/>
+<line x1="20" y1="737.0" x2="20" y2="817.0" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="20" cy="737.0" r="3.5" fill="#d5d1ca"/>
+<text x="34" y="741.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Came in by email from Zack</text>
+<text x="241.04999999999998" y="741.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<circle cx="20" cy="777.0" r="3.5" fill="#d5d1ca"/>
+<text x="34" y="781.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor added 2 jobs</text>
+<text x="187.20000000000002" y="781.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<circle cx="20" cy="817.0" r="3.5" fill="#d5d1ca"/>
+<text x="34" y="821.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter approved it</text>
+<text x="166.64999999999998" y="821.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<rect x="0" y="595" width="375" height="72" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="595" x2="375" y2="595" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="76" y="607" width="283" height="48" rx="8" fill="#152133"/>
+<text x="217.5" y="636.76" font-size="16" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid</text>
+<rect x="16" y="607" width="48" height="48" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(32.0,623.0) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="0" y="0" width="375" height="667" fill="#0a0e17" fill-opacity="0.45"/>
+<rect x="0" y="295" width="375" height="386" rx="14" fill="#ffffff"/>
+<g transform="translate(20.0,315.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></g>
+<text x="54" y="329.12" font-size="17" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Method</text>
+<g transform="translate(339.0,315.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<line x1="0" y1="351" x2="375" y2="351" stroke="#e7e5e0" stroke-width="1"/>
+<text x="12" y="382.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Baselane transfer</text>
+<g transform="translate(347,369) scale(0.6667)" fill="none" stroke="#152133" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></g>
+<text x="12" y="426.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Check</text>
+<text x="12" y="470.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zelle</text>
+<text x="12" y="514.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Venmo</text>
+<text x="12" y="558.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Cash</text>
+<text x="12" y="602.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Card</text>
+<text x="12" y="646.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Other</text></g><rect x="0" y="0" width="375" height="667" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="1814.3999999999999" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">Pieter got there first</text>
+<text x="32" y="1834.3999999999999" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">The refusal is one line above the buttons, as FormSheet draws any refusal</text>
+<text x="32" y="1858.3999999999999" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="1873.3999999999999" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">One --destructive line; focus goes back to the primary</text>
+<g transform="translate(32.0,1882.4) scale(0.55)"><g clip-path="url(#c10)"><rect x="0" y="0" width="1280" height="800" rx="0" fill="#ffffff"/>
+<line x1="0" y1="56" x2="1280" y2="56" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="20" y="16" width="24" height="24" rx="5" fill="#152133"/>
+<text x="32.0" y="31.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="52" y="33" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="134.616" y="10" width="448" height="36" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(144.616,20.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="166.616" y="33.04" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<rect x="546.616" y="18.0" width="28" height="20" rx="6" fill="#f2f0ec" stroke="#d5d1ca" stroke-width="1"/>
+<text x="560.616" y="32.0" font-size="11" font-weight="500" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">⌘K</text>
+<rect x="0" y="56" width="64" height="744" rx="0" fill="#f8f7f3"/>
+<line x1="64" y1="56" x2="64" y2="800" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="24" y="104" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="138" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="172" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="206" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="240" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="274" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="308" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="8" y="334" width="48" height="32" rx="8" fill="#e7e5e0"/>
+<rect x="8" y="342" width="2" height="16" rx="0" fill="#152133"/>
+<rect x="24" y="342" width="16" height="16" rx="4" fill="none" stroke="#152133" stroke-width="1.5"/>
+<rect x="24" y="376" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<rect x="24" y="410" width="16" height="16" rx="4" fill="none" stroke="#5b6576" stroke-width="1.5"/>
+<line x1="8" y1="744" x2="56" y2="744" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="32" cy="772" r="14" fill="#f2f0ec"/>
+<text x="32" y="776" font-size="10" font-weight="600" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">CS</text>
+<g transform="translate(96,96.28) scale(0.5833)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="114" y="106.68" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<text x="173.631136" y="106.68" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">/</text>
+<text x="184.631136" y="106.68" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="96" y="147.68" font-size="24" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="96" y="172" width="692" height="552" rx="6" fill="#f2f0ec"/>
+<rect x="96" y="172" width="692" height="36" rx="6" fill="#e7e5e0"/>
+<rect x="96" y="202" width="692" height="6" rx="0" fill="#e7e5e0"/>
+<text x="110" y="195" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="442.0" y="195" font-size="12" font-weight="400" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">1 / 1</text>
+<g transform="translate(758,182) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></g>
+<rect x="258.0909090909091" y="228" width="367.8181818181818" height="476" rx="0" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="284.8413223140496" y="271.4694214876033" font-size="12.539256198347108" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="284.8413223140496" y="286.5165289256198" font-size="8.359504132231404" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Plumbing and repairs</text>
+<text x="599.1586776859504" y="271.4694214876033" font-size="12.539256198347108" font-weight="600" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">INVOICE</text>
+<text x="599.1586776859504" y="286.5165289256198" font-size="8.359504132231404" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">#1043  ·  Nov 18, 2026</text>
+<text x="284.8413223140496" y="321.62644628099173" font-size="7.523553719008264" font-weight="600" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Bill to</text>
+<text x="284.8413223140496" y="335.001652892562" font-size="9.195454545454545" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="284.8413223140496" y="368.43966942148757" width="314.3173553719008" height="1" rx="0" fill="#d5d1ca"/>
+<text x="284.8413223140496" y="406.89338842975206" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2 · 15 Oxford Ave</text>
+<text x="599.1586776859504" y="406.89338842975206" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$650.00</text>
+<text x="284.8413223140496" y="428.6280991735537" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<text x="599.1586776859504" y="428.6280991735537" font-size="9.195454545454545" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$200.00</text>
+<text x="458.71900826446284" y="478.78512396694214" font-size="10.031404958677685" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="599.1586776859504" y="478.78512396694214" font-size="10.031404958677685" font-weight="600" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<rect x="96" y="172" width="692" height="552" rx="6" fill="none" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(828,173) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>
+<text x="850" y="185" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">From the email Zack sent Nov 18</text>
+<rect x="828" y="198" width="420" height="54" rx="6" fill="#f2f0ec"/>
+<text x="840" y="220" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Connor, here's the bill for the leak at 15 Oxford.</text>
+<text x="840" y="240" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Thanks, Zack</text>
+<text x="828" y="290.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="940" y="290.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<line x1="828" y1="304" x2="1248" y2="304" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="326.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<text x="940" y="326.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<line x1="828" y1="340" x2="1248" y2="340" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="362.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice date</text>
+<text x="940" y="362.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18, 2026</text>
+<line x1="828" y1="376" x2="1248" y2="376" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="398.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="940" y="398.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<line x1="828" y1="412" x2="1248" y2="412" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="434.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="940" y="434.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<line x1="940" y1="437.0" x2="1027.97464" y2="437.0" stroke="#d5d1ca" stroke-width="1"/>
+<text x="940" y="454.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<line x1="940" y1="457.0" x2="1055.83936" y2="457.0" stroke="#d5d1ca" stroke-width="1"/>
+<line x1="828" y1="468" x2="1248" y2="468" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="490.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<text x="940" y="490.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pay with the Oxford batch</text>
+<line x1="828" y1="504" x2="1248" y2="504" stroke="#e7e5e0" stroke-width="1"/>
+<text x="828" y="558" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">History</text>
+<line x1="828" y1="573" x2="1248" y2="573" stroke="#e7e5e0" stroke-width="1"/>
+<line x1="832" y1="600.0" x2="832" y2="660.0" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="832" cy="600.0" r="3.5" fill="#d5d1ca"/>
+<text x="846" y="604.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Came in by email from Zack</text>
+<text x="1026.51" y="604.5" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<circle cx="832" cy="630.0" r="3.5" fill="#d5d1ca"/>
+<text x="846" y="634.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor added 2 jobs</text>
+<text x="979.84" y="634.5" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<circle cx="832" cy="660.0" r="3.5" fill="#d5d1ca"/>
+<text x="846" y="664.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter approved it</text>
+<text x="962.03" y="664.5" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<rect x="64" y="740" width="1216" height="60" rx="0" fill="#f8f7f3"/>
+<line x1="64" y1="740" x2="1280" y2="740" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="1008" y="752" width="240" height="36" rx="8" fill="#152133"/>
+<text x="1128.0" y="775.04" font-size="14" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid</text>
+<rect x="960" y="752" width="36" height="36" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(970.0,762.0) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="0" y="0" width="1280" height="800" fill="#0a0e17" fill-opacity="0.45"/>
+<defs><filter id="sh04b12" x="-30%" y="-30%" width="160%" height="180%"><feGaussianBlur stdDeviation="12"/></filter></defs>
+<rect x="480.0" y="216" width="320" height="391" rx="14" fill="#152133" fill-opacity="0.14" filter="url(#sh04b12)"/>
+<rect x="480.0" y="204" width="320" height="391" rx="14" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="496.0" y="233.76" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Mark #1043 paid</text>
+<g transform="translate(768.0,220.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<line x1="480.0" y1="252" x2="800.0" y2="252" stroke="#e7e5e0" stroke-width="1"/>
+<text x="496.0" y="280" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid on</text>
+<rect x="496.0" y="292" width="288" height="36" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="508.0" y="315.04" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">11/21/2026</text>
+<g transform="translate(758.0,302.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></g>
+<text x="496.0" y="356" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Method</text>
+<rect x="496.0" y="368" width="288" height="36" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="506.0" y="391.04" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Baselane transfer</text>
+<g transform="translate(760.0,379.0) scale(0.5833)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g>
+<text x="496.0" y="432" font-size="13" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Check # or note</text>
+<text x="599.1296" y="432" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">(optional)</text>
+<rect x="496.0" y="444" width="288" height="36" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<line x1="480.0" y1="496" x2="800.0" y2="496" stroke="#e7e5e0" stroke-width="1"/>
+<text x="496.0" y="525" font-size="13" font-weight="400" fill="#b91c1c" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter already marked this paid.</text>
+<rect x="610.4" y="542" width="173.6" height="36" rx="8" fill="#152133"/>
+<text x="697.1999999999999" y="565.04" font-size="14" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid · $850.00</text>
+<rect x="528.9728" y="542" width="73.4272" height="36" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="565.6864" y="565.04" font-size="14" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Cancel</text></g><rect x="0" y="0" width="1280" height="800" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="1858.3999999999999" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="776.0" y="1873.3999999999999" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">The same line above the full-width primary</text>
+<g transform="translate(776.0,1882.4) scale(0.6)"><g clip-path="url(#c11)"><rect x="0" y="0" width="375" height="667" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="375" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="375" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16.0) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14.0" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<rect x="102" y="4.0" width="257" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(112,16.0) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="138" y="31.759999999999998" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<g transform="translate(16,83.84) scale(0.5833)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="34" y="95.04" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<text x="97.756608" y="95.04" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">/</text>
+<text x="108.756608" y="95.04" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="16" y="145.16" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<rect x="16" y="170" width="343" height="64" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="26" y="180" width="44" height="44" rx="6" fill="#f2f0ec"/>
+<g transform="translate(39.0,193.0) scale(0.7500)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></g>
+<text x="80" y="200.0" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="80" y="216.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">PDF · 182 KB · Zack</text>
+<text x="345" y="206.5" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Open</text>
+<g transform="translate(16,255) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>
+<text x="38" y="267" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">From the email Zack sent Nov 18</text>
+<rect x="16" y="280" width="343" height="54" rx="6" fill="#f2f0ec"/>
+<text x="28" y="302" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Connor, here's the bill for the leak at 15 Oxford.</text>
+<text x="28" y="322" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Thanks, Zack</text>
+<text x="16" y="376.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="128" y="376.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<line x1="16" y1="394" x2="359" y2="394" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="420.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<text x="128" y="420.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">1043</text>
+<line x1="16" y1="438" x2="359" y2="438" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="464.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice date</text>
+<text x="128" y="464.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18, 2026</text>
+<line x1="16" y1="482" x2="359" y2="482" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="508.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<text x="128" y="508.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<line x1="16" y1="526" x2="359" y2="526" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="552.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="128" y="552.5" font-size="15" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2</text>
+<line x1="128" y1="555.0" x2="229.50920000000002" y2="555.0" stroke="#d5d1ca" stroke-width="1"/>
+<text x="128" y="574.5" font-size="15" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Patch ceiling, Unit 2</text>
+<line x1="128" y1="577.0" x2="261.6608" y2="577.0" stroke="#d5d1ca" stroke-width="1"/>
+<line x1="16" y1="592" x2="359" y2="592" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="618.5" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<text x="128" y="618.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pay with the Oxford batch</text>
+<line x1="16" y1="636" x2="359" y2="636" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="690" font-size="17" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">History</text>
+<line x1="16" y1="705" x2="359" y2="705" stroke="#e7e5e0" stroke-width="1"/>
+<line x1="20" y1="737.0" x2="20" y2="817.0" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="20" cy="737.0" r="3.5" fill="#d5d1ca"/>
+<text x="34" y="741.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Came in by email from Zack</text>
+<text x="241.04999999999998" y="741.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<circle cx="20" cy="777.0" r="3.5" fill="#d5d1ca"/>
+<text x="34" y="781.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor added 2 jobs</text>
+<text x="187.20000000000002" y="781.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<circle cx="20" cy="817.0" r="3.5" fill="#d5d1ca"/>
+<text x="34" y="821.5" font-size="15" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter approved it</text>
+<text x="166.64999999999998" y="821.5" font-size="13" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<rect x="0" y="595" width="375" height="72" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="595" x2="375" y2="595" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="76" y="607" width="283" height="48" rx="8" fill="#152133"/>
+<text x="217.5" y="636.76" font-size="16" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid</text>
+<rect x="16" y="607" width="48" height="48" rx="8" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<g transform="translate(32.0,623.0) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></g>
+<rect x="0" y="0" width="375" height="667" fill="#0a0e17" fill-opacity="0.45"/>
+<rect x="0" y="228" width="375" height="453" rx="14" fill="#ffffff"/>
+<text x="16" y="262.12" font-size="17" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Mark #1043 paid</text>
+<g transform="translate(339.0,248.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<line x1="0" y1="284" x2="375" y2="284" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="313" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid on</text>
+<rect x="16" y="326" width="343" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(26,340.0) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></g>
+<text x="50" y="353.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 21, 2026</text>
+<text x="16" y="399" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Method</text>
+<rect x="16" y="412" width="343" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="439.76" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Baselane transfer</text>
+<g transform="translate(335,427.0) scale(0.5833)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g>
+<text x="16" y="485" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Check # or note</text>
+<text x="126.9088" y="485" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">(optional)</text>
+<rect x="16" y="498" width="343" height="44" rx="8" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<line x1="0" y1="558" x2="375" y2="558" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="588" font-size="14" font-weight="400" fill="#b91c1c" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter already marked this paid.</text>
+<rect x="16" y="606" width="343" height="44" rx="8" fill="#152133"/>
+<text x="187.5" y="633.76" font-size="16" font-weight="500" fill="#ffffff" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Mark paid · $850.00</text></g><rect x="0" y="0" width="375" height="667" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="2370.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#152133">Notes</text>
+<circle cx="40" cy="2388.3999999999996" r="8" fill="#c8a765"/>
+<text x="40" y="2392.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">1</text>
+<text x="56" y="2392.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Fields stack in one column, Method right above Check # or note, as Mercury's Mark as paid does.</text>
+<circle cx="40" cy="2408.3999999999996" r="8" fill="#c8a765"/>
+<text x="40" y="2412.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">2</text>
+<text x="56" y="2412.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Laptop: the dialog sizes to its content, here its 320 minimum; Cancel and the primary bottom right; Esc and Cmd+Enter work.</text>
+<circle cx="40" cy="2428.3999999999996" r="8" fill="#c8a765"/>
+<text x="40" y="2432.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">3</text>
+<text x="56" y="2432.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Tablet 768: the same 320 dialog at touch sizes (44px fields, 16px text); Cancel stays beside the primary from md.</text>
+<circle cx="40" cy="2448.3999999999996" r="8" fill="#c8a765"/>
+<text x="40" y="2452.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">4</text>
+<text x="56" y="2452.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Phone 375 and 320: bottom sheet, one full-width Mark paid · $850.00 (194px in a 288 column at 320), the X closes it.</text>
+<circle cx="40" cy="2468.3999999999996" r="8" fill="#c8a765"/>
+<text x="40" y="2472.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">5</text>
+<text x="56" y="2472.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Method and the calendar open as a popover with a mouse and on a tablet, and as a view inside the sheet on a phone.</text>
+<circle cx="40" cy="2488.3999999999996" r="8" fill="#c8a765"/>
+<text x="40" y="2492.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">6</text>
+<text x="56" y="2492.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Paid on is today: 11/21/2026 typed with a mouse, Nov 21, 2026 on touch. No quick picks, so backdating takes the calendar.</text>
+<circle cx="40" cy="2508.3999999999996" r="8" fill="#c8a765"/>
+<text x="40" y="2512.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">7</text>
+<text x="56" y="2512.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">The toast rides 16px above the ActionBar at every size. At 320 phoneMessage keeps one line: Paid · Zack gets an email.</text>
+<circle cx="40" cy="2528.3999999999996" r="8" fill="#c8a765"/>
+<text x="40" y="2532.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">8</text>
+<text x="56" y="2532.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Other toast details: Zack's emails are off, Zack has no email. History gets the Paid email only once it sends.</text>
+<circle cx="40" cy="2548.3999999999996" r="8" fill="#c8a765"/>
+<text x="40" y="2552.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">9</text>
+<text x="56" y="2552.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">FormSheet focuses the first empty field on open, here Check # or note; on Android that can raise the keyboard.</text>
+<circle cx="40" cy="2568.3999999999996" r="8" fill="#c8a765"/>
+<text x="40" y="2572.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">10</text>
+<text x="56" y="2572.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">The page behind is screen 2's To pay and Paid (03-invoice-page.svg); the chrome is app-shell.tsx as it renders today.</text>
+<circle cx="40" cy="2588.3999999999996" r="8" fill="#c8a765"/>
+<text x="40" y="2592.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">11</text>
+<text x="56" y="2592.3999999999996" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Refs: HoneyBook Mark as paid (total in the button), Mercury Mark as paid (Paid on over Payment method).</text>
+</svg>

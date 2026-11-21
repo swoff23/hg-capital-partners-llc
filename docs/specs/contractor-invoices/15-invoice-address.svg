@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1684" height="1228" viewBox="0 0 1684 1228">
+<title>Telling contractors the invoice address</title>
+<rect width="1684" height="1228" fill="#ffffff"/>
+<defs><clipPath id="c1"><rect x="0" y="0" width="375" height="330"/></clipPath><clipPath id="c2"><rect x="0" y="0" width="1280" height="420"/></clipPath><clipPath id="c3"><rect x="0" y="0" width="768" height="420"/></clipPath><clipPath id="c4"><rect x="0" y="0" width="375" height="420"/></clipPath><clipPath id="c5"><rect x="0" y="0" width="375" height="420"/></clipPath><clipPath id="c6"><rect x="0" y="0" width="375" height="420"/></clipPath></defs>
+<text x="32" y="40" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="18" font-weight="600" fill="#152133">Telling contractors the invoice address</text>
+<text x="32" y="62" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Most jobs sit on you or Pieter, so a contractor often has no Send invoice button; forwarding is their way in.</text>
+<text x="32" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">A. Tell them once, in your launch text</text>
+<text x="32" y="104" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">No app change: the address goes in the text you send each contractor when invoices go live.</text>
+<text x="32" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="32" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Your launch text, sent once</text>
+<g transform="translate(32.0,152.0) scale(0.6)"><g clip-path="url(#c1)"><rect x="0" y="0" width="375" height="330" rx="0" fill="#ffffff"/>
+<text x="187.5" y="30" font-size="13" font-weight="600" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Text to Zack</text>
+<rect x="59" y="52" width="300" height="196" rx="16" fill="#152133"/>
+<text x="73" y="78" font-size="13" font-weight="400" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Hi Zack, you can now send HG Capital</text>
+<text x="73" y="100" font-size="13" font-weight="400" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">your invoices in the app. Tap Send</text>
+<text x="73" y="122" font-size="13" font-weight="400" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice on a finished job, reply to</text>
+<text x="73" y="144" font-size="13" font-weight="400" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">the job email with the bill, or</text>
+<text x="73" y="166" font-size="13" font-weight="400" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">forward it to</text>
+<text x="73" y="188" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoices@mail.hgcapitalpartners.com</text>
+<text x="73" y="210" font-size="13" font-weight="400" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">When we pay it, you get an email.</text>
+<text x="73" y="232" font-size="13" font-weight="400" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Connor</text></g><rect x="0" y="0" width="375" height="330" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="398.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">B. The launch text, and the address on Your invoices</text>
+<rect x="431.81600000000014" y="385.0" width="104" height="18" rx="9" fill="#152133"/>
+<text x="483.81600000000014" y="398.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#ffffff" text-anchor="middle">Recommended</text>
+<text x="32" y="418.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">A quiet line with Copy under the title, and in the empty state, so they can find it again.</text>
+<text x="32" y="442.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="457.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Your invoices</text>
+<g transform="translate(32.0,466.0) scale(0.55)"><g clip-path="url(#c2)"><rect x="0" y="0" width="1280" height="420" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="1280" height="56" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="56" x2="1280" y2="56" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(32,20) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="54" y="33" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">My jobs</text>
+<text x="32" y="100" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Your invoices</text>
+<text x="32" y="134" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Or email them to invoices@mail.hgcapitalpartners.com</text>
+<text x="1248" y="134" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Copy</text>
+<line x1="32" y1="154" x2="1248" y2="154" stroke="#e7e5e0" stroke-width="1"/>
+<text x="32" y="180" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<text x="32" y="200" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2 · Sent Nov 18</text>
+<text x="1248" y="180" font-size="14" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="1248" y="200" font-size="13" font-weight="500" fill="#424e61" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Approved</text>
+<line x1="32" y1="218" x2="1248" y2="218" stroke="#e7e5e0" stroke-width="1"/>
+<text x="32" y="244" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1039</text>
+<text x="32" y="264" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">No job · Sent Nov 6</text>
+<text x="1248" y="244" font-size="14" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$425.00</text>
+<text x="1248" y="264" font-size="13" font-weight="500" fill="#1d7038" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 13</text>
+<line x1="32" y1="282" x2="1248" y2="282" stroke="#e7e5e0" stroke-width="1"/>
+<text x="32" y="308" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1036</text>
+<text x="32" y="328" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Repipe kitchen · Sent Oct 28</text>
+<text x="1248" y="308" font-size="14" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$2,180.00</text>
+<text x="1248" y="328" font-size="13" font-weight="500" fill="#1d7038" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 4</text></g><rect x="0" y="0" width="1280" height="420" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="442.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<text x="776.0" y="457.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Your invoices</text>
+<g transform="translate(776.0,466.0) scale(0.45)"><g clip-path="url(#c3)"><rect x="0" y="0" width="768" height="420" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="768" height="56" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="56" x2="768" y2="56" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(24,20) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="46" y="33" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">My jobs</text>
+<text x="24" y="100" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Your invoices</text>
+<text x="24" y="134" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Or email them to invoices@mail.hgcapitalpartners.com</text>
+<text x="744" y="134" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Copy</text>
+<line x1="24" y1="154" x2="744" y2="154" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="180" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<text x="24" y="200" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2 · Sent Nov 18</text>
+<text x="744" y="180" font-size="14" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="744" y="200" font-size="13" font-weight="500" fill="#424e61" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Approved</text>
+<line x1="24" y1="218" x2="744" y2="218" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="244" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1039</text>
+<text x="24" y="264" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">No job · Sent Nov 6</text>
+<text x="744" y="244" font-size="14" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$425.00</text>
+<text x="744" y="264" font-size="13" font-weight="500" fill="#1d7038" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 13</text>
+<line x1="24" y1="282" x2="744" y2="282" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="308" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1036</text>
+<text x="24" y="328" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Repipe kitchen · Sent Oct 28</text>
+<text x="744" y="308" font-size="14" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$2,180.00</text>
+<text x="744" y="328" font-size="13" font-weight="500" fill="#1d7038" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 4</text></g><rect x="0" y="0" width="768" height="420" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="442.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1161.6" y="457.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Your invoices</text>
+<g transform="translate(1161.6,466.0) scale(0.6)"><g clip-path="url(#c4)"><rect x="0" y="0" width="375" height="420" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="375" height="56" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="56" x2="375" y2="56" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(16,20) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="38" y="33" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">My jobs</text>
+<text x="16" y="100" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Your invoices</text>
+<text x="16" y="134" font-size="13" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoices@mail.hgcapitalpartners.com</text>
+<text x="359" y="134" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Copy</text>
+<line x1="16" y1="154" x2="359" y2="154" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="180" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<text x="16" y="200" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2 · Sent Nov 18</text>
+<text x="359" y="180" font-size="14" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="359" y="200" font-size="13" font-weight="500" fill="#424e61" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Approved</text>
+<line x1="16" y1="218" x2="359" y2="218" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="244" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1039</text>
+<text x="16" y="264" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">No job · Sent Nov 6</text>
+<text x="359" y="244" font-size="14" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$425.00</text>
+<text x="359" y="264" font-size="13" font-weight="500" fill="#1d7038" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 13</text>
+<line x1="16" y1="282" x2="359" y2="282" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="308" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1036</text>
+<text x="16" y="328" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Repipe kitchen · Sent Oct 28</text>
+<text x="359" y="308" font-size="14" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$2,180.00</text>
+<text x="359" y="328" font-size="13" font-weight="500" fill="#1d7038" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 4</text></g><rect x="0" y="0" width="375" height="420" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="1426.6" y="442.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1426.6" y="457.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Your invoices, empty</text>
+<g transform="translate(1426.6,466.0) scale(0.6)"><g clip-path="url(#c5)"><rect x="0" y="0" width="375" height="420" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="375" height="56" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="56" x2="375" y2="56" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(16,20) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="38" y="33" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">My jobs</text>
+<text x="16" y="100" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Your invoices</text>
+<text x="187.5" y="190" font-size="14" font-weight="400" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices you send show up here.</text>
+<text x="187.5" y="214" font-size="14" font-weight="400" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">You can also email them to</text>
+<text x="187.5" y="236" font-size="14" font-weight="500" fill="#152133" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">invoices@mail.hgcapitalpartners.com</text>
+<rect x="137.5" y="254" width="120" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="154.8444" y="280.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Copy address</text></g><rect x="0" y="0" width="375" height="420" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="766.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">C. Keep the address for you and Pieter</text>
+<text x="32" y="786.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Contractors use Send invoice or reply to job emails; only partners forward.</text>
+<text x="32" y="810.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="32" y="825.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Your invoices</text>
+<g transform="translate(32.0,834.0) scale(0.6)"><g clip-path="url(#c6)"><rect x="0" y="0" width="375" height="420" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="375" height="56" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="56" x2="375" y2="56" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(16,20) scale(0.6667)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></g>
+<text x="38" y="33" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">My jobs</text>
+<text x="16" y="100" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Your invoices</text>
+<line x1="16" y1="120" x2="359" y2="120" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="146" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1043</text>
+<text x="16" y="166" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Fix leak, Unit 2 · Sent Nov 18</text>
+<text x="359" y="146" font-size="14" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="359" y="166" font-size="13" font-weight="500" fill="#424e61" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Approved</text>
+<line x1="16" y1="184" x2="359" y2="184" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="210" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1039</text>
+<text x="16" y="230" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">No job · Sent Nov 6</text>
+<text x="359" y="210" font-size="14" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$425.00</text>
+<text x="359" y="230" font-size="13" font-weight="500" fill="#1d7038" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 13</text>
+<line x1="16" y1="248" x2="359" y2="248" stroke="#e7e5e0" stroke-width="1"/>
+<text x="16" y="274" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #1036</text>
+<text x="16" y="294" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Repipe kitchen · Sent Oct 28</text>
+<text x="359" y="274" font-size="14" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$2,180.00</text>
+<text x="359" y="294" font-size="13" font-weight="500" fill="#1d7038" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Paid Nov 4</text></g><rect x="0" y="0" width="375" height="420" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="1134.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#152133">Notes</text>
+<circle cx="40" cy="1152.0" r="8" fill="#c8a765"/>
+<text x="40" y="1156.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">1</text>
+<text x="56" y="1156.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">B's line: 'Or email them to ...' with Copy on laptop and tablet; on a phone just the address with Copy, one line down to 320.</text>
+<circle cx="40" cy="1172.0" r="8" fill="#c8a765"/>
+<text x="40" y="1176.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">2</text>
+<text x="56" y="1176.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">A and B both use the launch text; B is the reminder for whoever loses the text.</text>
+<circle cx="40" cy="1192.0" r="8" fill="#c8a765"/>
+<text x="40" y="1196.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">3</text>
+<text x="56" y="1196.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">C leaves contractors on jobs held by you or Pieter with no self-serve way in except a job email they may not have.</text>
+</svg>

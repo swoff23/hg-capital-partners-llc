@@ -57,14 +57,14 @@ Three things only Connor can do. Each one unblocks a build.
 
 | Item | Status | Size | When | After | Source |
 |---|---|---|---|---|---|
-| Contractor invoices | Spec ready | L | Dec 16 to Feb 14 | Invite the contractors | docs/contractor-invoices-plan.md |
+| Contractor invoices | Spec ready (MVP) | M | Dec 16 to Feb 14 | Invite the contractors | docs/contractor-invoices-plan.md |
 | 1099 list for January (new) | Needs a spec | S | Jan 1 to Jan 31 | QuickBooks, Contractor page | |
 | Financials you can trust | Needs a spec | M | Dec 16 to Jan 15 | QuickBooks | docs/uiux-review/financials.md |
 | Contractor onboarding in the portal | Spec ready | M | Dec 16 to Jan 15 | Contractor page | docs/specs/contractor-onboarding.md (branch `claude/contractor-form-integration-55b2b4`) |
 | Year-end pack for the CPA (new) | Needs a spec | M | Jan 16 to Feb 28 | QuickBooks | |
 | Leases on every unit | Needs a spec | L | Jan 16 to Feb 28 | Tenant contact | docs/property-page-plan.md section 2 |
 
-- **Contractor invoices.** Every invoice in one place, tied to its jobs: from the portal, an `invoices@` inbox or by hand. To review, To pay and Paid, plus a list of finished jobs with no invoice. Money still moves in Baselane. Needs Connor's OK on its 11 defaults.
+- **Contractor invoices.** A lightweight MVP (Nov 20): contractors send an invoice from a job, reply to a job email with it, or forward it to `invoices@mail.`; a partner loads it, tacks it onto jobs, approves it and marks it paid; the contractor sees Received, Approved or Paid. No AI reading yet. Money still moves in Baselane. The fuller plan waits in docs/specs/contractor-invoices/full-plan.md.
 - **1099 list for January.** One page lists each contractor's 2026 payments beside their W-9 and address, so whoever files has every number in one place. Reuses: QuickBooks vendor lines (`QboVendor`, `LedgerLine`) and the contractor page's W-9 files.
 - **Financials you can trust.** The UI review found 104 issues there, 20 of them high: no stated period, a basis toggle that changes nothing, $0 where nothing is booked, and no way to open the lines behind a figure. Fix them once real data flows.
 - **Contractor onboarding.** New contractors set themselves up from an invite or one sign-up link: details, trades, W-9 and insurance. It retires the Google Form, whose sheet holds every contractor's bank numbers in plain text.
@@ -116,7 +116,7 @@ Three things only Connor can do. Each one unblocks a build.
 | Add the QuickBooks production keys, then Connect | QuickBooks, Financials fixes, 1099 list, CPA pack, Rent roll |
 | Stop using Asana, and check when its billing ends | Finish leaving Asana |
 | Answer the three reopened tenant contact calls | Tenant contact |
-| Confirm or change the 11 invoice defaults | Contractor invoices |
+| Say "build it" for invoices (spec and screens done Nov 21) | Contractor invoices |
 | Emails for 14 contractors, and the office phone | Invite the contractors |
 | Say how residents should request maintenance | Maintenance requests |
 | Remove the two password variables, turn on Skew Protection | Tidy the secrets |
