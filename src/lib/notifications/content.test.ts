@@ -115,11 +115,13 @@ test("one thread per job, so a date move doesn't split it", () => {
 });
 
 test("each change reads as one line without the title", () => {
-  // Every job has one date and emails call it the due date, a scheduled job's included: never "visit" or "target".
+  // A TARGET line is the due date; a DAY line is the contractor's scheduled day: never "visit" or "target".
   assert.equal(itemText({ ...item("TARGET", `moved "${TITLE}" to Fri, Oct 30`), visit: false }), "moved the due date to Fri, Oct 30");
   assert.equal(itemText({ ...item("TARGET", `moved "${TITLE}" to Fri, Oct 30`), visit: true }), "moved the due date to Fri, Oct 30");
   assert.equal(itemText({ ...item("TARGET", `moved "${TITLE}" to no date`), visit: false }), "cleared the due date");
   assert.equal(itemText({ ...item("TARGET", `moved "${TITLE}" to no date`), visit: true }), "cleared the due date");
+  assert.equal(itemText(item("DAY", `moved "${TITLE}" to Fri, Oct 30`)), "moved the scheduled day to Fri, Oct 30");
+  assert.equal(itemText(item("DAY", `moved "${TITLE}" to no date`)), "cleared the scheduled day");
   // Rows queued before the flag read neutrally, and still parse.
   assert.equal(itemText(item("TARGET", `moved "${TITLE}" to Fri, Oct 30`)), "moved the date to Fri, Oct 30");
   assert.equal(itemText(item("TARGET", `moved "${TITLE}" to no date`)), "cleared the date");
@@ -129,7 +131,7 @@ test("each change reads as one line without the title", () => {
   assert.equal(itemText(item("ASSIGNED", `assigned you "${TITLE}" for Tue, Jan 5, 2027`)), "assigned you this job for Tue, Jan 5, 2027");
   assert.equal(itemText(item("ASSIGNED", `assigned you "Quote \"A\" for B"`)), "assigned you this job");
   assert.equal(itemText(item("STATUS", `started "${TITLE}"`, "Zack Smith")), "started the job");
-  assert.equal(itemText(item("STATUS", `scheduled "${TITLE}" for Thu, Oct 29`)), "set the due date to Thu, Oct 29");
+  assert.equal(itemText(item("STATUS", `scheduled "${TITLE}" for Thu, Oct 29`)), "scheduled it for Thu, Oct 29");
   assert.equal(itemText(item("STATUS", `set "${TITLE}" to open`)), "moved it to To do");
   assert.equal(itemText(item("STATUS", `sent "${TITLE}" back: Level the uppers`)), "sent it back: Level the uppers");
   assert.equal(itemText(item("STATUS", `sent "${TITLE}" for review`)), "sent it for review");
@@ -189,7 +191,7 @@ test("the job line names the unit as My jobs does (BCONTRACT-V03)", () => {
   );
 });
 
-test("a scheduled job's email gives its date as the due date", () => {
+test("a staff move to Scheduled reads as scheduling it, and the due date stays the due date", () => {
   const email = taskEmail({
     items: [item("STATUS", `scheduled "${TITLE}" for Thu, Oct 29`)],
     title: TITLE,
@@ -201,17 +203,17 @@ test("a scheduled job's email gives its date as the due date", () => {
     due: "2026-10-29",
     today: "2026-10-22",
   });
-  assert.equal(email.headline, "Connor set the due date to Thu, Oct 29.");
+  assert.equal(email.headline, "Connor scheduled it for Thu, Oct 29.");
   assert.equal(email.subject, "Update: Cabinet install, 23 Sherwood St");
   assert.equal(email.job.due, "Thu, Oct 29");
   assert.equal(email.primary?.label, "Start job");
   // Next year's date says the year.
-  assert.equal(itemText(item("STATUS", `scheduled "${TITLE}" for Tue, Jan 5, 2027`)), "set the due date to Tue, Jan 5, 2027");
+  assert.equal(itemText(item("STATUS", `scheduled "${TITLE}" for Tue, Jan 5, 2027`)), "scheduled it for Tue, Jan 5, 2027");
 });
 
 test("a title with a quote in it comes out whole", () => {
   const t = 'Hang 36" mirror';
-  assert.equal(itemText(item("STATUS", `scheduled "${t}" for Thu, Oct 29`)), "set the due date to Thu, Oct 29");
+  assert.equal(itemText(item("STATUS", `scheduled "${t}" for Thu, Oct 29`)), "scheduled it for Thu, Oct 29");
   assert.equal(itemText({ ...item("TARGET", `moved "${t}" to Fri, Oct 30`), visit: false }), "moved the due date to Fri, Oct 30");
   assert.equal(itemText(item("STATUS", `sent "${t}" for review`)), "sent it for review");
   assert.equal(itemText(item("STATUS", `marked "${t}" done`)), "sent it for review");
@@ -287,6 +289,8 @@ test("the whole email: subject, preview, What's new, the next step's buttons and
       directionsUrl: "https://maps.apple.com/?daddr=23%20Sherwood%20St%2C%20Buffalo%2C%20NY%2014213",
       photoUrl: null,
       due: "Fri, Oct 30",
+      scheduled: null,
+      scheduledAfterDue: false,
       // A partner's copy names the contractor and the checklist's progress, not the notes or items.
       notes: null,
       checklist: [],
@@ -744,13 +748,18 @@ test("the 8 am emails: Due today or Due yesterday leads, with no name in front",
   assert.equal(whatsNew([overdue], TITLE).headline, "Due yesterday.");
 });
 
-test("the morning after the due date: the next step and Change date; Change date sits in the Due row while the job takes one", () => {
+test("the morning after the due date: Add photos and Text to my crew on an In progress job; Change day only while the job takes one", () => {
   const T = "d".repeat(43);
   const base = { ...staffInput(), audience: "contractor" as const, linkToken: T };
-  const overdue = taskEmail({ ...base, status: "IN_PROGRESS", items: [{ ...item("OVERDUE", "due yesterday", "HG"), due: "2026-10-29" }] });
-  assert.deepEqual([overdue.primary?.label, ...overdue.secondary.map((b) => b.label)], ["Send for review", "Change date"]);
-  assert.equal(overdue.secondary[0].url, `https://hg.example.com/j/${T}?do=date`);
-  assert.equal(overdue.job.dateUrl, `https://hg.example.com/j/${T}?do=date`);
+  const overdueItems = [{ ...item("OVERDUE", "due yesterday", "HG"), due: "2026-10-29" }];
+  // In progress, the contractor no longer sets their day: no Change day, no Scheduled row link.
+  const overdue = taskEmail({ ...base, status: "IN_PROGRESS", items: overdueItems });
+  assert.deepEqual([overdue.primary?.label, ...overdue.secondary.map((b) => b.label)], ["Send for review", "Add photos", "Text to my crew"]);
+  assert.equal(overdue.job.dateUrl, null);
+  // While the job takes a day (To do, Scheduled, Waiting), the Scheduled row carries Change day.
+  const todo = taskEmail({ ...base, status: "OPEN", items: overdueItems });
+  assert.equal(todo.job.dateUrl, `https://hg.example.com/j/${T}?do=date`);
+  assert.ok(todo.secondary.some((b) => b.label === "Change day"));
   // In Review or closed, the date is HG's again.
   assert.equal(taskEmail({ ...base, status: "REVIEW" }).job.dateUrl, null);
   assert.equal(taskEmail({ ...base, status: "DONE" }).job.dateUrl, null);
@@ -785,7 +794,7 @@ test("handed the job and taken off it inside one bundle: nothing goes", () => {
 });
 
 test("taken off and given back inside one bundle (an Undo of a reassignment): nothing goes, unless the job changed meanwhile", () => {
-  const job = jobKey({ status: "SCHEDULED", target: "2026-11-23", notes: "Side door" });
+  const job = jobKey({ status: "SCHEDULED", due: "2026-11-23", scheduled: null, notes: "Side door" });
   const assigned = item("ASSIGNED", `assigned you "${TITLE}"`);
   const tookOff = { ...item("OFF", `took you off "${TITLE}"`), job };
   const comment = item("COMMENT", '"Doors"');
@@ -793,11 +802,11 @@ test("taken off and given back inside one bundle (an Undo of a reassignment): no
   assert.deepEqual(offItems([tookOff, assigned], { hasAccess: true, canceled: false, job }), []);
   assert.deepEqual(offItems([comment, tookOff, assigned], { hasAccess: true, canceled: false, job }), [comment]);
   // The visit moved while it was Zack's: the "assigned you" is the one line that tells Jose.
-  const moved = jobKey({ status: "SCHEDULED", target: "2026-11-24", notes: "Side door" });
+  const moved = jobKey({ status: "SCHEDULED", due: "2026-11-24", scheduled: null, notes: "Side door" });
   assert.deepEqual(offItems([tookOff, assigned], { hasAccess: true, canceled: false, job: moved }), [assigned]);
   // The notes changed, or it was started: the same.
-  assert.deepEqual(offItems([tookOff, assigned], { hasAccess: true, canceled: false, job: jobKey({ status: "SCHEDULED", target: "2026-11-23", notes: "Back door" }) }), [assigned]);
-  assert.deepEqual(offItems([tookOff, assigned], { hasAccess: true, canceled: false, job: jobKey({ status: "IN_PROGRESS", target: "2026-11-23", notes: "Side door" }) }), [assigned]);
+  assert.deepEqual(offItems([tookOff, assigned], { hasAccess: true, canceled: false, job: jobKey({ status: "SCHEDULED", due: "2026-11-23", scheduled: null, notes: "Back door" }) }), [assigned]);
+  assert.deepEqual(offItems([tookOff, assigned], { hasAccess: true, canceled: false, job: jobKey({ status: "IN_PROGRESS", due: "2026-11-23", scheduled: null, notes: "Side door" }) }), [assigned]);
   // A line queued before it carried the job: as before Nov 20, the "assigned you" goes.
   assert.deepEqual(offItems([item("OFF", `took you off "${TITLE}"`), assigned], { hasAccess: true, canceled: false, job }), [assigned]);
   // New to the job, taken off and given it again: they still hear they have it.
@@ -807,14 +816,14 @@ test("taken off and given back inside one bundle (an Undo of a reassignment): no
 test("8 am lines go only while still true when they send", () => {
   const today = { ...item("DUE_TODAY", "due today", "HG"), due: "2026-11-23" };
   const comment = item("COMMENT", '"Doors"');
-  const live = { status: "IN_PROGRESS" as const, due: "2026-11-23", today: "2026-11-23" };
+  const live = { status: "IN_PROGRESS" as const, due: "2026-11-23", scheduled: null, needsNotice: false, today: "2026-11-23" };
   assert.deepEqual(liveReminders([today, comment], live), [today, comment]);
   // The date moved, the job went to Review, or the day turned over: the line goes, the comment stays.
   assert.deepEqual(liveReminders([today, comment], { ...live, due: "2026-11-25" }), [comment]);
   assert.deepEqual(liveReminders([today, comment], { ...live, status: "REVIEW" }), [comment]);
   assert.deepEqual(liveReminders([today], { ...live, today: "2026-11-24" }), []);
   const overdue = { ...item("OVERDUE", "due yesterday", "HG"), due: "2026-11-22" };
-  assert.deepEqual(liveReminders([overdue], { status: "OPEN", due: "2026-11-22", today: "2026-11-23" }), [overdue]);
+  assert.deepEqual(liveReminders([overdue], { status: "OPEN", due: "2026-11-22", scheduled: null, needsNotice: false, today: "2026-11-23" }), [overdue]);
 });
 
 test("photos: none on a closed job's contractor email, and up to six of HG's in the job section", () => {
@@ -833,7 +842,7 @@ test("an assignment handed over twice in one bundle reads once", () => {
 });
 
 test("a change put back before the email goes says nothing (Connor, Nov 15)", () => {
-  const now = { due: "2026-10-30", notes: "Paint is in the basement.", status: "IN_PROGRESS" as const };
+  const now = { due: "2026-10-30", scheduled: null, notes: "Paint is in the basement.", status: "IN_PROGRESS" as const };
   const moved = (to: string, from: string): OutboxItem => ({ ...item("TARGET", `moved "${TITLE}" to ${to}`), visit: false, from });
   const comment = item("COMMENT", '"Doors"');
   // Moved and moved back: the date lines go, anything else in the bundle stays.
@@ -867,6 +876,10 @@ test("a change put back before the email goes says nothing (Connor, Nov 15)", ()
   // Lines queued before Nov 15 carry no `from` and send as before.
   const old = item("TARGET", `moved "${TITLE}" to Fri, Oct 30`);
   assert.deepEqual(undoneDropped([old], now), [old]);
+  // The scheduled day (DAY) is its own kind, compared with the day the job has now.
+  const day = (to: string, from: string): OutboxItem => ({ ...item("DAY", `moved "${TITLE}" to ${to}`), from });
+  assert.deepEqual(undoneDropped([day("Mon, Nov 2", "2026-10-31"), day("Sat, Oct 31", "2026-11-02")], { ...now, scheduled: "2026-10-31" }), []);
+  assert.deepEqual(undoneDropped([day("Mon, Nov 2", "2026-10-31")], { ...now, scheduled: "2026-11-02" }), [day("Mon, Nov 2", "2026-10-31")]);
 });
 
 test("notes fingerprint: the same notes print the same, trimmed as stored, and none prints empty", () => {
@@ -875,6 +888,15 @@ test("notes fingerprint: the same notes print the same, trimmed as stored, and n
   assert.match(notesFingerprint("Lockbox 4321"), /^[0-9a-z]{1,11}$/);
   assert.equal(notesFingerprint(null), "");
   assert.equal(notesFingerprint("   "), "");
+});
+
+test("a contractor's day moved twice in one email reads from the day the partners last saw", () => {
+  const first = { ...item("DAY", `moved "${TITLE}" to Mon, Nov 23 (was Tue, Nov 17)`, "Zack"), from: "2026-11-17" };
+  const second = { ...item("DAY", `moved "${TITLE}" to Wed, Nov 25 (was Mon, Nov 23)`, "Zack"), from: "2026-11-23" };
+  assert.deepEqual(itemLines([first, second], TITLE), ["Zack moved the scheduled day to Wed, Nov 25 (was Tue, Nov 17)"]);
+  // A first pick where there was no day: the latest line names no earlier one.
+  const set = { ...item("DAY", `moved "${TITLE}" to Mon, Nov 23`, "Zack"), from: "" };
+  assert.deepEqual(itemLines([set, second], TITLE), ["Zack moved the scheduled day to Wed, Nov 25"]);
 });
 
 // ---------------------------------------------------------------------------
@@ -926,9 +948,9 @@ const claimed = (over: Partial<Parameters<typeof claimedRowVerdict>[0]> = {}) =>
 test("the second decision, on the job read again after the claim: what is left to say, the date they see, or why nothing goes", () => {
   const goes = claimed();
   assert.deepEqual(goes.send && [goes.items.map((i) => i.kind), goes.due, goes.job], [["ASSIGNED"], "2026-10-23", JOB]);
-  // A Scheduled job's date is its visit.
+  // A Scheduled job keeps its due date, and its scheduled day rides beside it (contractor-scheduled-date.md).
   const visit = claimed({ job: { ...JOB, status: "SCHEDULED", scheduledFor: new Date("2026-10-30T00:00:00Z") } });
-  assert.equal(visit.send && visit.due, "2026-10-30");
+  assert.deepEqual(visit.send && [visit.due, visit.scheduled], ["2026-10-23", "2026-10-30"]);
   assert.deepEqual(claimed({ job: null }), { send: false, reason: "no task" });
   // Taken off since the batch read, with nothing saying so: nothing about a job that isn't theirs.
   assert.deepEqual(claimed({ hasAccess: false }), { send: false, reason: "nothing to send" });

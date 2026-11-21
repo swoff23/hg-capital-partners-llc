@@ -47,7 +47,7 @@ test("with skips, the news counts what changed and the reason is the detail, cut
     detail: "1 is closed",
   });
   assert.equal(skipDetail({ closed: 2, changed: 1 }), "2 are closed, 1 changed since");
-  assert.equal(skipDetail({ needsDate: 1 }), "1 needs a visit date");
+  assert.equal(skipDetail({ needsDate: 1 }), "1 needs a day");
   assert.equal(skipDetail({ gone: 2 }), "2 were deleted");
   assert.deepEqual(statusLine(0, "DONE", { changed: 3 }), { message: "Nothing changed", detail: "3 changed since" });
   // An address's own period stays single: the reason isn't joined to it.

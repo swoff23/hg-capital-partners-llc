@@ -55,8 +55,11 @@ export function jobLinkUrl(appUrl: string, token: string, step: JobLinkStep | nu
   return q ? `${base}?${q}` : base;
 }
 
-/** The statuses a contractor may set the date in: waiting on them, not yet marked done (core.ts setDateByContractor). */
-export const CONTRACTOR_DATE_STATUSES = ["OPEN", "SCHEDULED", "WAITING", "IN_PROGRESS"] as const;
+/**
+ * The statuses a contractor may set or move their scheduled day in: before they start
+ * (docs/specs/contractor-scheduled-date.md, Q2; core.ts scheduleByContractor).
+ */
+export const CONTRACTOR_DATE_STATUSES = ["OPEN", "SCHEDULED", "WAITING"] as const;
 
 export function contractorMaySetDate(status: string): boolean {
   return (CONTRACTOR_DATE_STATUSES as readonly string[]).includes(status);

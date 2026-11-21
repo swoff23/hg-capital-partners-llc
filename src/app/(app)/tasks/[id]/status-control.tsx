@@ -19,8 +19,8 @@ import { useStatusRun } from "./status-run";
 /**
  * The status chip at the top of the task page: a menu of the statuses (D6,
  * D6c), `StatusMenu` with its number keys and, on a phone, a titled sheet.
- * Waiting asks what it's waiting on first and Scheduled asks for the visit
- * date, each as a step in the same layer: the status commits only when the
+ * Waiting asks what it's waiting on first and Scheduled asks for the scheduled
+ * day, each as a step in the same layer: the status commits only when the
  * question is answered, and Back or Esc leaves it as it was. Every change
  * toasts with Undo. Review is offered only when a contractor is assigned or
  * the task is already in Review (BTASKS-041). While Waiting, WaitingReason
@@ -82,7 +82,7 @@ export function StatusControl({
       before: () => setShown(to),
       done: `Status set to ${STATUS_LABEL[to]}`,
       key: `task:${taskId}:status`,
-      // Back to what it was, if nothing has moved it since. Waiting needs its reason again, and a visit date this change set goes with it.
+      // Back to what it was, if nothing has moved it since. Waiting needs its reason again, and a scheduled day this change set goes with it.
       undo: () =>
         setTaskStatus(taskId, from, {
           expected: to,
@@ -127,15 +127,15 @@ export function StatusControl({
     }
     if (to === "SCHEDULED") {
       return {
-        title: "Visit date",
+        title: "Scheduled day",
         content: ({ close, container }) => (
           <DatePanel
-            // Only a real visit date is the current value: the due date is not a visit.
+            // Only a real scheduled day is the current value: the due date is not one.
             value={scheduledFor}
             today={today}
-            label="Visit date"
+            label="Scheduled day"
             layout={container === "sheet" ? "steps" : "together"}
-            // A scheduled job needs a visit date: "No date" is never offered.
+            // A scheduled job needs a scheduled day: "No date" is never offered.
             allowNone={false}
             onPick={(date) => {
               close();

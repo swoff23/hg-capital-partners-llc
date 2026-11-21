@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="520" viewBox="0 0 1100 520" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Jobs a contractor already re-dated</title>
+<defs>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#5d6778"/></marker>
+</defs>
+<rect width="1100" height="520" fill="#ffffff"/>
+<text x="32" y="40" font-size="17" font-weight="600" fill="#152133">Q9. Jobs a contractor re-dated since Nov 14 with the old Change date</text>
+<text x="32" y="62" font-size="12" fill="#5d6778">Their pick overwrote your due date. The activity log still has your date, so it can be put back.</text>
+
+<!-- ============ A ============ -->
+<rect x="16" y="80" width="1068" height="250" rx="12" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<text x="36" y="108" font-size="14" font-weight="600" fill="#152133">A. Fix them once, after you OK the list (recommended)</text>
+<text x="36" y="126" font-size="11" fill="#5d6778">Open jobs only. No emails go out. Each job gets one activity line saying what changed.</text>
+
+<g transform="translate(36 146)">
+  <rect width="290" height="150" rx="8" fill="#f8f7f3" stroke="#e7e5e0"/>
+  <text x="14" y="24" font-size="11.5" font-weight="600" fill="#152133">1. I list them for you</text>
+  <text x="14" y="48" font-size="10.5" fill="#424e61">Fix the kitchen faucet · Zack</text>
+  <text x="14" y="64" font-size="10" fill="#5d6778">Your due Thu, Nov 19 · their day Mon, Nov 23</text>
+  <line x1="14" y1="76" x2="276" y2="76" stroke="#e7e5e0"/>
+  <text x="14" y="96" font-size="10.5" fill="#424e61">Unclog the basement drain · Luis</text>
+  <text x="14" y="112" font-size="10" fill="#5d6778">Your due Fri, Nov 20 · their day Tue, Nov 24</text>
+  <text x="14" y="138" font-size="10" fill="#5d6778">Nothing changes until you say OK.</text>
+</g>
+<line x1="336" y1="221" x2="384" y2="221" stroke="#5d6778" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<g transform="translate(392 146)">
+  <rect width="300" height="150" rx="8" fill="#ffffff" stroke="#d5d1ca"/>
+  <text x="14" y="24" font-size="11.5" font-weight="600" fill="#152133">2. Each job, after</text>
+  <rect x="14" y="38" width="62" height="18" rx="9" fill="#f2f0ec"/>
+  <text x="45" y="51" font-size="9.5" font-weight="500" fill="#424e61" text-anchor="middle">Scheduled</text>
+  <text x="14" y="80" font-size="10.5" font-weight="500" fill="#424e61">Scheduled</text>
+  <text x="96" y="80" font-size="10.5" fill="#152133">Mon, Nov 23</text>
+  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4M12 17h.01" transform="translate(166 70) scale(0.45)" fill="none" stroke="#a54e09" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+  <line x1="14" y1="90" x2="286" y2="90" stroke="#e7e5e0"/>
+  <text x="14" y="110" font-size="10.5" font-weight="500" fill="#424e61">Due</text>
+  <text x="96" y="110" font-size="10.5" fill="#152133">Thu, Nov 19</text>
+  <text x="14" y="138" font-size="10" fill="#5d6778">Their day moved to Scheduled; your date is back.</text>
+</g>
+
+<g transform="translate(720 146)">
+  <rect width="344" height="150" rx="8" fill="#ffffff" stroke="#e7e5e0"/>
+  <text x="14" y="24" font-size="11.5" font-weight="600" fill="#152133">The activity line</text>
+  <circle cx="20" cy="50" r="4" fill="#d5d1ca"/>
+  <text x="32" y="54" font-size="10.5" fill="#424e61">Zack's Mon, Nov 23 became the scheduled day,</text>
+  <text x="32" y="70" font-size="10.5" fill="#424e61">and the due date went back to Thu, Nov 19.</text>
+  <text x="14" y="102" font-size="10" fill="#5d6778">Done jobs and canceled jobs are left as they are.</text>
+  <text x="14" y="118" font-size="10" fill="#5d6778">A job you re-dated yourself after their move keeps</text>
+  <text x="14" y="134" font-size="10" fill="#5d6778">your later date as Due.</text>
+</g>
+
+<!-- ============ B ============ -->
+<rect x="16" y="346" width="1068" height="150" rx="12" fill="#ffffff" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="36" y="374" font-size="14" font-weight="600" fill="#152133">B. Leave them as they are</text>
+<text x="36" y="392" font-size="11" fill="#5d6778">Their day stays as your due date. You fix any you care about by hand.</text>
+<g transform="translate(36 410)">
+  <rect width="300" height="66" rx="8" fill="#ffffff" stroke="#d5d1ca"/>
+  <rect x="14" y="12" width="40" height="18" rx="9" fill="#f2f0ec"/>
+  <text x="34" y="25" font-size="9.5" font-weight="500" fill="#424e61" text-anchor="middle">To do</text>
+  <text x="14" y="52" font-size="10.5" font-weight="500" fill="#424e61">Due</text>
+  <text x="96" y="52" font-size="10.5" fill="#152133">Mon, Nov 23</text>
+  <text x="168" y="52" font-size="10" fill="#5d6778">(their day, not yours)</text>
+</g>
+<text x="370" y="432" font-size="11" fill="#424e61">Nothing to run, but late and the 8 am emails go by their day on those jobs, and</text>
+<text x="370" y="448" font-size="11" fill="#424e61">the list shows no scheduled day for them.</text>
+</svg>

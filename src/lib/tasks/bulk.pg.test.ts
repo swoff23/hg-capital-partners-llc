@@ -9,7 +9,7 @@ import { toYmd, todayYmdEastern } from "@/lib/dates";
 import { STATUS_ORDER } from "@/lib/task-scope";
 import { assignEach, deleteEach, moveDatesEach, setPropertyEach, setStatusEach, undoAssignEach, undoDatesEach, undoPropertyEach, undoStatusEach } from "./bulk-core";
 import * as core from "./core";
-import { targetDate } from "./rules";
+import { scheduledDay } from "./rules";
 
 /**
  * Bulk edit's rules (bulk-core.ts, docs/specs/bulk-edit.md) on a real Postgres
@@ -267,25 +267,22 @@ test("moving tasks to the building they're on changes nothing, an unlisted unit 
   assert.equal(await prisma.taskEvent.count({ where: { taskId: upper.id, kind: "PROPERTY" } }), 0, "no line for it");
 });
 
-test("a date for many: closed, deleted and Scheduled-without-a-date are skipped; jobs move their visit date", { skip, timeout }, async () => {
+test("a date for many: closed and deleted are skipped; jobs move their due date, never their scheduled day", { skip, timeout }, async () => {
   const staffTask = await make({ title: "Order mulch", dueDate: "2026-11-25" });
   const done = await make({ title: "Done already", status: "DONE" });
-  const scheduled = await make({ title: "Furnace check", assignee: { contactId: zack.contactId } });
+  const scheduled = await make({ title: "Furnace check", dueDate: "2026-11-27", assignee: { contactId: zack.contactId } });
   await prisma.$transaction((tx) => core.setStatus(tx, scheduled.id, "SCHEDULED", staff, { scheduledFor: "2026-11-26" }));
   const gone = await make({ title: "Gone soon" });
   await prisma.task.delete({ where: { id: gone.id } });
   const ids = [staffTask.id, done.id, scheduled.id, gone.id];
 
-  const moved = await prisma.$transaction((tx) => moveDatesEach(tx, ids, new Set([scheduled.id]), "2026-11-30", staff));
+  const moved = await prisma.$transaction((tx) => moveDatesEach(tx, ids, "2026-11-30", staff));
   assert.deepEqual([moved.done, moved.skipped], [2, { gone: 1, closed: 1 }]);
   assert.equal(toYmd((await prisma.task.findUniqueOrThrow({ where: { id: staffTask.id } })).dueDate), "2026-11-30");
   const job = await prisma.task.findUniqueOrThrow({ where: { id: scheduled.id } });
-  assert.equal(toYmd(job.scheduledFor), "2026-11-30", "a Scheduled job moves its visit date");
-  assert.deepEqual(moved.changed.map((c) => [c.id, c.field, c.value]).sort(), [[staffTask.id, "dueDate", "2026-11-25"], [scheduled.id, "scheduledFor", "2026-11-26"]].sort());
-
-  const cleared = await prisma.$transaction((tx) => moveDatesEach(tx, [staffTask.id, scheduled.id], new Set([scheduled.id]), null, staff));
-  assert.deepEqual([cleared.done, cleared.skipped], [1, { needsDate: 1 }]);
-  assert.equal(toYmd(targetDate(await prisma.task.findUniqueOrThrow({ where: { id: scheduled.id } }))), "2026-11-30", "it keeps its visit date");
+  assert.equal(toYmd(job.dueDate), "2026-11-30", "a Scheduled job moves its due date");
+  assert.equal(toYmd(job.scheduledFor), "2026-11-26", "and keeps the contractor's day");
+  assert.deepEqual(moved.changed.map((c) => [c.id, c.field, c.value]).sort(), [[staffTask.id, "dueDate", "2026-11-25"], [scheduled.id, "dueDate", "2026-11-27"]].sort());
 });
 
 test("reopening a finished repeating task takes back its untouched copy, with the copy locked in order", { skip, timeout }, async () => {
@@ -309,7 +306,7 @@ test("Undo of a reassignment queues nothing that will send: the new contractor's
   const open = (contactId: string) =>
     prisma.notificationOutbox.findMany({ where: { taskId: job.id, recipientContactId: contactId, sentAt: null }, select: { items: true } });
   const now = await prisma.task.findUniqueOrThrow({ where: { id: job.id } });
-  const key = jobKey({ status: now.status, target: toYmd(targetDate(now)), notes: now.description });
+  const key = jobKey({ status: now.status, due: toYmd(now.dueDate), scheduled: toYmd(scheduledDay(now)), notes: now.description });
   // Zack's access ended with the Undo; Jose has his back.
   for (const row of await open(zack.contactId)) assert.deepEqual(offItems(parseItems(row.items), { hasAccess: false, canceled: false, job: key }), []);
   const jose = await open(joseId);
@@ -320,7 +317,7 @@ test("Undo of a reassignment queues nothing that will send: the new contractor's
 test("a date Undo puts each back, but leaves a date someone changed since", { skip, timeout }, async () => {
   const a = await make({ title: "Paint trim", dueDate: "2026-11-24" });
   const b = await make({ title: "Caulk tub", dueDate: "2026-11-25" });
-  const moved = await prisma.$transaction((tx) => moveDatesEach(tx, [a.id, b.id], new Set(), "2026-12-01", staff));
+  const moved = await prisma.$transaction((tx) => moveDatesEach(tx, [a.id, b.id], "2026-12-01", staff));
   assert.equal(moved.changed.length, 2);
   await prisma.$transaction((tx) => core.patchTask(tx, b.id, { dueDate: "2026-12-05" }, staff));
   const back = await prisma.$transaction((tx) => undoDatesEach(tx, moved.changed, staff));
@@ -448,12 +445,12 @@ test("a draft sent with real tasks' ids is untouched by a bulk status, assignee,
   assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: a.id } })).propertyId, crescent);
   await untouched("a property Undo");
 
-  // ---- Due date: a new date (as a contractor's job, and as a plain task), and cleared ----
-  for (const jobs of [new Set([draft.id]), new Set<string>()]) {
-    const dated = await inTx((tx) => moveDatesEach(tx, [draft.id, a.id], jobs, "2026-12-10", staff));
+  // ---- Due date: a new date (a contractor's job and a plain task move the same way now), and cleared ----
+  {
+    const dated = await inTx((tx) => moveDatesEach(tx, [draft.id, a.id], "2026-12-10", staff));
     assert.deepEqual([dated.done, dated.skipped], [1, { changed: 1 }], "skipped as a draft, not as a closed task");
   }
-  const cleared = await inTx((tx) => moveDatesEach(tx, [draft.id, a.id], new Set(), null, staff));
+  const cleared = await inTx((tx) => moveDatesEach(tx, [draft.id, a.id], null, staff));
   assert.deepEqual([cleared.done, cleared.skipped], [1, { changed: 1 }]);
   assert.deepEqual(cleared.changed, [{ id: a.id, field: "dueDate", value: "2026-12-10", set: null }]);
   await untouched("a date for many");
@@ -571,7 +568,7 @@ test("a bulk Undo that arrives after the task became a draft again skips it, and
   const draft = await saveDraft();
   const added = await prisma.$transaction((tx) => core.addDraft(tx, draft.id, staff));
   const assign = await prisma.$transaction((tx) => assignEach(tx, [{ id: draft.id, expected: { contactId: zack.contactId } }], { contactId: joseId }, staff));
-  const dates = await prisma.$transaction((tx) => moveDatesEach(tx, [draft.id], new Set([draft.id]), "2026-12-15", staff));
+  const dates = await prisma.$transaction((tx) => moveDatesEach(tx, [draft.id], "2026-12-15", staff));
   assert.deepEqual([assign.done, assign.emails, dates.done], [1, 1, 1], "while it's a task, bulk edit changes it as any task");
   // Zack was told he's off it (the line carries the job as he knew it); Jose was handed it and its new date.
   const queued = async (contactId: string) =>
@@ -579,7 +576,7 @@ test("a bulk Undo that arrives after the task became a draft again skips it, and
   assert.deepEqual([await queued(zack.contactId), await queued(joseId)], [["ASSIGNED", "OFF"], ["ASSIGNED", "TARGET"]]);
   const [zackRow] = await prisma.notificationOutbox.findMany({ where: { taskId: draft.id, recipientContactId: zack.contactId, sentAt: null } });
   const off = parseItems(zackRow.items).find((i) => i.kind === "OFF");
-  assert.equal(off?.job, jobKey({ status: "OPEN", target: "2026-11-25", notes: "Bring the tall ladder." }), "the 'took you off' line carries the job as Zack knew it");
+  assert.equal(off?.job, jobKey({ status: "OPEN", due: "2026-11-25", scheduled: null, notes: "Bring the tall ladder." }), "the 'took you off' line carries the job as Zack knew it");
 
   await prisma.$transaction((tx) => core.undoAddDraft(tx, draft.id, added.addEventId, staff));
   const asDraft = await whole(draft.id);

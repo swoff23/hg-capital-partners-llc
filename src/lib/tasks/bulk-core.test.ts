@@ -158,8 +158,8 @@ test("every bulk change and every bulk Undo skips a draft as changed since, befo
     setPropertyEach: (tx) => setPropertyEach(tx, [id], "p-congress", PIETER),
     "setPropertyEach to none": (tx) => setPropertyEach(tx, [id], null, PIETER),
     undoPropertyEach: (tx) => undoPropertyEach(tx, [{ id, from: { propertyId: null, unitLabel: null }, to: { propertyId: "p-crescent", unitLabel: "Rear" } }], PIETER),
-    moveDatesEach: (tx) => moveDatesEach(tx, [id], new Set([id]), "2026-12-10", PIETER),
-    "moveDatesEach clearing": (tx) => moveDatesEach(tx, [id], new Set(), null, PIETER),
+    moveDatesEach: (tx) => moveDatesEach(tx, [id], "2026-12-10", PIETER),
+    "moveDatesEach clearing": (tx) => moveDatesEach(tx, [id], null, PIETER),
     undoDatesEach: (tx) => undoDatesEach(tx, [{ id, field: "dueDate", value: null, set: "2026-11-25" }], PIETER),
   };
   for (const [name, run] of Object.entries(runs)) {
@@ -203,7 +203,7 @@ test("a draft sent with real tasks: the tasks change, each in its savepoint, and
   assert.deepEqual(touching(assign.calls, DRAFT.id), []);
 
   const dates = setup();
-  const dated = await moveDatesEach(dates.tx, ids, new Set(), "2026-12-01", PIETER);
+  const dated = await moveDatesEach(dates.tx, ids, "2026-12-01", PIETER);
   assert.deepEqual([dated.done, dated.skipped], [2, { changed: 1 }]);
   assert.deepEqual(dated.changed.map((c) => [c.id, c.field, c.value, c.set]), [["t-a", "dueDate", "2026-11-24", "2026-12-01"], ["t-z", "dueDate", null, "2026-12-01"]]);
   assert.equal(dates.stored.get(DRAFT.id)?.dueDate?.toISOString(), "2026-11-25T00:00:00.000Z");

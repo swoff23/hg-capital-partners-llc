@@ -17,7 +17,7 @@ import type { Ymd } from "@/lib/dates";
 import { unitAfterMove, type PropertyOption } from "@/lib/picker-options-shape";
 import { isActiveStatus } from "@/lib/task-scope";
 import { assignLine, deleteBody, deleteTitle, deletedLine, dueLine, emailsDetail, propertyLine, statusLine, tasksCount, undoLine, type BulkLine } from "@/lib/tasks/bulk-copy";
-import { assigneeName, assigneeValueOf, isContractorJob, targetField, targetOf, type ListPatch, type ListTask } from "@/lib/tasks/list";
+import { assigneeName, assigneeValueOf, type ListPatch, type ListTask } from "@/lib/tasks/list";
 import { shortName } from "@/lib/tasks/list-sort";
 import { cn } from "@/lib/utils";
 import { WaitingForm } from "./[id]/status-control";
@@ -146,20 +146,18 @@ function Bar({ properties, picks }: { properties: PropertyOption[]; picks: Picks
   }
 
   // ---- Due date ----
-  // What each row's date chip shows: a contractor's job its target, any other task its due date.
-  const shownDate = (t: ListTask) => (isContractorJob(t) ? targetOf(t) : t.due);
+  // What each row's date chip shows: the due date, jobs included. A bulk date edit always moves Due.
+  const shownDate = (t: ListTask) => t.due;
   const dueShared = shared(list, shownDate);
   const dueMixed = !agree(list, shownDate);
   function moveTo(to: Ymd | null) {
     const items = list;
     const changes = items
       .filter((t) => isActiveStatus(t.status))
-      .map((t) => ({ id: t.id, field: isContractorJob(t) ? targetField(t) : ("dueDate" as const), value: to }))
-      // A Scheduled job keeps its visit date: the server skips it.
-      .filter((c) => c.value !== null || c.field === "dueDate");
+      .map((t) => ({ id: t.id, field: "dueDate" as const, value: to }));
     runEdit(
       { kind: "dates", changes },
-      () => bulkDue(items.map((t) => t.id), items.filter(isContractorJob).map((t) => t.id), to),
+      () => bulkDue(items.map((t) => t.id), to),
       (res) =>
         said(
           dueLine(res.done, to, res.skipped),
@@ -273,14 +271,14 @@ function Bar({ properties, picks }: { properties: PropertyOption[]; picks: Picks
                       }
                     : to === "SCHEDULED"
                       ? {
-                          title: "Visit date",
+                          title: "Scheduled day",
                           content: ({ close, container }) => (
                             <DatePanel
                               value={shared(list, (t) => t.scheduledFor)}
                               today={today}
-                              label="Visit date"
+                              label="Scheduled day"
                               layout={container === "sheet" ? "steps" : "together"}
-                              // A scheduled job needs a visit date: "No date" is never offered.
+                              // A scheduled job needs a scheduled day: "No date" is never offered.
                               allowNone={false}
                               onPick={(date) => {
                                 close();

@@ -146,6 +146,10 @@ export interface JobEmailInput {
     directionsUrl: string | null;
     photoUrl: string | null;
     due: string | null;
+    /** The contractor's scheduled day, written out, while the job is Scheduled. */
+    scheduled?: string | null;
+    /** That day lands after the due date: said in words beside it. */
+    scheduledAfterDue?: boolean;
     notes: string | null;
     checklist: { title: string; done: boolean }[];
     contractor: string | null;
@@ -154,12 +158,14 @@ export interface JobEmailInput {
     accessUrl?: string | null;
     /** Add to calendar's .ics. */
     calendarUrl?: string | null;
-    /** Change date: the contractor's own date (opens the job's date sheet). */
+    /** Change day: the contractor's scheduled day (opens the job's day sheet). */
     dateUrl?: string | null;
     photos?: JobEmailPhoto[];
     morePhotos?: number;
   };
   footnote?: string;
+  /** The 24-hour notice line (docs/specs/contractor-scheduled-date.md, Q6), in a warn-tinted box under What's new. */
+  notice?: string;
 }
 
 /** An http(s) URL, or a throw: every link in an email is checked before it's written. */
@@ -223,17 +229,25 @@ export function renderJobEmail(input: JobEmailInput): RenderedEmail {
 
   const facts: { label: string; text: string; html: string }[] = [];
   if (job.contractor) facts.push({ label: "Contractor", text: job.contractor, html: escapeHtml(job.contractor) });
-  if (job.due || job.dateUrl) {
-    const calendar = job.calendarUrl ? safeUrl(job.calendarUrl) : null;
-    const change = job.dateUrl ? safeUrl(job.dateUrl) : null;
-    const links = [calendar ? { label: "Add to calendar", url: calendar } : null, change ? { label: job.due ? "Change date" : "Set a date", url: change } : null].filter(
-      (l): l is { label: string; url: string } => !!l,
-    );
+  // Two dates (docs/specs/contractor-scheduled-date.md): Due, HG Capital's, and the contractor's scheduled day. Add to
+  // calendar sits with the day the .ics uses (their day, else Due); Change day with the scheduled day.
+  const calendar = job.calendarUrl ? safeUrl(job.calendarUrl) : null;
+  const change = job.dateUrl ? safeUrl(job.dateUrl) : null;
+  const dateFact = (label: string, value: string, links: ({ label: string; url: string } | null)[]) => {
+    const kept = links.filter((l): l is { label: string; url: string } => !!l);
     facts.push({
-      label: "Due",
-      text: [job.due ?? "No date", ...links.map((l) => `${l.label}: ${l.url}`)].join("\n"),
-      html: [job.due ? escapeHtml(job.due) : "No date", ...links.map((l) => inlineLink(l.label, l.url))].join(" &middot; "),
+      label,
+      text: [value, ...kept.map((l) => `${l.label}: ${l.url}`)].join("\n"),
+      html: [escapeHtml(value), ...kept.map((l) => inlineLink(l.label, l.url))].join(" &middot; "),
     });
+  };
+  if (job.due) dateFact("Due", job.due, [!job.scheduled && calendar ? { label: "Add to calendar", url: calendar } : null]);
+  if (job.scheduled || change) {
+    const value = job.scheduled ? `${job.scheduled}${job.scheduledAfterDue ? " (after the due date)" : ""}` : "Not set";
+    dateFact("Scheduled", value, [
+      job.scheduled && calendar ? { label: "Add to calendar", url: calendar } : null,
+      change ? { label: job.scheduled ? "Change day" : "Set a day", url: change } : null,
+    ]);
   }
   if (job.accessUrl) {
     const access = safeUrl(job.accessUrl);
@@ -264,6 +278,7 @@ export function renderJobEmail(input: JobEmailInput): RenderedEmail {
     "",
     "What's new",
     input.headline,
+    ...(input.notice ? ["", input.notice] : []),
     ...input.lines,
     ...(input.closing ? ["", input.closing] : []),
     ...(input.primary && primaryUrl ? ["", `${input.primary.label}: ${primaryUrl}`] : []),
@@ -295,7 +310,7 @@ ${previewHtml(input.preview)}
 <tr><td style="padding:0 0 16px;border-bottom:1px solid ${t.goldDeep};">${LETTERHEAD}</td></tr>
 <tr><td style="padding:24px 0 0;${LABEL}">What's new</td></tr>
 <tr><td style="padding:4px 0 0;font-size:18px;line-height:1.4;font-weight:600;color:${t.foreground};">${escapeWithBreaks(input.headline)}</td></tr>
-${input.lines.map((l) => `<tr><td style="padding:8px 0 0;font-size:15px;line-height:1.5;color:${t.fg2};">${escapeWithBreaks(l)}</td></tr>\n`).join("")}${newPhotos.length ? `<tr><td style="padding:10px 0 0;font-size:0;line-height:0;">${photoStripHtml(newPhotos, input.morePhotos ?? 0)}</td></tr>\n` : ""}${input.closing ? `<tr><td style="padding:12px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.closing)}</td></tr>\n` : ""}${
+${input.notice ? `<tr><td style="padding:12px 0 0;"><div style="background:${t.warnTint};color:${t.warn};border-radius:6px;padding:10px 12px;font-size:15px;line-height:1.5;font-weight:500;">${escapeHtml(input.notice)}</div></td></tr>\n` : ""}${input.lines.map((l) => `<tr><td style="padding:8px 0 0;font-size:15px;line-height:1.5;color:${t.fg2};">${escapeWithBreaks(l)}</td></tr>\n`).join("")}${newPhotos.length ? `<tr><td style="padding:10px 0 0;font-size:0;line-height:0;">${photoStripHtml(newPhotos, input.morePhotos ?? 0)}</td></tr>\n` : ""}${input.closing ? `<tr><td style="padding:12px 0 0;font-size:16px;line-height:1.5;">${escapeHtml(input.closing)}</td></tr>\n` : ""}${
     input.primary && primaryUrl
       ? `<tr><td style="padding:24px 0 0;">
 <a href="${escapeHtml(primaryUrl)}" style="${PRIMARY}">${escapeHtml(input.primary.label)}</a>

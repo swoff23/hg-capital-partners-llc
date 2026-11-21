@@ -3,7 +3,7 @@ import { toYmd, type Ymd } from "@/lib/dates";
 import { unitAfterMove, unitLabels } from "@/lib/picker-options-shape";
 import { isActiveStatus, isDiscarded, isDraftStatus } from "@/lib/task-scope";
 import * as core from "./core";
-import { targetField, type DateChange } from "./list";
+import type { DateChange } from "./list";
 import { repeatCreatedCopy } from "./repeat";
 
 /**
@@ -124,10 +124,10 @@ class Closed extends core.TaskRuleError {
   }
 }
 
-/** Clearing a Scheduled job's visit date: it needs one, so it's left as it is. */
+/** Clearing a Scheduled job's day: it needs one, so it's left as it is. */
 class NeedsDate extends core.TaskRuleError {
   constructor() {
-    super("A scheduled job needs a visit date.");
+    super("A scheduled job needs a day.");
     this.name = "NeedsDate";
   }
 }
@@ -423,23 +423,21 @@ export async function undoPropertyEach(tx: core.Tx, changes: readonly PropertyCh
 // ---------------------------------------------------------------------------
 
 /**
- * One date for every pick (null clears). A contractor's job (`jobs`) moves
- * its target (the visit date while Scheduled, otherwise the due date) and any
- * other task its due date, the rule each row's date chip uses. A closed task
- * is skipped, and so is clearing a Scheduled job's visit date. Returns each
- * moved date as it was and as this set it, for Undo (undoDatesEach).
+ * One due date for every pick (null clears), contractor jobs included: a
+ * job's scheduled day is the contractor's, and bulk edit never moves it
+ * (docs/specs/contractor-scheduled-date.md). A closed task is skipped.
+ * Returns each moved date as it was and as this set it, for Undo
+ * (undoDatesEach).
  */
-export async function moveDatesEach(tx: core.Tx, ids: readonly string[], jobs: ReadonlySet<string>, to: Ymd | null, p: core.Principal) {
+export async function moveDatesEach(tx: core.Tx, ids: readonly string[], to: Ymd | null, p: core.Principal) {
   const value = to === null ? null : toYmd(to);
   if (to !== null && !value) throw new core.TaskRuleError("That isn't a date.");
   return eachTask<DateMove>(tx, ids, async (row) => {
     if (!isActiveStatus(row.status)) throw new Closed();
-    const field = jobs.has(row.id) ? targetField({ status: row.status, scheduledFor: toYmd(row.scheduledFor) }) : "dueDate";
-    if (field === "scheduledFor" && !value) throw new NeedsDate();
-    const was = toYmd(field === "dueDate" ? row.dueDate : row.scheduledFor);
+    const was = toYmd(row.dueDate);
     if (was === value) return "done";
-    await core.patchTask(tx, row.id, field === "dueDate" ? { dueDate: value } : { scheduledFor: value }, p);
-    return { id: row.id, field, value: was, set: value };
+    await core.patchTask(tx, row.id, { dueDate: value }, p);
+    return { id: row.id, field: "dueDate" as const, value: was, set: value };
   });
 }
 
@@ -456,7 +454,7 @@ export async function undoDatesEach(tx: core.Tx, moves: readonly DateMove[], p: 
       const m = byId.get(row.id)!;
       if (!isActiveStatus(row.status)) throw new Closed();
       if (toYmd(m.field === "dueDate" ? row.dueDate : row.scheduledFor) !== m.set) throw new ChangedSince();
-      // A Scheduled job keeps a visit date: Undo can't take it back to none.
+      // A Scheduled job keeps its day: Undo can't take it back to none.
       if (m.field === "scheduledFor" && row.status === "SCHEDULED" && !m.value) throw new NeedsDate();
       await core.patchTask(tx, row.id, m.field === "dueDate" ? { dueDate: m.value } : { scheduledFor: m.value }, p);
       return "done";

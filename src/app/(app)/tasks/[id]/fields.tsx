@@ -5,6 +5,7 @@ import { Button as AriaButton } from "react-aria-components";
 import { KeyRound, MessageSquareText, Phone, Repeat } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 import type { AssigneeContractor, AssigneeUser, AssigneeValue } from "@/components/assignee-picker";
+import { AfterDueMark } from "@/components/after-due-mark";
 import { DatePicker } from "@/components/due-date-picker";
 import { Code } from "@/components/code";
 import { AssigneePicker, PropertyPicker, UnitPicker } from "@/components/entity-picker";
@@ -18,9 +19,10 @@ import type { Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
 import { offersUnits, unitAfterMove, unitDisplay, type PropertyOption } from "@/lib/picker-options-shape";
 import { fmtShortDay } from "@/lib/tasks/activity";
+import { isAfterDue } from "@/lib/tasks/rules";
 import { describeRepeat, repeatDue, type RepeatRule } from "@/lib/tasks/repeat";
 import { cn } from "@/lib/utils";
-import { updateTask } from "./actions";
+import { setTaskStatus, updateTask } from "./actions";
 
 export type { PropertyOption };
 
@@ -72,6 +74,7 @@ export function TaskFields({
   taskId,
   today,
   status,
+  waitingOn = null,
   overdue,
   values,
   users,
@@ -90,6 +93,8 @@ export function TaskFields({
   taskId: string;
   today: Ymd;
   status: TaskStatus;
+  /** A Waiting task's reason, so Undo of a day picked here puts it back as it was. */
+  waitingOn?: string | null;
   overdue: boolean;
   values: TaskFieldValues;
   users: AssigneeUser[];
@@ -114,6 +119,33 @@ export function TaskFields({
 }) {
   const { run } = useRun();
   const [v, setOptimistic] = useOptimistic(values, (cur, patch: Partial<TaskFieldValues>) => ({ ...cur, ...patch }));
+  // The status as this rail shows it: a day picked on a To do or Waiting task turns it Scheduled at once.
+  const [shownStatus, setShownStatus] = useOptimistic(status);
+  const scheduledShown = shownStatus === "SCHEDULED" ? v.scheduledFor : null;
+
+  /**
+   * The Scheduled row (docs/specs/contractor-scheduled-date.md, Q10 A): a day picked on a To do or Waiting task
+   * turns it Scheduled, as a contractor's pick does; on a Scheduled one it moves the day. Undo puts both back.
+   */
+  function pickScheduled(scheduledFor: Ymd | null) {
+    // A draft never shows the row (tasks-from-claude.md 6.1): nothing schedules it.
+    if (!scheduledFor || status === "DRAFT") return;
+    const done = `Scheduled for ${fmtShortDay(scheduledFor, today)}`;
+    if (shownStatus === "SCHEDULED") {
+      save({ scheduledFor }, { done, field: "scheduled", undo: { scheduledFor: v.scheduledFor } });
+      return;
+    }
+    const was = status;
+    run(() => setTaskStatus(taskId, "SCHEDULED", { scheduledFor, expected: was }), {
+      before: () => {
+        setShownStatus("SCHEDULED");
+        setOptimistic({ scheduledFor });
+      },
+      done,
+      key: `task:${taskId}:status`,
+      undo: () => setTaskStatus(taskId, was, { expected: "SCHEDULED", ...(was === "WAITING" && waitingOn ? { waitingOn } : {}) }),
+    });
+  }
   const property = properties.find((p) => p.id === v.propertyId);
 
   /** Saves a patch at once and toasts it with Undo; the toast's `key` makes a quick second edit replace it. */
@@ -251,27 +283,22 @@ export function TaskFields({
             }}
           />
         </Row>
-        {status === "SCHEDULED" && (
+        {(shownStatus === "OPEN" || shownStatus === "WAITING" || shownStatus === "SCHEDULED") && (
+          // Right below Due, while the job isn't started (Q10 A): yours, then theirs. Picking a day schedules it.
           <Row label="Scheduled">
-            <DatePicker
-              label="Visit date"
-              placeholder="Pick a date"
-              prefix={<span className="text-muted-foreground lg:hidden">Visit</span>}
-              value={v.scheduledFor}
-              today={today}
-              // A scheduled job needs a visit date: "No date" is never offered.
-              allowNone={false}
-              onChange={(scheduledFor) =>
-                save(
-                  { scheduledFor },
-                  {
-                    done: scheduledFor ? `Visit set to ${fmtShortDay(scheduledFor, today)}` : "Visit date cleared",
-                    field: "visit",
-                    undo: { scheduledFor: v.scheduledFor },
-                  },
-                )
-              }
-            />
+            <div className="flex items-center gap-1.5">
+              <DatePicker
+                label="Scheduled day"
+                placeholder="Set a day"
+                prefix={<span className="text-muted-foreground lg:hidden">Scheduled</span>}
+                value={scheduledShown}
+                today={today}
+                // A scheduled job needs a scheduled day: "No date" is never offered.
+                allowNone={false}
+                onChange={pickScheduled}
+              />
+              {scheduledShown && v.dueDate && isAfterDue(scheduledShown, v.dueDate) && <AfterDueMark due={v.dueDate} today={today} />}
+            </div>
           </Row>
         )}
         <Row label="Property">

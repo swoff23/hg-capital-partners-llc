@@ -16,7 +16,7 @@ import { CrewText } from "./_components/crew-text";
 import { HashScroll } from "./_components/hash-scroll";
 import { JobActions } from "./_components/job-actions";
 import { JobHeader } from "./_components/job-header";
-import { JobDate } from "./_components/job-date";
+import { JobDates } from "./_components/job-date";
 import { AddressActions, JobChecklist, LockboxSection, TenantsSection } from "./_components/job-details";
 import { JobMediaSection } from "./_components/job-media";
 import { JobNotice } from "./_components/job-notice";
@@ -84,20 +84,22 @@ export default async function JobPage({ params, searchParams }: PageProps<"/p/jo
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
                   <StatusBadge status={job.status} className="shrink-0" />
-                  {active && (
-                    <JobDate
-                      taskId={job.id}
-                      target={job.target}
-                      isVisit={job.targetIsVisit}
-                      today={today}
-                      editable={contractorMaySetDate(job.status)}
-                      openOnLoad={ask === "date"}
-                    />
-                  )}
                 </div>
                 <h1 className="mt-1 text-title text-balance break-words text-foreground">{job.title}</h1>
                 {(job.address || job.unitLabel) && (
                   <p className="mt-1 text-meta text-muted-foreground">{addressLine(job.address, job.unitLabel)}</p>
+                )}
+                {/* Their scheduled day and HG Capital's due date, before the address actions (contractor-scheduled-date, Q3 A). */}
+                {active && (
+                  <JobDates
+                    taskId={job.id}
+                    scheduled={job.scheduled}
+                    due={job.due}
+                    today={today}
+                    editable={contractorMaySetDate(job.status)}
+                    needsNotice={job.needsNotice}
+                    openOnLoad={ask === "date"}
+                  />
                 )}
               </div>
             </div>

@@ -273,13 +273,22 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
         : null,
     ]);
     // The second decision: the task gone or a draft since, or nothing left to say.
-    const second = claimedRowVerdict({ audience: delivery.audience, items: live.items, job: fresh, hasAccess: !!accessRow, today: todayYmdEastern(now) });
+    // Who lives there, for the 24-hour notice (docs/specs/contractor-scheduled-date.md, Q6): read once for a contractor.
+    const jobAccess = delivery.audience === "contractor" && row.recipientContactId ? await readJobAccess(prisma, first.task) : null;
+    const second = claimedRowVerdict({
+      audience: delivery.audience,
+      items: live.items,
+      job: fresh,
+      hasAccess: !!accessRow,
+      needsNotice: !!jobAccess?.needsNotice,
+      today: todayYmdEastern(now),
+    });
     if (!second.send) {
       await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: now, lastError: second.reason } });
       result.skipped++;
       continue;
     }
-    const { items, due, job } = second;
+    const { items, due, scheduled, job } = second;
     const task = { ...first.task, status: job.status, dueDate: job.dueDate, scheduledFor: job.scheduledFor, description: job.description };
     const off = items.some((i) => i.kind === "OFF");
 
@@ -303,7 +312,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
         ? await mintJobLink(prisma, { taskId: taskId, kind: "STAFF", userId: row.recipientUserId })
         : null;
     // "Show access" when the job page would show the tenants or the lockbox (docs/specs/tenant-contact.md section 3).
-    const access = contractorId ? await readJobAccess(prisma, task) : null;
+    const access = contractorId ? jobAccess : null;
     const hasAccess = !!access && (!!access.lockbox || access.tenants.length > 0);
     // Its own reply address, while replies by email are on (section 5): a reply posts to this job as this recipient.
     const replyConfig = getEnv().email;
@@ -323,6 +332,8 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       taskId: taskId,
       status: task.status,
       due,
+      scheduled,
+      needsNotice: !!access?.needsNotice,
       today: todayYmdEastern(now),
       notes,
       checklist: task.checklist,

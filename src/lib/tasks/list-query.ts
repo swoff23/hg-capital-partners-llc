@@ -352,17 +352,17 @@ export function takenHerePhotosWhere(propertyId: string): Prisma.TaskAttachmentW
 
 /**
  * The 8 am run's jobs (notifications/reminders.ts): a contractor's job that
- * waits on them, with its date on one of `days`. A Scheduled job's date is
- * its visit, or its due date when it has no visit. The four statuses are
- * named, so never In review, Done, Canceled or a draft.
+ * waits on them, with its due date, or its scheduled day while Scheduled, on
+ * one of `days`. The four statuses are named, so never In review, Done,
+ * Canceled or a draft.
  */
 export function dueReminderWhere(days: readonly Date[]): Prisma.TaskWhereInput {
   return {
     assigneeContactId: { not: null },
+    // Due by Due for every open job, their scheduled day while Scheduled (docs/specs/contractor-scheduled-date.md).
     OR: [
+      { status: { in: ["OPEN", "SCHEDULED", "WAITING", "IN_PROGRESS"] }, dueDate: { in: [...days] } },
       { status: "SCHEDULED", scheduledFor: { in: [...days] } },
-      { status: "SCHEDULED", scheduledFor: null, dueDate: { in: [...days] } },
-      { status: { in: ["OPEN", "WAITING", "IN_PROGRESS"] }, dueDate: { in: [...days] } },
     ],
   };
 }

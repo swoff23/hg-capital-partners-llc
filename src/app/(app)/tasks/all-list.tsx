@@ -8,7 +8,7 @@ import { describeRepeat } from "@/lib/tasks/repeat";
 import { cn } from "@/lib/utils";
 import { useTaskList } from "./task-list-context";
 import { usePicks } from "./task-picks";
-import { TaskRow, hasStatusColumn } from "./task-row";
+import { TaskRow, hasScheduledColumn, hasStatusColumn } from "./task-row";
 import { TaskSection } from "./task-section";
 
 /**
@@ -41,6 +41,7 @@ export function AllList({
   const { tasks } = useTaskList();
   const picks = usePicks();
   const statusColumn = tasks.some((t) => hasStatusColumn(t));
+  const scheduledColumn = tasks.some(hasScheduledColumn);
   const field = scoped && sort.field === "property" ? null : sort.field === "due" ? null : sort.field;
 
   const row = (t: ListTask) => (
@@ -50,6 +51,7 @@ export function AllList({
       avatar
       person={field !== "assignee"}
       statusColumn={statusColumn}
+      scheduledColumn={scheduledColumn}
       street={!scoped && field !== "property"}
       cadence={cadence && t.repeat ? describeRepeat(t.repeat, { short: true, from: t.due }) : undefined}
     />
@@ -57,7 +59,7 @@ export function AllList({
 
   return (
     <div className="@container">
-      <TaskColumnHeads statusColumn={statusColumn} />
+      <TaskColumnHeads statusColumn={statusColumn} scheduledColumn={scheduledColumn} />
       {field === null ? (
         <ul className="@container divide-y divide-border">{tasks.map(row)}</ul>
       ) : (
@@ -122,13 +124,23 @@ function runs(tasks: readonly ListTask[], field: "property" | "assignee"): { key
 /**
  * The column headers over a wide list (task-list-sort.md 3.2), on the
  * one-line rows' widths so each label sits over its column: nothing over the
- * titles, Status, Property, Unit, Assignee, then Due over the date's right
+ * titles, Status, Property, Unit, Assignee, Scheduled (plain, only when a row has a
+ * scheduled day), then Due over the date's right
  * edge. Property, Assignee and Due sort the list; a click flips one already
  * picked. Below the one-line width they drop with the columns, and Sort is in
  * the Filters sheet. `placeholder` draws them inert for the loading screen,
  * which has no FilterScope and doesn't know the sort.
  */
-export function TaskColumnHeads({ statusColumn, placeholder = false }: { statusColumn: boolean; placeholder?: boolean }) {
+export function TaskColumnHeads({
+  statusColumn,
+  scheduledColumn = false,
+  placeholder = false,
+}: {
+  statusColumn: boolean;
+  /** Some row has a scheduled day: a plain Scheduled heading between Assignee and Due. */
+  scheduledColumn?: boolean;
+  placeholder?: boolean;
+}) {
   const head = (label: string, field: string, className: string, numeric = false) =>
     placeholder ? (
       <span className={cn(listHeadClass, "flex items-center gap-1", numeric && "justify-end", className)}>
@@ -150,6 +162,7 @@ export function TaskColumnHeads({ statusColumn, placeholder = false }: { statusC
         {head("Property", "property", "w-36 flex-none")}
         <span className={cn(listHeadClass, "w-24 flex-none")}>Unit</span>
         {head("Assignee", "assignee", "w-28 flex-none")}
+        {scheduledColumn && <span className={cn(listHeadClass, "w-32 flex-none")}>Scheduled</span>}
         {head("Due", "due", "w-30 flex-none", true)}
       </div>
     </div>

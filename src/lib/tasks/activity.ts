@@ -337,7 +337,8 @@ export function eventLine(e: ActivityEvent, names: ActivityNames, today: Ymd): {
     }
     case "SCHEDULED": {
       const to = s(d.to);
-      return { text: to ? `${a} moved the visit to ${fmtShortDay(to, today)}` : `${a} cleared the visit date` };
+      if (!to) return { text: `${a} cleared the scheduled day` };
+      return { text: `${a} ${s(d.from) ? "moved" : "set"} the scheduled day to ${fmtShortDay(to, today)}` };
     }
     case "PROPERTY":
       return { text: propertyLine(e, d, names) };
@@ -644,7 +645,7 @@ function mergedSentence(key: string, evs: ActivityEvent[], names: ActivityNames,
     case "due":
       return { text: datesSentence(a, "the due date", evs, today, { move: "moved", clear: "cleared the due date" }) };
     case "visit":
-      return { text: datesSentence(a, "the visit", evs, today, { move: "moved", clear: "cleared the visit date" }) };
+      return { text: datesSentence(a, "the scheduled day", evs, today, { move: "moved", clear: "cleared the scheduled day" }) };
     case "status": {
       const first = evs[0];
       const origin = s(dataOf(first).from) as TaskStatus | null;
@@ -957,7 +958,7 @@ export function changeKind(e: Pick<ActivityEvent, "kind" | "data">): string {
     case "DUE":
       return "due date";
     case "SCHEDULED":
-      return "visit";
+      return "scheduled day";
     case "PROPERTY": {
       const d = dataOf(e as ActivityEvent);
       return "unitTo" in d || "unitFrom" in d ? "unit" : "property";

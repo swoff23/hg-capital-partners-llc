@@ -156,6 +156,7 @@ export function TaskPageView(p: TaskPageViewProps) {
               taskId={task.id}
               today={p.today}
               status={task.status}
+              waitingOn={task.waitingOn}
               overdue={p.overdue}
               values={p.values}
               users={p.users}

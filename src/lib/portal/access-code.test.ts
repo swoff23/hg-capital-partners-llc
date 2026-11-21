@@ -214,5 +214,5 @@ test("readJobAccess: no unit on a building names no household, and no property s
   const got = await readJobAccess(fakeDb(seen), { propertyId: "p1", unitLabel: null, entryPermittedAt: null }, NOW);
   assert.deepEqual(got.tenants, []);
   assert.deepEqual(seen, [], "no lease read at all");
-  assert.deepEqual(await readJobAccess(fakeDb(), { propertyId: null, unitLabel: "Front", entryPermittedAt: NOW }, NOW), { tenants: [], permitted: false, lockbox: null });
+  assert.deepEqual(await readJobAccess(fakeDb(), { propertyId: null, unitLabel: "Front", entryPermittedAt: NOW }, NOW), { tenants: [], permitted: false, needsNotice: false, lockbox: null });
 });

@@ -1,11 +1,15 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import type { TaskStatus } from "@prisma/client";
 import { Plus } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { AfterDueMark } from "@/components/after-due-mark";
 import { STATUS_TONE, StatusBadge, StatusMark } from "@/components/status-badge";
 import { LinkButton, Section } from "@/components/ui";
 import { fmtDay, type Ymd } from "@/lib/dates";
 import { STATUS_LABEL } from "@/lib/task-scope";
+import { fmtShortDay } from "@/lib/tasks/activity";
+import { isAfterDue } from "@/lib/tasks/rules";
 import { cn } from "@/lib/utils";
 import { Count } from "./record-ui";
 
@@ -15,9 +19,11 @@ export type PropertyTask = {
   status: TaskStatus;
   /** What a Waiting task waits on ("Zack's quote"), or null. */
   waitingOn: string | null;
-  /** The task's Target (D7: the visit date while Scheduled, otherwise Due). */
-  target: string | null;
-  /** A past Target by Today's rule (isTargetLate). */
+  /** The task's due date. */
+  due: string | null;
+  /** The contractor's day while the job is Scheduled (scheduledDay), else null. */
+  scheduled: string | null;
+  /** Past Due by Today's rule (isOverdue). */
   late: boolean;
   who: { label: string; name: string | null; email: string | null; contractor: boolean } | null;
 };
@@ -44,6 +50,8 @@ export function PropertyTasksSection({
   tasks: PropertyTask[];
   today: Ymd;
 }) {
+  // 7.5rem holds a status word; a Scheduled job's day (and its warning) in the column takes 13rem on every row.
+  const statusCol = { "--status-col": tasks.slice(0, SHOWN).some((t) => t.scheduled) ? "13rem" : "7.5rem" } as CSSProperties;
   return (
     <Section
       title={
@@ -73,11 +81,15 @@ export function PropertyTasksSection({
       ) : (
         <ul className="@container divide-y divide-border">
           {tasks.slice(0, SHOWN).map((t) => {
-            const date = t.target ? fmtDay(t.target, { year: "auto", now: today }) : null;
+            const date = t.due ? fmtDay(t.due, { year: "auto", now: today }) : null;
+            // A Scheduled job's day rides with its status, the warning after it when it is past Due.
+            const day = t.scheduled ? fmtShortDay(t.scheduled, today) : null;
+            const mark = t.scheduled && t.due && isAfterDue(t.scheduled, t.due) ? <AfterDueMark due={t.due} today={today} /> : null;
             return (
               <li
                 key={t.id}
-                className="group relative grid min-h-10 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 py-2 pointer-coarse:min-h-12 @min-[30rem]:grid-cols-[7.5rem_minmax(0,1fr)_auto_6rem]"
+                style={statusCol}
+                className="group relative grid min-h-10 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 py-2 pointer-coarse:min-h-12 @min-[30rem]:grid-cols-[var(--status-col)_minmax(0,1fr)_auto_6rem]"
               >
                 <Link
                   href={`/tasks/${t.id}`}
@@ -95,7 +107,11 @@ export function PropertyTasksSection({
                       <span className="truncate">Waiting on {t.waitingOn}</span>
                     </span>
                   ) : (
-                    <StatusBadge status={t.status} className="hidden @min-[30rem]:inline-flex" />
+                    <>
+                      <StatusBadge status={t.status} className="hidden @min-[30rem]:inline-flex" />
+                      {day && <span className="hidden min-w-0 truncate pl-1.5 text-meta text-muted-foreground @min-[30rem]:inline">{day}</span>}
+                      {mark && <span className="hidden pl-1.5 @min-[30rem]:inline-flex">{mark}</span>}
+                    </>
                   )}
                 </span>
 
@@ -104,6 +120,8 @@ export function PropertyTasksSection({
                   <p className="col-start-2 row-start-1 truncate text-body text-foreground underline-offset-3 group-hover:underline">{t.title}</p>
                   <p className={cn("col-start-2 row-start-2 truncate text-meta @min-[30rem]:hidden", STATUS_TONE[t.status])}>
                     {STATUS_LABEL[t.status]}
+                    {day && <span className="text-muted-foreground"> {day}</span>}
+                    {mark && <span className="ml-1.5 inline-flex align-middle">{mark}</span>}
                   </p>
                 </div>
 

@@ -8,7 +8,7 @@ import { isActiveStatus, isDraftStatus } from "@/lib/task-scope";
 import * as core from "./core";
 import { assignEach, deleteEach, moveDatesEach, setPropertyEach, setStatusEach, undoAssignEach, undoDatesEach, undoPropertyEach, undoStatusEach } from "./bulk-core";
 import type { AssignChange, AssignPick, DateMove, DeleteOutcome, PropertyChange, StatusChange, StatusPick } from "./bulk-core";
-import { targetField, type DateChange } from "./list";
+import type { DateChange } from "./list";
 import { deleteTask } from "./service";
 
 /**
@@ -46,14 +46,17 @@ function revalidate(rows: { id: string; propertyId: string | null; dealId: strin
 }
 
 /**
- * Move active tasks to `to` (null clears). `which` picks the date:
- *   "due"    the due date (staff tasks, "Move all to today");
- *   "target" what a contractor sees (D7): a Scheduled job's visit date,
- *            otherwise its due date.
+ * Move active tasks to `to` (null clears). `which` picks the date
+ * (docs/specs/contractor-scheduled-date.md):
+ *   "due"       the due date: every row's date chip, contractor jobs
+ *               included, and "Move all to today";
+ *   "scheduled" a Scheduled job's scheduled day: the Tasks page's Scheduled
+ *               column. A job that isn't Scheduled is skipped, and it can't
+ *               be cleared (staff clear it by changing the status).
  * Closed tasks, drafts, tasks deleted since the list was drawn and dates
  * already at `to` are skipped. Returns each moved date as it was, for Undo.
  */
-export async function moveTaskDates(ids: string[], to: Ymd | null, which: "due" | "target", p: core.Principal): Promise<DateChange[]> {
+export async function moveTaskDates(ids: string[], to: Ymd | null, which: "due" | "scheduled", p: core.Principal): Promise<DateChange[]> {
   const value = to === null ? null : toYmd(to);
   if (to !== null && !value) throw new core.TaskRuleError("That isn't a date.");
   const unique = [...new Set(ids)];
@@ -70,8 +73,9 @@ export async function moveTaskDates(ids: string[], to: Ymd | null, which: "due" 
     const moved: DateChange[] = [];
     for (const r of rows) {
       if (!isActiveStatus(r.status)) continue;
-      const field = which === "target" ? targetField({ status: r.status, scheduledFor: toYmd(r.scheduledFor) }) : "dueDate";
-      if (field === "scheduledFor" && !value) throw new core.TaskRuleError("A scheduled job needs a visit date.");
+      const field = which === "scheduled" ? "scheduledFor" : "dueDate";
+      if (field === "scheduledFor" && r.status !== "SCHEDULED") continue;
+      if (field === "scheduledFor" && !value) throw new core.TaskRuleError("A scheduled job needs a day.");
       const was = toYmd(field === "dueDate" ? r.dueDate : r.scheduledFor);
       if (was === value) continue;
       await core.patchTask(tx, r.id, field === "dueDate" ? { dueDate: value } : { scheduledFor: value }, p);
@@ -146,9 +150,9 @@ export async function undoBulkAssign(changes: AssignChange[], p: core.Principal)
   return { done, skipped };
 }
 
-/** One date for many (bulk-core.ts moveDatesEach). */
-export async function bulkMoveDates(ids: string[], jobs: string[], to: Ymd | null, p: core.Principal) {
-  const { rows, ...out } = await prisma.$transaction((tx) => moveDatesEach(tx, ids, new Set(jobs), to, p), BULK_TX);
+/** One due date for many (bulk-core.ts moveDatesEach). */
+export async function bulkMoveDates(ids: string[], to: Ymd | null, p: core.Principal) {
+  const { rows, ...out } = await prisma.$transaction((tx) => moveDatesEach(tx, ids, to, p), BULK_TX);
   revalidate(rows);
   return out;
 }

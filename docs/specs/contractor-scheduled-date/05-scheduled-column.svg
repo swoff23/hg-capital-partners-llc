@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1010" viewBox="0 0 1200 1010" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>A Scheduled column and the after-due warning</title>
+<defs>
+  <g id="warn">
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" fill="none" stroke="#a54e09" stroke-width="2.2" stroke-linejoin="round"/>
+    <path d="M12 9v4M12 17h.01" stroke="#a54e09" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+  <g id="cb"><circle r="8" fill="none" stroke="#c9c5bd" stroke-width="1.5"/></g>
+  <g id="sched"><circle r="5" fill="none" stroke="#5d6778" stroke-width="1.5" stroke-dasharray="2 1.6"/></g>
+  <g id="prog"><circle r="5" fill="none" stroke="#5d6778" stroke-width="1.5"/><path d="M0 -5 A5 5 0 0 1 0 5 Z" fill="#5d6778"/></g>
+  <g id="av"><circle r="9" fill="#e7e5e0"/></g>
+</defs>
+<rect width="1200" height="1010" fill="#ffffff"/>
+<text x="32" y="40" font-size="17" font-weight="600" fill="#152133">Q4, redrawn: the Tasks page with your scheduled day and the after-due warning</text>
+<text x="32" y="62" font-size="12" fill="#5d6778">Laptop 1280 with the sidebar open (the list is 976px). Both options: you can change their day by clicking it; they still can't touch Due.</text>
+
+<!-- ================= A ================= -->
+<rect x="16" y="80" width="1168" height="300" rx="12" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<text x="36" y="108" font-size="14" font-weight="600" fill="#152133">A. Its own Scheduled column (your idea, recommended)</text>
+
+<g transform="translate(36 124) scale(0.9)">
+  <!-- header -->
+  <text x="172" y="18" font-size="12" font-weight="500" fill="#5d6778">Status</text>
+  <text x="360" y="18" font-size="12" font-weight="500" fill="#5d6778">Property</text>
+  <text x="516" y="18" font-size="12" font-weight="500" fill="#5d6778">Unit</text>
+  <text x="624" y="18" font-size="12" font-weight="500" fill="#5d6778">Assignee</text>
+  <text x="748" y="18" font-size="12" font-weight="600" fill="#152133">Scheduled</text>
+  <text x="976" y="18" font-size="12" font-weight="500" fill="#5d6778" text-anchor="end">Due</text>
+  <line x1="0" y1="28" x2="976" y2="28" stroke="#e7e5e0"/>
+  <rect x="742" y="28" width="108" height="200" fill="#f8f7f3"/>
+  <!-- row 1 -->
+  <use href="#cb" x="10" y="48"/>
+  <text x="32" y="53" font-size="14" fill="#152133">Fix the kitchen fa…</text>
+  <use href="#sched" x="180" y="48"/><text x="192" y="53" font-size="13" fill="#424e61">Scheduled</text>
+  <text x="360" y="53" font-size="13" fill="#424e61">1412 Elm St</text>
+  <text x="516" y="53" font-size="13" fill="#424e61">2</text>
+  <use href="#av" x="634" y="48"/><text x="650" y="53" font-size="13" fill="#424e61">Zack</text>
+  <text x="748" y="53" font-size="13" fill="#152133">Nov 17</text>
+  <text x="976" y="53" font-size="13" fill="#424e61" text-anchor="end">Nov 19</text>
+  <line x1="32" y1="68" x2="976" y2="68" stroke="#e7e5e0"/>
+  <!-- row 2 -->
+  <use href="#cb" x="10" y="88"/>
+  <text x="32" y="93" font-size="14" fill="#152133">Replace smoke det…</text>
+  <use href="#prog" x="180" y="88"/><text x="192" y="93" font-size="13" fill="#424e61">In progress</text>
+  <text x="360" y="93" font-size="13" fill="#424e61">88 Oak Ave</text>
+  <text x="516" y="93" font-size="13" fill="#424e61">1</text>
+  <use href="#av" x="634" y="88"/><text x="650" y="93" font-size="13" fill="#424e61">Zack</text>
+  <text x="976" y="93" font-size="13" fill="#b4452b" text-anchor="end">Nov 16</text>
+  <line x1="32" y1="108" x2="976" y2="108" stroke="#e7e5e0"/>
+  <!-- row 3 -->
+  <use href="#cb" x="10" y="128"/>
+  <text x="32" y="133" font-size="14" fill="#152133">Unclog the basem…</text>
+  <use href="#sched" x="180" y="128"/><text x="192" y="133" font-size="13" fill="#424e61">Scheduled</text>
+  <text x="360" y="133" font-size="13" fill="#424e61">56 Tamarack St</text>
+  <text x="516" y="133" font-size="13" fill="#424e61">Upper</text>
+  <use href="#av" x="634" y="128"/><text x="650" y="133" font-size="13" fill="#424e61">Luis</text>
+  <use href="#warn" transform="translate(796 121) scale(0.6)"/>
+  <text x="748" y="133" font-size="13" fill="#152133">Nov 21</text>
+  <text x="976" y="133" font-size="13" fill="#424e61" text-anchor="end">Nov 20</text>
+  <line x1="32" y1="148" x2="976" y2="148" stroke="#e7e5e0"/>
+  <!-- row 4 -->
+  <use href="#cb" x="10" y="168"/>
+  <text x="32" y="173" font-size="14" fill="#152133">Patch the hall dry…</text>
+  <text x="360" y="173" font-size="13" fill="#424e61">56 Tamarack St</text>
+  <text x="516" y="173" font-size="13" fill="#424e61">Lower</text>
+  <use href="#av" x="634" y="168"/><text x="650" y="173" font-size="13" fill="#424e61">Luis</text>
+  <text x="976" y="173" font-size="13" fill="#424e61" text-anchor="end">Nov 24</text>
+  <line x1="32" y1="188" x2="976" y2="188" stroke="#e7e5e0"/>
+  <!-- row 5 -->
+  <use href="#cb" x="10" y="208"/>
+  <text x="32" y="213" font-size="14" fill="#152133">Renew the insuran…</text>
+  <text x="360" y="213" font-size="13" fill="#424e61">88 Oak Ave</text>
+  <use href="#av" x="634" y="208"/><text x="650" y="213" font-size="13" fill="#424e61">Pieter</text>
+  <text x="976" y="213" font-size="13" fill="#424e61" text-anchor="end">Dec 1</text>
+  <!-- tooltip -->
+  <rect x="660" y="150" width="236" height="30" rx="6" fill="#152133"/>
+  <path d="M798 150 l6 -6 l6 6 Z" fill="#152133"/>
+  <text x="778" y="170" font-size="12" fill="#ffffff" text-anchor="middle">After the due date, Fri, Nov 20</text>
+</g>
+
+<text x="936" y="140" font-size="11.5" fill="#424e61">Shows whenever a row in the list</text>
+<text x="936" y="156" font-size="11.5" fill="#424e61">has a scheduled day, like Status.</text>
+<text x="936" y="178" font-size="11.5" fill="#424e61">Click the day to change it.</text>
+<text x="936" y="200" font-size="11.5" fill="#424e61">The warning icon goes after the</text>
+<text x="936" y="216" font-size="11.5" fill="#424e61">day; hover says why (a tap on touch).</text>
+<text x="936" y="240" font-size="11.5" font-weight="600" fill="#152133">Cost: titles shrink</text>
+<text x="936" y="256" font-size="11.5" fill="#424e61">From about 236px to 128px here,</text>
+<text x="936" y="272" font-size="11.5" fill="#424e61">about 18 letters before the "…".</text>
+<text x="936" y="288" font-size="11.5" fill="#424e61">Roomy with the sidebar closed or</text>
+<text x="936" y="304" font-size="11.5" fill="#424e61">on a wider screen.</text>
+<text x="936" y="326" font-size="11" fill="#5d6778">Ref: Plane and ClickUp give start</text>
+<text x="936" y="342" font-size="11" fill="#5d6778">and due dates their own columns.</text>
+
+<!-- ================= B ================= -->
+<rect x="16" y="396" width="1168" height="276" rx="12" fill="#ffffff" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="36" y="424" font-size="14" font-weight="600" fill="#152133">B. Inside the Status column</text>
+
+<g transform="translate(36 440) scale(0.9)">
+  <text x="280" y="18" font-size="12" font-weight="500" fill="#5d6778">Status</text>
+  <text x="468" y="18" font-size="12" font-weight="500" fill="#5d6778">Property</text>
+  <text x="624" y="18" font-size="12" font-weight="500" fill="#5d6778">Unit</text>
+  <text x="732" y="18" font-size="12" font-weight="500" fill="#5d6778">Assignee</text>
+  <text x="976" y="18" font-size="12" font-weight="500" fill="#5d6778" text-anchor="end">Due</text>
+  <line x1="0" y1="28" x2="976" y2="28" stroke="#e7e5e0"/>
+  <use href="#cb" x="10" y="48"/>
+  <text x="32" y="53" font-size="14" fill="#152133">Fix the kitchen faucet</text>
+  <use href="#sched" x="288" y="48"/><text x="300" y="53" font-size="13" fill="#424e61">Scheduled</text><text x="370" y="53" font-size="13" fill="#152133">Tue, Nov 17</text>
+  <text x="468" y="53" font-size="13" fill="#424e61">1412 Elm St</text>
+  <text x="624" y="53" font-size="13" fill="#424e61">2</text>
+  <use href="#av" x="742" y="48"/><text x="758" y="53" font-size="13" fill="#424e61">Zack</text>
+  <text x="976" y="53" font-size="13" fill="#424e61" text-anchor="end">Nov 19</text>
+  <line x1="32" y1="68" x2="976" y2="68" stroke="#e7e5e0"/>
+  <use href="#cb" x="10" y="88"/>
+  <text x="32" y="93" font-size="14" fill="#152133">Replace smoke detectors</text>
+  <use href="#prog" x="288" y="88"/><text x="300" y="93" font-size="13" fill="#424e61">In progress</text>
+  <text x="468" y="93" font-size="13" fill="#424e61">88 Oak Ave</text>
+  <text x="624" y="93" font-size="13" fill="#424e61">1</text>
+  <use href="#av" x="742" y="88"/><text x="758" y="93" font-size="13" fill="#424e61">Zack</text>
+  <text x="976" y="93" font-size="13" fill="#b4452b" text-anchor="end">Nov 16</text>
+  <line x1="32" y1="108" x2="976" y2="108" stroke="#e7e5e0"/>
+  <use href="#cb" x="10" y="128"/>
+  <text x="32" y="133" font-size="14" fill="#152133">Unclog the basement drain</text>
+  <use href="#sched" x="288" y="128"/><text x="300" y="133" font-size="13" fill="#424e61">Scheduled</text><text x="370" y="133" font-size="13" fill="#152133">Sat, Nov 21</text>
+  <use href="#warn" transform="translate(444 121) scale(0.6)"/>
+  <text x="468" y="133" font-size="13" fill="#424e61">56 Tamarack St</text>
+  <text x="624" y="133" font-size="13" fill="#424e61">Upper</text>
+  <use href="#av" x="742" y="128"/><text x="758" y="133" font-size="13" fill="#424e61">Luis</text>
+  <text x="976" y="133" font-size="13" fill="#424e61" text-anchor="end">Nov 20</text>
+  <line x1="32" y1="148" x2="976" y2="148" stroke="#e7e5e0"/>
+  <use href="#cb" x="10" y="168"/>
+  <text x="32" y="173" font-size="14" fill="#152133">Patch the hall drywall</text>
+  <text x="468" y="173" font-size="13" fill="#424e61">56 Tamarack St</text>
+  <text x="624" y="173" font-size="13" fill="#424e61">Lower</text>
+  <use href="#av" x="742" y="168"/><text x="758" y="173" font-size="13" fill="#424e61">Luis</text>
+  <text x="976" y="173" font-size="13" fill="#424e61" text-anchor="end">Nov 24</text>
+  <line x1="32" y1="188" x2="976" y2="188" stroke="#e7e5e0"/>
+  <use href="#cb" x="10" y="208"/>
+  <text x="32" y="213" font-size="14" fill="#152133">Renew the insurance policy</text>
+  <text x="468" y="213" font-size="13" fill="#424e61">88 Oak Ave</text>
+  <use href="#av" x="742" y="208"/><text x="758" y="213" font-size="13" fill="#424e61">Pieter</text>
+  <text x="976" y="213" font-size="13" fill="#424e61" text-anchor="end">Dec 1</text>
+</g>
+
+<text x="936" y="456" font-size="11.5" fill="#424e61">The day sits beside the word</text>
+<text x="936" y="472" font-size="11.5" fill="#424e61">Scheduled, under the Status heading.</text>
+<text x="936" y="494" font-size="11.5" fill="#424e61">Titles keep their room.</text>
+<text x="936" y="516" font-size="11.5" fill="#424e61">Same warning icon and hover.</text>
+<text x="936" y="538" font-size="11.5" fill="#424e61">It can never get a sort of its own,</text>
+<text x="936" y="554" font-size="11.5" fill="#424e61">and it reads as part of the status,</text>
+<text x="936" y="570" font-size="11.5" fill="#424e61">not as a date you can scan down.</text>
+
+<!-- ================= narrow ================= -->
+<rect x="16" y="688" width="574" height="306" rx="12" fill="#ffffff" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="36" y="716" font-size="13" font-weight="600" fill="#152133">Both options, without columns</text>
+<text x="36" y="734" font-size="11" fill="#5d6778">Phone 375, tablet 768, a narrow window, and Today.</text>
+<g transform="translate(36 748)">
+  <rect width="290" height="222" rx="18" fill="#ffffff" stroke="#d5d1ca" stroke-width="1.5"/>
+  <text x="14" y="30" font-size="11.5" fill="#152133">Fix the kitchen faucet</text>
+  <text x="276" y="30" font-size="10.5" fill="#424e61" text-anchor="end">Nov 19</text>
+  <use href="#sched" transform="translate(19 46) scale(0.8)"/>
+  <text x="28" y="50" font-size="10" fill="#424e61">Scheduled Tue, Nov 17 · 1412 Elm St</text>
+  <line x1="14" y1="64" x2="276" y2="64" stroke="#e7e5e0"/>
+  <text x="14" y="88" font-size="11.5" fill="#152133">Unclog the basement drain</text>
+  <text x="276" y="88" font-size="10.5" fill="#424e61" text-anchor="end">Nov 20</text>
+  <use href="#sched" transform="translate(19 104) scale(0.8)"/>
+  <text x="28" y="108" font-size="10" fill="#424e61">Scheduled Sat, Nov 21</text>
+  <use href="#warn" transform="translate(140 99) scale(0.45)"/>
+  <text x="155" y="108" font-size="10" fill="#424e61">· 56 Tamarack St</text>
+  <line x1="14" y1="122" x2="276" y2="122" stroke="#e7e5e0"/>
+  <text x="14" y="146" font-size="11.5" fill="#152133">Replace smoke detectors</text>
+  <text x="276" y="146" font-size="10.5" fill="#b4452b" text-anchor="end">Nov 16</text>
+  <use href="#prog" transform="translate(19 162) scale(0.8)"/>
+  <text x="28" y="166" font-size="10" fill="#424e61">In progress · 88 Oak Ave</text>
+  <line x1="14" y1="180" x2="276" y2="180" stroke="#e7e5e0"/>
+  <text x="14" y="204" font-size="11.5" fill="#152133">Patch the hall drywall</text>
+  <text x="276" y="204" font-size="10.5" fill="#424e61" text-anchor="end">Nov 24</text>
+</g>
+<text x="344" y="770" font-size="11.5" fill="#424e61">The chip is always Due, so red</text>
+<text x="344" y="786" font-size="11.5" fill="#424e61">always means late.</text>
+<text x="344" y="808" font-size="11.5" fill="#424e61">Their day leads the second line</text>
+<text x="344" y="824" font-size="11.5" fill="#424e61">with the status. At 320 the</text>
+<text x="344" y="840" font-size="11.5" fill="#424e61">address drops first, never the</text>
+<text x="344" y="856" font-size="11.5" fill="#424e61">day or the warning.</text>
+<text x="344" y="878" font-size="11.5" fill="#424e61">On touch, tap the icon to see</text>
+<text x="344" y="894" font-size="11.5" fill="#424e61">why; tap the row to open it.</text>
+
+<!-- ================= elsewhere ================= -->
+<rect x="610" y="688" width="574" height="306" rx="12" fill="#ffffff" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="630" y="716" font-size="13" font-weight="600" fill="#152133">The same warning on both job pages</text>
+<text x="630" y="734" font-size="11" fill="#5d6778">Same icon, same words, wherever their day shows.</text>
+
+<text x="630" y="762" font-size="11" font-weight="500" fill="#424e61">Their job page (Q3 rows), phone</text>
+<g transform="translate(630 772)">
+  <rect width="250" height="88" rx="10" fill="#ffffff" stroke="#d5d1ca" stroke-width="1.5"/>
+  <text x="14" y="30" font-size="11" font-weight="500" fill="#424e61">Scheduled</text>
+  <use href="#warn" transform="translate(94 20) scale(0.5)"/>
+  <text x="112" y="30" font-size="11" fill="#152133">Sat, Nov 21</text>
+  <line x1="112" y1="34" x2="172" y2="34" stroke="#152133" stroke-dasharray="1.5 2"/>
+  <path d="M232 23 l4 4 l-4 4" fill="none" stroke="#5d6778" stroke-width="1.4"/>
+  <line x1="14" y1="46" x2="236" y2="46" stroke="#e7e5e0"/>
+  <text x="14" y="70" font-size="11" font-weight="500" fill="#424e61">Due</text>
+  <text x="112" y="70" font-size="11" fill="#5d6778">Fri, Nov 20</text>
+</g>
+
+<text x="904" y="762" font-size="11" font-weight="500" fill="#424e61">Your task page, laptop</text>
+<g transform="translate(904 772)">
+  <rect width="260" height="88" rx="10" fill="#ffffff" stroke="#d5d1ca" stroke-width="1.5"/>
+  <text x="14" y="30" font-size="11" fill="#5d6778">Due</text>
+  <rect x="96" y="16" width="80" height="22" rx="6" fill="#ffffff" stroke="#c9c5bd"/>
+  <text x="136" y="31" font-size="10.5" fill="#152133" text-anchor="middle">Fri, Nov 20</text>
+  <text x="14" y="68" font-size="11" fill="#5d6778">Scheduled</text>
+  <rect x="96" y="54" width="80" height="22" rx="6" fill="#ffffff" stroke="#c9c5bd"/>
+  <text x="136" y="69" font-size="10.5" fill="#152133" text-anchor="middle">Sat, Nov 21</text>
+  <use href="#warn" transform="translate(184 58) scale(0.55)"/>
+</g>
+
+<text x="630" y="890" font-size="11.5" fill="#424e61">Hover (or tap on touch): "After the due date, Fri, Nov 20".</text>
+<text x="630" y="910" font-size="11.5" fill="#424e61">They can still pick a day after Due, since the tenant's day</text>
+<text x="630" y="926" font-size="11.5" fill="#424e61">sometimes lands there; the icon tells both of you.</text>
+<text x="630" y="948" font-size="11.5" fill="#424e61">You can change their day here or in the list. Only you</text>
+<text x="630" y="964" font-size="11.5" fill="#424e61">change Due.</text>
+</svg>

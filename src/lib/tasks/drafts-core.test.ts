@@ -958,14 +958,14 @@ test("every function that takes one task's row for a write refuses a discarded d
     undoApproval: "acts only on a Done task",
     deleteTask: "answers for a discarded draft as for a missing task",
     takeBackRepeat: "takes the copy a finished task made, never a draft",
-    setDateByContractor: "a contractor's write: their access check refuses any draft",
+    scheduleByContractor: "a contractor's write: their access check refuses any draft",
     addLateContractorBatch: "a contractor's write: their access check refuses any draft",
     takeBackContractorPost: "a contractor's write: their access check refuses any draft",
   };
   assert.deepEqual(taking, [...REFUSES, ...Object.keys(OWN_RULE)].sort(), "a function that takes a task's row is on one of the two lists");
   const fns = coreFunctions();
   for (const name of REFUSES) assert.match(fns.get(name) ?? "", /\brefuseDiscarded\(|\bawait ownComment\(tx,/, `${name} refuses a discarded draft`);
-  for (const name of ["setDateByContractor", "addLateContractorBatch", "takeBackContractorPost"]) assert.match(fns.get(name) ?? "", /await assertContractorAccess\(tx, taskId, p\);/, name);
+  for (const name of ["scheduleByContractor", "addLateContractorBatch", "takeBackContractorPost"]) assert.match(fns.get(name) ?? "", /await assertContractorAccess\(tx, taskId, p\);/, name);
   // The line is the one a missing draft gets, and only a unit renamed on its building is carried onto a discarded draft.
   assert.match(fns.get("refuseDiscarded") ?? "", /if \(task && isDiscarded\(task\)\) throw new TaskRuleError\(DRAFT_GONE_LINE\);/);
   assert.match(fns.get("patchTask") ?? "", /return writePatch\(tx, taskId, patch, p, now, "refuse"\);/);

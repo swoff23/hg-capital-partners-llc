@@ -14,11 +14,12 @@ test("a moved due date reads from the day before to the day after, and who", () 
   assert.equal(dateChangeText(c!, "2026-10-26"), "Due date moved to Fri, Oct 30 (was Thu, Oct 29)");
 });
 
-test("the words are Due date and Visit, never target", () => {
+test("the words are Due date and Scheduled day, never target or Visit", () => {
   const a = dateChange(job({ due: "2026-10-30" }), [due("2026-10-29", "2026-10-30")])!;
   const b = dateChange(job({ status: "SCHEDULED", scheduled: "2026-10-30" }), [visit("2026-10-29", "2026-10-30")])!;
   for (const c of [a, b]) assert.doesNotMatch(dateChangeText(c, "2026-10-26"), /target/i);
-  assert.match(dateChangeText(b, "2026-10-26"), /^Visit moved to Fri, Oct 30 \(was Thu, Oct 29\)$/);
+  assert.match(dateChangeText(b, "2026-10-26"), /^Scheduled day moved to Fri, Oct 30 \(was Thu, Oct 29\)$/);
+  for (const c of [a, b]) assert.doesNotMatch(dateChangeText(c, "2026-10-26"), /visit/i);
 });
 
 test("a date set where there was none, and one cleared", () => {
@@ -43,22 +44,22 @@ test("no date events, no notice", () => {
   assert.equal(dateChange(job({ due: "2026-10-29" }), []), null);
 });
 
-test("the due date moving while the job is Scheduled isn't something the contractor sees: the visit is their date", () => {
+test("the due date moving while the job is Scheduled is shown: it's HG Capital's date", () => {
   const now = job({ status: "SCHEDULED", due: "2026-11-05", scheduled: "2026-10-27" });
-  assert.equal(dateChange(now, [due("2026-10-29", "2026-11-05")]), null);
+  assert.deepEqual(dateChange(now, [due("2026-10-29", "2026-11-05")]), { kind: "moved", visit: false, from: "2026-10-29", to: "2026-11-05", by: "Connor" });
 });
 
-test("starting your own Scheduled job swaps the visit for the due date, and that is not HG moving it", () => {
+test("starting your own Scheduled job ends the scheduled day, and that is not HG moving it", () => {
   const now = job({ status: "IN_PROGRESS", due: "2026-10-30", scheduled: "2026-10-27" });
   assert.equal(dateChange(now, [status("SCHEDULED", "IN_PROGRESS")]), null);
 });
 
 test("a date edit is read against the status the job had at that moment", () => {
-  // Visit moved 27 -> 28 while Scheduled, then the contractor started the job: the visit move is what they missed.
+  // Scheduled day moved 27 -> 28 while Scheduled, then the contractor started the job: the day's move is what they missed.
   const now = job({ status: "IN_PROGRESS", due: "2026-10-30", scheduled: "2026-10-28" });
   const c = dateChange(now, [visit("2026-10-27", "2026-10-28"), status("SCHEDULED", "IN_PROGRESS")])!;
   assert.deepEqual([c.visit, c.from, c.to], [true, "2026-10-27", "2026-10-28"]);
-  assert.equal(dateChangeText(c, "2026-10-26"), "Visit moved to Wed, Oct 28 (was Tue, Oct 27)");
+  assert.equal(dateChangeText(c, "2026-10-26"), "Scheduled day moved to Wed, Oct 28 (was Tue, Oct 27)");
 });
 
 test("a move of a different kind after a status change starts its own notice", () => {

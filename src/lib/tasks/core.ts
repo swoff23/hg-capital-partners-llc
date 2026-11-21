@@ -7,6 +7,7 @@ import { jobKey, notesFingerprint } from "@/lib/notifications/content";
 import { unitDisplay, unitLabels } from "@/lib/picker-options-shape";
 import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
 import { contractorMaySetDate } from "@/lib/portal/job-link-paths";
+import type { ReminderKind } from "@/lib/notifications/reminder-rules";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, STATUS_LABEL, draftTask, isActiveStatus, isDiscarded } from "@/lib/task-scope";
 import { homeOccupied, readTaskHome } from "@/lib/tenants/living";
@@ -23,9 +24,8 @@ import {
   canSetStatus,
   contractorStatusRefusal,
   notifyAudience,
+  scheduledDay,
   statusEventVisibility,
-  targetDate,
-  targetIsVisit,
   writeAudience,
   type NotifyChange,
   type PrincipalKind,
@@ -369,7 +369,7 @@ async function archivedAssigneeToGiveBack(tx: Tx, taskId: string, from: TaskStat
 
 export interface OutboxItem {
   // OFF: taken off the job or canceled (notifyOff); DUE_TODAY and OVERDUE: the 8 am emails (notifications/reminders.ts).
-  kind: NotifyChange["kind"] | "OFF" | "DUE_TODAY" | "OVERDUE";
+  kind: NotifyChange["kind"] | "OFF" | ReminderKind;
   actorLabel: string;
   summary: string;
   at: string;
@@ -385,14 +385,14 @@ export interface OutboxItem {
   eventId?: string;
   /** A send-back's note: the note comment's id. Its text sits inside the STATUS summary, so the drain rebuilds or strips it. */
   noteEventId?: string;
-  /** TARGET: the date that moved is the booked visit, not the due date ("moved the visit to Fri, Oct 30"). */
+  /** Legacy (rows queued before Nov 21): a TARGET line whose date was the scheduled day. DAY lines carry that now. */
   visit?: boolean;
   /** DUE_TODAY and OVERDUE (notifications/reminders.ts): the date the reminder is for, which keeps it to once per date. */
   due?: string;
   /**
-   * TARGET, NOTES and STATUS: what the job had before this change, so the drain drops a change put back before the
-   * email goes (notifications/content.ts undoneDropped). TARGET the date ("" for none), NOTES notesFingerprint, STATUS
-   * the status.
+   * TARGET, DAY, NOTES and STATUS: what the job had before this change, so the drain drops a change put back before
+   * the email goes (notifications/content.ts undoneDropped). TARGET the due date and DAY the scheduled day ("" for
+   * none), NOTES notesFingerprint, STATUS the status.
    */
   from?: string;
   /**
@@ -414,7 +414,7 @@ type NotifyTask = Pick<Task, "id" | "assigneeContactId" | "status">;
  */
 const emailDay = (d: Date | Ymd, now: Date) => fmtDay(d, { weekday: true, year: "auto", now: todayYmdEastern(now) });
 
-/** The assignment line; a Scheduled job says its visit date. */
+/** The assignment line; a Scheduled job says its scheduled day. */
 const assignedSummary = (t: Pick<Task, "title" | "status" | "scheduledFor">, now: Date) =>
   t.status === "SCHEDULED" && t.scheduledFor ? `assigned you "${t.title}" for ${emailDay(t.scheduledFor, now)}` : `assigned you "${t.title}"`;
 
@@ -516,29 +516,45 @@ async function notifyOff(tx: Tx, task: NotifyTask, contactId: string, p: Princip
   await enqueue(tx, { contactId }, task.id, { kind: "OFF", actorLabel: p.label, summary, at: now.toISOString(), ...(job ? { job } : {}) }, now);
 }
 
+/** The stored words of each 8 am line (content.ts itemText writes what the email says). */
+const REMINDER_SUMMARY: Record<ReminderKind, string> = {
+  SCHEDULED_TODAY: "scheduled today",
+  SCHEDULED_TOMORROW: "scheduled tomorrow",
+  DUE_TODAY: "due today",
+  DUE_TOMORROW: "due tomorrow",
+  OVERDUE: "due yesterday",
+};
+
 /** Advisory-lock namespace for the 8 am reminders (portal uses 7301 to 7303). */
 const REMINDER_LOCK = 7304;
 
 /**
- * One 8 am email (docs/specs/contractor-job-emails.md, section 6): "Due
- * today" on the job's date, "Due yesterday" the morning after, under the same
+ * One 8 am line (docs/specs/contractor-job-emails.md, section 6;
+ * docs/specs/contractor-scheduled-date.md): its kind and day, under the same
  * rules as any email to a contractor (a login, a first sign-in, their switch
- * on). Once per job, contractor and date: a reminder already queued or sent
- * for that date is found in the outbox and not queued again, under a lock so
- * two runs at once queue one. It bundles with anything else waiting for them
- * on the job. Returns whether it queued. Never for a draft, read here again
- * inside the transaction: the run's own list of jobs can be a moment old, and
- * an Add's Undo may have made the job a draft since. A reminder that landed
- * beside such an Undo and was closed unsent for it (the send run's "draft",
- * notifications/content.ts) reached nobody, so it doesn't count as queued:
- * the job added again that morning gets its reminder.
+ * on). Once per job, contractor, kind and day: one already queued or sent is
+ * found in the outbox and not queued again, under a lock so two runs at once
+ * queue one. A line the send run dropped as no longer true ("nothing to
+ * send") doesn't count, so a day moved away and back gets its heads-up.
+ *
+ * `morningStart`: the 8 am run's own rule, one line per job per morning
+ * (spec section 4): any reminder line queued for this job since that instant
+ * holds this one back, so a job that changes during the 8 o'clock hour (a
+ * Start, a moved day) doesn't get a second email. The right-away heads-up
+ * (reminders.ts queueNoticeNow) passes none. Returns whether it queued.
+ *
+ * Never for a draft, read here again inside the transaction: the run's own
+ * list of jobs can be a moment old, and an Add's Undo may have made the job a
+ * draft since. A reminder closed unsent for that ("draft") or as no longer
+ * true ("nothing to send") reached nobody, so it doesn't count as queued.
  */
 export async function queueDueReminder(
   tx: Tx,
   task: { id: string; assigneeContactId: string },
-  kind: "DUE_TODAY" | "OVERDUE",
+  kind: ReminderKind,
   due: Ymd,
   now: Date,
+  morningStart?: Date,
 ): Promise<boolean> {
   const contactId = task.assigneeContactId;
   const row = await tx.task.findUnique({ where: { id: task.id }, select: { status: true } });
@@ -549,10 +565,20 @@ export async function queueDueReminder(
   const seen = await tx.$queryRaw<{ one: number }[]>`
     SELECT 1 AS one FROM "NotificationOutbox"
     WHERE "recipientContactId" = ${contactId} AND "taskId" = ${task.id} AND "items" @> ${marker}::jsonb
-      AND "lastError" IS DISTINCT FROM 'draft'
+      AND ("lastError" IS NULL OR "lastError" NOT IN ('nothing to send', 'draft'))
     LIMIT 1`;
   if (seen.length > 0) return false;
-  const summary = kind === "DUE_TODAY" ? "due today" : "due yesterday";
+  if (morningStart) {
+    const kinds = Object.keys(REMINDER_SUMMARY);
+    const thisMorning = await tx.$queryRaw<{ one: number }[]>`
+      SELECT 1 AS one FROM "NotificationOutbox" o, jsonb_array_elements(o."items") AS i
+      WHERE o."recipientContactId" = ${contactId} AND o."taskId" = ${task.id}
+        AND i->>'kind' = ANY(${kinds}::text[])
+        AND ((i->>'at')::timestamptz AT TIME ZONE 'UTC') >= (${morningStart.toISOString()}::timestamptz AT TIME ZONE 'UTC')
+      LIMIT 1`;
+    if (thisMorning.length > 0) return false;
+  }
+  const summary = REMINDER_SUMMARY[kind];
   await enqueue(tx, { contactId }, task.id, { kind, actorLabel: "HG", summary, at: now.toISOString(), due }, now);
   return true;
 }
@@ -1448,7 +1474,7 @@ export function statusSummary(
 export interface StatusOptions {
   /** Required for WAITING. */
   waitingOn?: string | null;
-  /** The visit date for SCHEDULED; keeps the existing one when omitted. */
+  /** The scheduled day for SCHEDULED; keeps the existing one when omitted. */
   scheduledFor?: Ymd | null;
   /** A shared note to the contractor, e.g. why a job was sent back from Review; a contractor's Mark done note. */
   note?: string | null;
@@ -1519,7 +1545,7 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   const waitingOn = opts.waitingOn?.trim() || null;
   if (to === "WAITING" && !waitingOn) throw new TaskRuleError("Say what it's waiting on.");
   const scheduledFor = opts.scheduledFor !== undefined ? ymdToDate(opts.scheduledFor) : before.scheduledFor;
-  if (to === "SCHEDULED" && !scheduledFor) throw new TaskRuleError("Pick the visit date.");
+  if (to === "SCHEDULED" && !scheduledFor) throw new TaskRuleError("Pick the scheduled day.");
 
   const closing = to === "DONE" || to === "CANCELED";
   const reopening = !isActiveStatus(before.status) && isActiveStatus(to);
@@ -2136,19 +2162,23 @@ async function writePatch(tx: Tx, taskId: string, patch: TaskPatch, p: Principal
     // The contractor taken off an open job hears so, so nobody makes the trip (docs/specs/contractor-job-emails.md 6).
     if (before.assigneeContactId && isActiveStatus(before.status)) {
       // The job as they knew it, so giving it straight back says nothing unless it changed meanwhile (content.ts offItems).
-      const job = jobKey({ status: before.status, target: toYmd(targetDate(before)), notes: before.description });
+      const job = jobKey({ status: before.status, due: toYmd(before.dueDate), scheduled: toYmd(scheduledDay(before)), notes: before.description });
       await notifyOff(tx, after, before.assigneeContactId, p, `took you off "${after.title}"`, now, job);
     }
   } else if (after.assigneeContactId) {
-    // Same contractor: tell them about what they can see change.
-    const targetBefore = toYmd(targetDate(before));
-    const targetAfter = toYmd(targetDate(after));
-    if (targetBefore !== targetAfter) {
-      const to = targetAfter ? emailDay(targetAfter, now) : "no date";
-      // Whether the date that moved is the booked visit, so the email says "visit" or "due date" the way the job
-      // page labels it (a cleared date is the one the job had).
-      const visit = targetIsVisit(targetAfter ? after : before);
-      await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${to}`, now, { visit, from: targetBefore ?? "" });
+    // Same contractor: tell them about what they can see change. Due (TARGET) and their scheduled day (DAY) are
+    // separate lines (docs/specs/contractor-scheduled-date.md), so the email names which one moved.
+    const dueBefore = toYmd(before.dueDate);
+    const dueAfter = toYmd(after.dueDate);
+    if (dueBefore !== dueAfter) {
+      const to = dueAfter ? emailDay(dueAfter, now) : "no date";
+      await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${to}`, now, { from: dueBefore ?? "" });
+    }
+    const dayBefore = toYmd(scheduledDay(before));
+    const dayAfter = toYmd(scheduledDay(after));
+    if (dayBefore !== dayAfter) {
+      const to = dayAfter ? emailDay(dayAfter, now) : "no date";
+      await notify(tx, after, p, { kind: "DAY", visibility: "SHARED" }, `moved "${after.title}" to ${to}`, now, { from: dayBefore ?? "" });
     }
     if (events.some((e) => e.kind === "NOTES")) {
       await notify(tx, after, p, { kind: "NOTES", visibility: "SHARED" }, `updated the notes on "${after.title}"`, now, { from: notesFingerprint(before.description) });
@@ -2158,35 +2188,30 @@ async function writePatch(tx: Tx, taskId: string, patch: TaskPatch, p: Principal
 }
 
 /**
- * A contractor sets the day they agreed with the tenant (docs/specs/contractor-job-emails.md, section 7, Connor's
- * call): it becomes the job's due date, and a Scheduled job's day too, so the two can't disagree. Earlier or later, no
- * approval. Only on a job waiting on them (To do, Scheduled, Waiting, In progress). Both partners get "Zack moved the
- * due date to Mon, Nov 23 (was Thu, Nov 19)". Marks the task edited in the app, so the Asana sync holds it back.
+ * A contractor sets or moves their scheduled day: the day they plan to go,
+ * usually agreed with the tenant (docs/specs/contractor-scheduled-date.md,
+ * Q1 and Q2). It never touches the due date, which is HG Capital's alone. On
+ * a To do or Waiting job it is a move to Scheduled through setStatus, whose
+ * line reads "scheduled "Fix the sink" for Tue, Nov 17" to both partners; a
+ * Waiting reason clears. On a Scheduled job it moves the day, earlier or
+ * later, no approval, and both partners get "moved "Fix the sink" to Mon,
+ * Nov 23 (was Tue, Nov 17)". Never on an In progress, Review or closed job.
+ * Marks the task edited in the app, so the Asana sync holds it back.
  */
-export async function setDateByContractor(tx: Tx, taskId: string, date: Ymd, p: Extract<Principal, { kind: "contractor" }>, now = new Date()): Promise<Task> {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !ymdToDate(date)) throw new TaskRuleError("Pick a date.");
+export async function scheduleByContractor(tx: Tx, taskId: string, date: Ymd, p: Extract<Principal, { kind: "contractor" }>, now = new Date()): Promise<Task> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !ymdToDate(date)) throw new TaskRuleError("Pick a day.");
   await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
   await assertContractorAccess(tx, taskId, p);
   const before = await tx.task.findUnique({ where: { id: taskId } });
   if (!before) throw new TaskRuleError("That job no longer exists.");
-  if (!contractorMaySetDate(before.status)) throw new TaskRuleError("This job's date can't change now.");
-  const from = toYmd(targetDate(before));
+  if (!contractorMaySetDate(before.status)) throw new TaskRuleError("This job's day can't change now.");
+  if (before.status !== "SCHEDULED") return (await setStatus(tx, taskId, "SCHEDULED", p, { scheduledFor: date }, now)).task;
+  const from = toYmd(before.scheduledFor);
   if (from === date) return before;
-  const d = ymdToDate(date);
-  const data: Prisma.TaskUncheckedUpdateInput = {};
-  const events: EventInput[] = [];
-  if (toYmd(before.dueDate) !== date) {
-    data.dueDate = d;
-    events.push({ kind: "DUE", data: { from: toYmd(before.dueDate), to: date } });
-  }
-  if (before.status === "SCHEDULED" && toYmd(before.scheduledFor) !== date) {
-    data.scheduledFor = d;
-    events.push({ kind: "SCHEDULED", data: { from: toYmd(before.scheduledFor), to: date } });
-  }
-  const after = await tx.task.update({ where: { id: taskId }, data: { ...data, ...editStamp(p, now) } });
-  for (const e of events) await addEvent(tx, taskId, p, e);
+  const after = await tx.task.update({ where: { id: taskId }, data: { scheduledFor: ymdToDate(date), ...editStamp(p, now) } });
+  await addEvent(tx, taskId, p, { kind: "SCHEDULED", data: { from, to: date } });
   const was = from ? ` (was ${emailDay(from, now)})` : "";
-  await notify(tx, after, p, { kind: "TARGET", visibility: "SHARED" }, `moved "${after.title}" to ${emailDay(date, now)}${was}`, now, { visit: false, from: from ?? "" });
+  await notify(tx, after, p, { kind: "DAY", visibility: "SHARED" }, `moved "${after.title}" to ${emailDay(date, now)}${was}`, now, { from: from ?? "" });
   return after;
 }
 
