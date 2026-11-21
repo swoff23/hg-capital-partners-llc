@@ -28,7 +28,7 @@ const REASONS: Record<BulkSkip, [one: string, many: string]> = {
   closed: ["is closed", "are closed"],
   changed: ["changed since", "changed since"],
   gone: ["was deleted", "were deleted"],
-  needsDate: ["needs a visit date", "need a visit date"],
+  needsDate: ["needs a day", "need a day"],
   refused: ["couldn't change", "couldn't change"],
 };
 const ORDER: BulkSkip[] = ["closed", "changed", "needsDate", "gone", "refused"];

@@ -107,9 +107,13 @@ export type JobTenant = { name: string; phone: string | null; dial: string | nul
  * vacant home, or permission). Names and numbers only: never rent, emails,
  * notes, another household or the units list.
  */
-export type JobAccess = { tenants: JobTenant[]; permitted: boolean; lockbox: LockboxAccess | null };
+/**
+ * `needsNotice`: someone lives there and Permission to enter is off, so the contractor gives the tenant 24 hours'
+ * notice before going (docs/specs/contractor-scheduled-date.md, Q6 and Q7).
+ */
+export type JobAccess = { tenants: JobTenant[]; permitted: boolean; needsNotice: boolean; lockbox: LockboxAccess | null };
 
-export const NO_ACCESS: JobAccess = { tenants: [], permitted: false, lockbox: null };
+export const NO_ACCESS: JobAccess = { tenants: [], permitted: false, needsNotice: false, lockbox: null };
 
 type JobAccessReader = Pick<PrismaClient, "property" | "lease">;
 
@@ -140,6 +144,7 @@ export async function readJobAccess(
   return {
     tenants: (living?.tenants ?? []).map(({ tenant: t }) => ({ name: t.fullName, phone: t.phone, dial: t.phoneE164 ?? t.phone })),
     permitted: state.permitted,
+    needsNotice: state.occupied && !state.permitted,
     lockbox: state.showsLockbox ? pickLockboxAccess(row.units, job.unitLabel) : null,
   };
 }

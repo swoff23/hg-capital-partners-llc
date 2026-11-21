@@ -1,4 +1,5 @@
 import type { TaskEventKind, TaskStatus, Visibility } from "@prisma/client";
+import type { Ymd } from "@/lib/dates";
 
 /**
  * Who may do what to a task, what contractors see, and who gets emailed.
@@ -11,12 +12,15 @@ export type PrincipalKind = "staff" | "contractor" | "system" | "asana";
 /** Contractors get two buttons: Start job and Mark done (docs/asana-migration-plan.md D6c). */
 const CONTRACTOR_CAN_START: readonly TaskStatus[] = ["OPEN", "SCHEDULED", "WAITING"];
 const CONTRACTOR_CAN_FINISH: readonly TaskStatus[] = ["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING"];
+/** Picking their day turns a To do or Waiting job Scheduled (docs/specs/contractor-scheduled-date.md, Q2). Only core.ts scheduleByContractor asks. */
+const CONTRACTOR_CAN_SCHEDULE: readonly TaskStatus[] = ["OPEN", "WAITING"];
 
 export function canSetStatus(kind: PrincipalKind, from: TaskStatus, to: TaskStatus): boolean {
   if (from === to) return false;
   if (kind !== "contractor") return true;
   if (to === "IN_PROGRESS") return CONTRACTOR_CAN_START.includes(from);
   if (to === "REVIEW") return CONTRACTOR_CAN_FINISH.includes(from);
+  if (to === "SCHEDULED") return CONTRACTOR_CAN_SCHEDULE.includes(from);
   return false;
 }
 
@@ -73,14 +77,25 @@ export function contractorSeesRow(
   return row.audienceContactId === null || row.audienceContactId === contactId;
 }
 
-/** What a contractor sees as "Target": the visit date while Scheduled, otherwise the due date. */
-export function targetDate(t: { status: TaskStatus; scheduledFor: Date | null; dueDate: Date | null }): Date | null {
-  return targetIsVisit(t) ? t.scheduledFor : t.dueDate;
+/**
+ * A job's two dates (docs/specs/contractor-scheduled-date.md): Due is HG
+ * Capital's alone, and the scheduled day is the day the contractor plans to
+ * go. The scheduled day counts only while the job is Scheduled; the column
+ * keeps its last value after Start, unseen. Late, the Due emails and the date
+ * chip on staff lists go by Due only.
+ */
+export function scheduledDay<T extends Date | Ymd>(t: { status: TaskStatus; scheduledFor: T | null }): T | null {
+  return t.status === "SCHEDULED" ? t.scheduledFor : null;
 }
 
-/** Whether that date is the booked visit, which the portal labels "Visit date" rather than "Due date". */
-export function targetIsVisit(t: { status: TaskStatus; scheduledFor: Date | null }): boolean {
-  return t.status === "SCHEDULED" && t.scheduledFor !== null;
+/** The day a contractor's own lists, crew text and calendar go by: their scheduled day, else Due (Q8). */
+export function jobDay<T extends Date | Ymd>(t: { status: TaskStatus; scheduledFor: T | null; dueDate: T | null }): T | null {
+  return scheduledDay(t) ?? t.dueDate;
+}
+
+/** Their day lands after Due: the warning after the date (Q4). Both are "YYYY-MM-DD", so they compare as text. */
+export function isAfterDue(scheduled: Ymd | null | undefined, due: Ymd | null | undefined): boolean {
+  return !!scheduled && !!due && scheduled > due;
 }
 
 /**
@@ -93,7 +108,8 @@ export function targetIsVisit(t: { status: TaskStatus; scheduledFor: Date | null
  *     contractor hears back about finished work only when it's sent back.
  *   - a contractor changes their job → both partners hear about it.
  *   - staff changing staff tasks, the system and the importer email nobody.
- * `TARGET` stands for "the date the contractor sees moved"; core decides that.
+ * `TARGET` stands for "the due date moved" and `DAY` for "the scheduled day
+ * moved" (docs/specs/contractor-scheduled-date.md); core decides which.
  *
  * `contractorGetsEmail` is the whole rule for a contractor's task emails
  * (src/lib/portal/job-emails.ts): an active login, signed in at least once,
@@ -101,15 +117,16 @@ export function targetIsVisit(t: { status: TaskStatus; scheduledFor: Date | null
  * and nothing is sent later to catch them up.
  */
 export type NotifyChange = {
-  kind: TaskEventKind | "TARGET";
+  kind: TaskEventKind | "TARGET" | "DAY";
   visibility: Visibility;
   /** A STATUS change's new status: a staff move to Done emails nobody. */
   to?: TaskStatus;
 };
 
-const STAFF_TO_CONTRACTOR: ReadonlySet<NotifyChange["kind"]> = new Set(["ASSIGNED", "TARGET", "NOTES"]);
-// TARGET: the day a contractor agreed with the tenant (core.ts setDateByContractor).
-const CONTRACTOR_TO_STAFF: ReadonlySet<NotifyChange["kind"]> = new Set(["COMMENT", "ATTACHMENT", "STATUS", "TARGET"]);
+const STAFF_TO_CONTRACTOR: ReadonlySet<NotifyChange["kind"]> = new Set(["ASSIGNED", "TARGET", "DAY", "NOTES"]);
+// DAY: the contractor moved their scheduled day (core.ts scheduleByContractor). TARGET stays for rows queued before
+// Nov 21, when a contractor's pick moved the due date.
+const CONTRACTOR_TO_STAFF: ReadonlySet<NotifyChange["kind"]> = new Set(["COMMENT", "ATTACHMENT", "STATUS", "TARGET", "DAY"]);
 
 export function notifyAudience(
   actor: PrincipalKind,

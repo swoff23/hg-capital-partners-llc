@@ -29,6 +29,8 @@ Each chunk ships its own small migration.
 
 [contractor-job-emails.md](contractor-job-emails.md) makes a job email carry the whole job: What's new, the details, buttons that open the job with no sign-in, reply by email, "Text to my crew", three new emails (taken off a job, 8 am on the date, 8 am the morning after) and a date the contractor sets with the tenant. Connor and Pieter's copy gets the same treatment. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
 
+[contractor-scheduled-date.md](contractor-scheduled-date.md) gives a contractor's job two dates: Due, which only HG Capital sets, and a scheduled day the contractor sets and moves. It adds a Scheduled column on the Tasks page, a warning when the day lands after Due, a "Scheduled today" email, and a heads-up the day before at homes that need 24 hours' notice. It was planned with Connor on Nov 21, 2026, and waits for his "build it".
+
 [send-for-review.md](send-for-review.md) keeps a finished job's emails to what a contractor needs: their button reads "Send for review", Connor and Pieter's email reads "Review:", and Approve or closing a job no longer emails the contractor, so they only hear back when a job is sent back. It was planned with Connor on Nov 15, 2026; he said "build it" the same day, and it's built.
 
 [error-alerts.md](error-alerts.md) sends Connor an alert when the app breaks: server and browser errors, the site going down, and background jobs that stop. It runs on Sentry's free plan alone. It was planned with Connor on Nov 3, 2026, and reviewed on Nov 14, when he took Q13 to Q21. It waits for his "build it".

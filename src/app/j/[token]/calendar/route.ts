@@ -6,7 +6,7 @@ import { jobCalendar } from "@/lib/portal/job-calendar";
 import { jobLinkUrl } from "@/lib/portal/job-link-paths";
 import { resolveJobLink } from "@/lib/portal/job-links";
 import { addressLine } from "@/lib/portal/job-view";
-import { targetDate } from "@/lib/tasks/rules";
+import { jobDay } from "@/lib/tasks/rules";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     where: { id: link.taskId },
     select: { id: true, title: true, unitLabel: true, status: true, dueDate: true, scheduledFor: true, property: { select: { address: true } } },
   });
-  const date = task ? toYmd(targetDate(task)) : null;
+  // Their scheduled day when they have one, else Due (docs/specs/contractor-scheduled-date.md, section 4).
+  const date = task ? toYmd(jobDay(task)) : null;
   if (!task || !date) return notFound();
   const appUrl = getEnv().appUrl;
   const address = task.property?.address ?? null;

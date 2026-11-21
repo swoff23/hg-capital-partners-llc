@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="580" viewBox="0 0 1200 580" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Picking a day and the job's status</title>
+<defs>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#5d6778"/></marker>
+  <!-- one job header card, 230 x 112 -->
+  <g id="card">
+    <rect width="230" height="112" rx="10" fill="#ffffff" stroke="#d5d1ca" stroke-width="1.5"/>
+    <text x="14" y="62" font-size="12.5" font-weight="600" fill="#152133">Fix the kitchen faucet</text>
+    <line x1="14" y1="76" x2="216" y2="76" stroke="#e7e5e0"/>
+  </g>
+</defs>
+<rect width="1200" height="580" fill="#ffffff"/>
+<text x="32" y="40" font-size="17" font-weight="600" fill="#152133">Q2. When they pick a day, does the job turn Scheduled?</text>
+<text x="32" y="62" font-size="12" fill="#5d6778">The top of their job page, step by step. Due stays yours the whole way (Q1).</text>
+
+<!-- ===== Option A ===== -->
+<rect x="24" y="84" width="1152" height="250" rx="12" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<text x="48" y="114" font-size="14" font-weight="600" fill="#152133">A. Yes, it's the Scheduled you already use (recommended)</text>
+<text x="48" y="134" font-size="11.5" fill="#5d6778">One meaning of Scheduled for everyone. Your lists, filters and status menu already handle it.</text>
+
+<g transform="translate(48 158)">
+  <use href="#card"/>
+  <rect x="14" y="16" width="40" height="18" rx="9" fill="#f2f0ec"/>
+  <text x="34" y="29" font-size="9.5" font-weight="500" fill="#424e61" text-anchor="middle">To do</text>
+  <text x="62" y="29" font-size="10.5" font-weight="500" fill="#424e61">Due</text><text x="84" y="29" font-size="10.5" fill="#5d6778">Thu, Nov 19</text>
+  <text x="14" y="98" font-size="11" font-weight="500" fill="#424e61">Scheduled</text>
+  <text x="216" y="98" font-size="11" fill="#152133" text-anchor="end">Set a day</text>
+  <line x1="166" y1="102" x2="216" y2="102" stroke="#152133" stroke-dasharray="1.5 2"/>
+</g>
+<line x1="286" y1="214" x2="356" y2="214" stroke="#5d6778" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="321" y="204" font-size="10.5" fill="#424e61" text-anchor="middle">picks a day</text>
+
+<g transform="translate(364 158)">
+  <use href="#card"/>
+  <rect x="14" y="16" width="62" height="18" rx="9" fill="#f2f0ec"/>
+  <text x="45" y="29" font-size="9.5" font-weight="500" fill="#424e61" text-anchor="middle">Scheduled</text>
+  <text x="84" y="29" font-size="10.5" font-weight="500" fill="#424e61">Due</text><text x="106" y="29" font-size="10.5" fill="#5d6778">Thu, Nov 19</text>
+  <text x="14" y="98" font-size="11" font-weight="500" fill="#424e61">Scheduled</text>
+  <text x="216" y="98" font-size="11" fill="#152133" text-anchor="end">Tue, Nov 17</text>
+  <line x1="152" y1="102" x2="216" y2="102" stroke="#152133" stroke-dasharray="1.5 2"/>
+</g>
+<line x1="602" y1="214" x2="672" y2="214" stroke="#5d6778" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="637" y="204" font-size="10.5" fill="#424e61" text-anchor="middle">taps Start</text>
+
+<g transform="translate(680 158)">
+  <use href="#card"/>
+  <rect x="14" y="16" width="64" height="18" rx="9" fill="#f2f0ec"/>
+  <text x="46" y="29" font-size="9.5" font-weight="500" fill="#424e61" text-anchor="middle">In progress</text>
+  <text x="86" y="29" font-size="10.5" font-weight="500" fill="#424e61">Due</text><text x="108" y="29" font-size="10.5" fill="#5d6778">Thu, Nov 19</text>
+  <rect x="14" y="90" width="120" height="6" rx="3" fill="#f2f0ec"/>
+</g>
+
+<text x="936" y="174" font-size="12" font-weight="600" fill="#152133">What follows</text>
+<text x="936" y="194" font-size="11.5" fill="#424e61">Moving the day keeps it Scheduled.</text>
+<text x="936" y="211" font-size="11.5" fill="#424e61">A Waiting job they pick a day on</text>
+<text x="936" y="227" font-size="11.5" fill="#424e61">turns Scheduled too.</text>
+<text x="936" y="247" font-size="11.5" fill="#424e61">After Start, the Scheduled row</text>
+<text x="936" y="263" font-size="11.5" fill="#424e61">goes away: they're there.</text>
+<text x="936" y="283" font-size="11.5" fill="#424e61">You can still schedule a job</text>
+<text x="936" y="299" font-size="11.5" fill="#424e61">yourself, the same way as now.</text>
+
+<!-- ===== Option B ===== -->
+<rect x="24" y="350" width="1152" height="206" rx="12" fill="#ffffff" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="48" y="380" font-size="14" font-weight="600" fill="#152133">B. No, the date stands apart from status</text>
+<text x="48" y="400" font-size="11.5" fill="#5d6778">The job stays To do until they Start. A new date to carry through lists, filters and emails.</text>
+
+<g transform="translate(48 424)">
+  <use href="#card"/>
+  <rect x="14" y="16" width="40" height="18" rx="9" fill="#f2f0ec"/>
+  <text x="34" y="29" font-size="9.5" font-weight="500" fill="#424e61" text-anchor="middle">To do</text>
+  <text x="62" y="29" font-size="10.5" font-weight="500" fill="#424e61">Due</text><text x="84" y="29" font-size="10.5" fill="#5d6778">Thu, Nov 19</text>
+  <text x="14" y="98" font-size="11" font-weight="500" fill="#424e61">Scheduled</text>
+  <text x="216" y="98" font-size="11" fill="#152133" text-anchor="end">Set a day</text>
+  <line x1="166" y1="102" x2="216" y2="102" stroke="#152133" stroke-dasharray="1.5 2"/>
+</g>
+<line x1="286" y1="480" x2="356" y2="480" stroke="#5d6778" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="321" y="470" font-size="10.5" fill="#424e61" text-anchor="middle">picks a day</text>
+
+<g transform="translate(364 424)">
+  <use href="#card"/>
+  <rect x="14" y="16" width="40" height="18" rx="9" fill="#f2f0ec"/>
+  <text x="34" y="29" font-size="9.5" font-weight="500" fill="#424e61" text-anchor="middle">To do</text>
+  <text x="62" y="29" font-size="10.5" font-weight="500" fill="#424e61">Due</text><text x="84" y="29" font-size="10.5" fill="#5d6778">Thu, Nov 19</text>
+  <text x="14" y="98" font-size="11" font-weight="500" fill="#424e61">Scheduled</text>
+  <text x="216" y="98" font-size="11" fill="#152133" text-anchor="end">Tue, Nov 17</text>
+  <line x1="152" y1="102" x2="216" y2="102" stroke="#152133" stroke-dasharray="1.5 2"/>
+</g>
+
+<text x="636" y="440" font-size="12" font-weight="600" fill="#152133">The catch</text>
+<text x="636" y="460" font-size="11.5" fill="#424e61">Your Scheduled status still means a day you set, so there are two kinds of</text>
+<text x="636" y="477" font-size="11.5" fill="#424e61">"scheduled": a To do job with their day, and a Scheduled job with yours.</text>
+<text x="636" y="497" font-size="11.5" fill="#424e61">Filtering your list by Scheduled would miss every job they booked.</text>
+</svg>

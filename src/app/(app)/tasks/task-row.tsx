@@ -9,7 +9,9 @@ import { LinkPending } from "@/components/link-pending";
 import { pendingRowFill } from "@/components/ui";
 import { StatusBadge, StatusMark } from "@/components/status-badge";
 import { isActiveStatus } from "@/lib/task-scope";
-import { isContractorJob, isOverdue, isTargetLate, targetField, targetOf, type ListTask } from "@/lib/tasks/list";
+import { AfterDueMark } from "@/components/after-due-mark";
+import { fmtShortDay } from "@/lib/tasks/activity";
+import { isContractorJob, isOverdue, scheduledAfterDue, scheduledOf, type ListTask } from "@/lib/tasks/list";
 import { personName, shortName } from "@/lib/tasks/list-sort";
 import { cn } from "@/lib/utils";
 import { AssigneeCell, assigneeCellPull } from "./assignee-cell";
@@ -26,6 +28,11 @@ import { usePicks } from "./task-picks";
 export function hasStatusColumn(task: ListTask, { status = true, reason = false }: { status?: boolean; reason?: boolean } = {}): boolean {
   if (task.status === "WAITING" && task.waitingOn && (status || reason)) return true;
   return status && task.status !== "OPEN";
+}
+
+/** Whether a row has a scheduled day for the Tasks page's Scheduled column (scheduledOf): a list keeps the column when any row does. */
+export function hasScheduledColumn(task: ListTask): boolean {
+  return scheduledOf(task) != null;
 }
 
 /**
@@ -59,9 +66,13 @@ export function hasStatusColumn(task: ListTask, { status = true, reason = false 
  * the overdue date's alone. A canceled title is struck through in --muted-foreground,
  * like a done one.
  *
- * A row shows its status once it's past To do (task-list-sort.md 3.5). A
- * contractor's job shows its Target (D7: the visit date while Scheduled,
- * otherwise Due); a staff task its Due date. The status column is the same width
+ * A row shows its status once it's past To do (task-list-sort.md 3.5). The
+ * date chip is always Due, contractor jobs included, so red always means late.
+ * A Scheduled job's day rides with its status ("Scheduled Sat, Nov 21", then
+ * the AfterDueMark when the day is past Due), in the status column from 480
+ * up and leading the second line below; on the Tasks page's one-line layout
+ * the Scheduled column (`scheduledColumn`) carries the day and the status
+ * reads "Scheduled". The status column is the same width
  * on every row of a list, so its marks line up; a list where no row shows a
  * status (staff To dos) passes `statusColumn={false}` (see hasStatusColumn)
  * and its titles get the width back. Must sit inside a TaskListProvider and
@@ -85,6 +96,8 @@ export function TaskRow({
   reason = false,
   status = true,
   statusColumn: listHasStatus = true,
+  scheduledColumn = false,
+  wideStatus = false,
   street = true,
   cadence,
   actions,
@@ -103,6 +116,10 @@ export function TaskRow({
   status?: boolean;
   /** False when no row in the list shows a status, so the empty column drops (hasStatusColumn). */
   statusColumn?: boolean;
+  /** True when some row in the list has a scheduled day (hasScheduledColumn): the one-line layout adds its Scheduled column, and the status reads just "Scheduled" there. */
+  scheduledColumn?: boolean;
+  /** Some row in the list shows a scheduled day with its status ("Scheduled Tue, Nov 24" and the mark): the status column takes 208px so it fits. */
+  wideStatus?: boolean;
   /** False under a heading that names the building: the place is the unit alone, and a one-line row's Property cell stays empty. */
   street?: boolean;
   /**
@@ -142,9 +159,10 @@ export function TaskRow({
   // The person reassigns from the row where the list offers people (the Tasks page) and the row names them;
   // under a person's heading the heading names them and the cell stays empty.
   const assignable = Boolean(people) && avatar && person;
-  const date = job ? targetOf(task) : task.due;
-  const late = job ? isTargetLate(task, today) : isOverdue(task, today);
-  const visit = job && targetField(task) === "scheduledFor";
+  const date = task.due;
+  const late = isOverdue(task, today);
+  const scheduled = scheduledOf(task);
+  const afterDue = scheduledAfterDue(task);
   const who = avatar && person ? personName(task.assignee) : null;
   const first = shortName(who);
   const property = street ? task.place : null;
@@ -171,9 +189,19 @@ export function TaskRow({
     </span>
   );
   const reasonOnly = waitingOn && reason ? waiting(waitingOn, `Waiting on ${waitingOn}`) : null;
+  // A Scheduled job: the badge, then its day and the warning when the day is past Due. The day is the
+  // text only, so the place drops before it at 320 (the second line truncates the place first).
+  const withDay = badge && scheduled && status ? (
+    <span className="flex min-w-0 items-center gap-1.5">
+      {badge}
+      <span className="truncate text-meta text-muted-foreground">{fmtShortDay(scheduled, today)}</span>
+      {afterDue && task.due && <AfterDueMark due={task.due} today={today} />}
+    </span>
+  ) : null;
   // The status column, from a 480px list up; and the second line's lead below that.
-  const wide = reasonOnly ?? (waitingOn && status ? waiting(`Waiting on ${waitingOn}`) : badge);
-  const narrow = reasonOnly ?? badge;
+  // On a one-line row with the Scheduled column the day moves there and the status is its word alone.
+  const wide = reasonOnly ?? (waitingOn && status ? waiting(`Waiting on ${waitingOn}`) : (withDay ?? badge));
+  const narrow = reasonOnly ?? (withDay ?? badge);
 
   // The place line: the status lead below a 480px list, the place, the avatar.
   // With none of them the row is the title and its date alone.
@@ -189,11 +217,11 @@ export function TaskRow({
         value={date}
         today={today}
         overdue={late}
-        label={visit ? "Visit date" : "Due date"}
+        label="Due date"
         // Named with the task, so a screen reader hears which one: "Due date for Fix the sink: Apr 19" (TASKS-V02).
         subject={task.title}
         isDisabled={!isActiveStatus(task.status)}
-        onChange={(to) => reschedule(task, to, job ? "target" : "due")}
+        onChange={(to) => reschedule(task, to, "due")}
       />
     </span>
   );
@@ -322,7 +350,16 @@ export function TaskRow({
               To do. 144px, so "Waiting on" keeps a word of its reason, and 176 on a wide
               one-line list. */}
           {statusColumn && (
-            <span className={cn("hidden w-36 shrink-0 @min-[30rem]:flex", oneLine && "lg:@min-[60rem]:w-44")}>{wide}</span>
+            <span className={cn("hidden w-36 shrink-0 @min-[30rem]:flex", (scheduledColumn || wideStatus) && "w-52", oneLine && "lg:@min-[60rem]:w-44")}>
+              {oneLine && scheduledColumn && withDay ? (
+                <>
+                  <span className="flex min-w-0 lg:@min-[60rem]:hidden">{wide}</span>
+                  <span className="hidden lg:@min-[60rem]:flex">{badge}</span>
+                </>
+              ) : (
+                wide
+              )}
+            </span>
           )}
           {oneLine && (
             // The one-line row's own columns, between the status and the date (task-list-sort.md 3.1):
@@ -347,6 +384,27 @@ export function TaskRow({
                         {first}
                       </span>
                       <span className="sr-only">{who}</span>
+                    </>
+                  )}
+                </span>
+              )}
+              {scheduledColumn && (
+                // The Scheduled column (128px, TaskColumnHeads): the day as a chip like Due's, the warning after it.
+                // 128 holds the widest weekday chip ("Wednesday") and the mark. Empty for a row with no scheduled
+                // day, so the Due column stays lined up.
+                <span className="pointer-events-auto flex w-32 flex-none items-center gap-1">
+                  {scheduled && (
+                    <>
+                      <DueDatePicker
+                        value={scheduled}
+                        today={today}
+                        label="Scheduled day"
+                        subject={task.title}
+                        allowNone={false}
+                        isDisabled={!isActiveStatus(task.status)}
+                        onChange={(to) => reschedule(task, to, "scheduled")}
+                      />
+                      {afterDue && task.due && <AfterDueMark due={task.due} today={today} />}
                     </>
                   )}
                 </span>

@@ -202,11 +202,19 @@ test("job email: photo strips link each thumbnail, Due carries Add to calendar, 
   assert.ok(!text.includes("v=thumb"));
 });
 
-test("job email: an email with nothing to do has no buttons, and the Due row can offer Change date", () => {
+test("job email: an email with nothing to do has no buttons, and the Scheduled row can offer Change day", () => {
   const off = renderJobEmail({ ...job, primary: null, secondary: [], footnote: undefined });
   assert.equal([...off.html.matchAll(/<a href="/g)].length, 1, "only Directions");
   assert.ok(!off.text.includes("Start job"));
-  const dated = renderJobEmail({ ...job, job: { ...job.job, dateUrl: "https://hg.example.com/j/tok?do=date" } });
-  assert.ok(dated.html.includes(">Change date</a>"));
-  assert.ok(dated.text.includes("Change date: https://hg.example.com/j/tok?do=date"));
+  const url = "https://hg.example.com/j/tok?do=date";
+  // No scheduled day yet: the row reads "Not set" and offers Set a day.
+  const open = renderJobEmail({ ...job, job: { ...job.job, dateUrl: url } });
+  assert.ok(open.html.includes(">Set a day</a>"));
+  assert.ok(open.text.includes(`Set a day: ${url}`));
+  assert.ok(open.text.includes("Not set"));
+  // With a day, the same link reads Change day and sits in the Scheduled row, not the Due row.
+  const dated = renderJobEmail({ ...job, job: { ...job.job, scheduled: "Thu, Oct 29", dateUrl: url } });
+  assert.ok(dated.html.includes(">Change day</a>"));
+  assert.ok(dated.text.includes(`Change day: ${url}`));
+  assert.ok(dated.text.indexOf("Change day") > dated.text.indexOf("Scheduled"));
 });

@@ -42,7 +42,7 @@ import {
   settleLost,
   statusUpdateText,
   stillUploading,
-  dueDateParts,
+  dateParts,
   stripCounts,
   unconfirmedIds,
   updateTimeLabel,
@@ -59,8 +59,8 @@ const job = (id: string, over: Partial<JobCard> = {}): JobCard => ({
   address: null,
   photoUrl: null,
   unitLabel: null,
-  target: null,
-  targetIsVisit: false,
+  due: null,
+  scheduled: null,
   finishedOn: null,
   newCount: 0,
   ...over,
@@ -74,14 +74,14 @@ test("day labels: today, tomorrow, yesterday, then the weekday and date", () => 
   assert.equal(dayLabel("2027-01-05", TODAY), "Tue, Jan 5, 2027");
 });
 
-test("a job's date reads as a label and a day: Due date, or Visit date for a booked visit", () => {
-  assert.deepEqual(dueDateParts("2026-10-22", false, TODAY), { label: "Due date", short: "Due", day: "Today" });
-  assert.deepEqual(dueDateParts("2026-10-29", true, TODAY), { label: "Visit date", short: "Visit", day: "Thu, Oct 29" });
+test("a job's date reads as a label and a day: Due date, or Scheduled with no short label", () => {
+  assert.deepEqual(dateParts("2026-10-22", "due", TODAY), { label: "Due date", short: "Due", day: "Today" });
+  assert.deepEqual(dateParts("2026-10-29", "scheduled", TODAY), { label: "Scheduled", short: "", day: "Thu, Oct 29" });
 });
 
 test("By date: soonest first for open jobs, no date last, one group per day", () => {
   const groups = groupByDate(
-    [job("b", { target: "2026-10-29" }), job("none"), job("a", { target: "2026-10-22" }), job("c", { target: "2026-10-29" })],
+    [job("b", { due: "2026-10-29" }), job("none"), job("a", { due: "2026-10-22" }), job("c", { due: "2026-10-29" })],
     TODAY,
   );
   assert.deepEqual(
@@ -97,8 +97,8 @@ test("By date: soonest first for open jobs, no date last, one group per day", ()
 test("Done, By date: grouped by the day each job was finished, most recent first, not by its old Target", () => {
   const groups = groupJobs(
     [
-      job("early", { target: "2026-10-30", finishedOn: "2026-10-20" }),
-      job("late", { target: "2026-10-05", finishedOn: "2026-10-22" }),
+      job("early", { due: "2026-10-30", finishedOn: "2026-10-20" }),
+      job("late", { due: "2026-10-05", finishedOn: "2026-10-22" }),
       job("undated", { finishedOn: "2026-10-21" }),
     ],
     { tab: "done", group: "date", today: TODAY },
@@ -114,7 +114,7 @@ test("Done, By date: grouped by the day each job was finished, most recent first
 });
 
 test("Open uses the Target, soonest first, whichever switch is on", () => {
-  const jobs = [job("later", { target: "2026-10-29", address: "23 Sherwood St" }), job("sooner", { target: "2026-10-23", address: "23 Sherwood St" })];
+  const jobs = [job("later", { due: "2026-10-29", address: "23 Sherwood St" }), job("sooner", { due: "2026-10-23", address: "23 Sherwood St" })];
   assert.deepEqual(
     groupJobs(jobs, { tab: "open", group: "date", today: TODAY }).map((g) => g.label),
     ["Tomorrow", "Thu, Oct 29"],
@@ -138,10 +138,10 @@ test("Done, By property: most recently finished first inside each address", () =
 
 test("By property: addresses in street-number order, no property last, soonest Target inside", () => {
   const groups = groupByProperty([
-    job("x", { address: "767 Prospect Ave", target: "2026-11-02" }),
+    job("x", { address: "767 Prospect Ave", due: "2026-11-02" }),
     job("loose"),
     job("y", { address: "23 Sherwood St" }),
-    job("z", { address: "767 Prospect Ave", target: "2026-10-25" }),
+    job("z", { address: "767 Prospect Ave", due: "2026-10-25" }),
   ]);
   assert.deepEqual(
     groups.map((g) => [g.label, g.jobs.map((j) => j.id)]),

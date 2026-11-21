@@ -9,19 +9,17 @@ import {
   byDateThenStatus,
   canReceiveSendBack,
   compareByDue,
-  compareByTarget,
   doneMessage,
   groupContractors,
   groupMine,
   isApproval,
   isContractorJob,
   isOverdue,
-  isTargetLate,
+  scheduledAfterDue,
+  scheduledOf,
   movedAllMessage,
   movedMessage,
   ownerKeyOf,
-  targetField,
-  targetOf,
   tickPlan,
   toListTask,
   withLegacyPeople,
@@ -103,15 +101,13 @@ test("toListTask: names the assignee, shortens the address, keeps calendar dates
   assert.equal(t.propertyId, "p1");
   assert.deepEqual(t.assignee, { kind: "contact", id: "c-zack", name: "Zack Reading", hasLogin: false });
   assert.equal(t.checked, false);
-  assert.equal(targetOf(t), "2026-10-27", "Scheduled jobs target the visit date");
-  assert.equal(targetField(t), "scheduledFor");
+  assert.equal(scheduledOf(t), "2026-10-27", "a Scheduled job shows its day");
 
   const legacy = toListTask({ ...base, status: "DONE", assigneeContact: null, assigneeName: "Bob", property: null, deal: { address: "12 Elm St, Buffalo" } });
   assert.deepEqual(legacy.assignee, { kind: "name", name: "Bob" });
   assert.equal(legacy.place, "12 Elm St");
   assert.equal(legacy.checked, true);
-  assert.equal(targetOf(legacy), "2026-10-30", "anything not Scheduled targets Due");
-  assert.equal(targetField(legacy), "dueDate");
+  assert.equal(scheduledOf(legacy), null, "anything not Scheduled has no day");
 });
 
 test("overdue: before today, and never Waiting or Review", () => {
@@ -122,10 +118,13 @@ test("overdue: before today, and never Waiting or Review", () => {
   assert.equal(isOverdue(task({ due: "2026-10-01", status: "WAITING" }), TODAY), false);
   assert.equal(isOverdue(task({ due: "2026-10-01", status: "REVIEW" }), TODAY), false);
   assert.equal(isOverdue(task({ due: "2026-10-01", status: "DONE" }), TODAY), false);
-  // A Scheduled job is late by its visit date, not its due date.
+  // A Scheduled job is late by its due date only, never by its scheduled day (contractor-scheduled-date.md).
   const job = task({ who: zack, status: "SCHEDULED", scheduledFor: "2026-10-20", due: "2026-10-30" });
-  assert.equal(isTargetLate(job, TODAY), true);
-  assert.equal(isTargetLate({ ...job, scheduledFor: "2026-10-23" }, TODAY), false);
+  assert.equal(isOverdue(job, TODAY), false);
+  assert.equal(isOverdue({ ...job, due: "2026-10-21" }, TODAY), true);
+  // Its day after Due is flagged.
+  assert.equal(scheduledAfterDue({ ...job, scheduledFor: "2026-10-31" }), true);
+  assert.equal(scheduledAfterDue(job), false);
 });
 
 test("groupMine: Unassigned, Overdue, Today, Waiting and No date, each in its own place", () => {
@@ -273,10 +272,9 @@ test("sorting: date first (none last), then status order, then newest first", ()
   const e = task({ title: "earlier", due: "2026-10-20", status: "WAITING" });
   assert.deepEqual(ids([d, a, b, c, e].sort(compareByDue)), ["earlier", "to do new", "to do old", "in progress", "undated"]);
 
-  // Jobs sort on Target: a Scheduled job's visit date, not its due date.
+  // Jobs sort on Due too, not their scheduled day.
   const visit = task({ title: "visit Fri", who: zack, status: "SCHEDULED", scheduledFor: "2026-10-23", due: "2026-12-01" });
   const due = task({ title: "due Mon", who: zack, due: "2026-10-26" });
-  assert.deepEqual(ids([due, visit].sort(compareByTarget)), ["visit Fri", "due Mon"]);
   assert.deepEqual(ids([due, visit].sort(compareByDue)), ["due Mon", "visit Fri"]);
 });
 

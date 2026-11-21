@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="430" viewBox="0 0 1000 430" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Which side the warning goes on</title>
+<defs>
+  <g id="warn">
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" fill="none" stroke="#a54e09" stroke-width="2.2" stroke-linejoin="round"/>
+    <path d="M12 9v4M12 17h.01" stroke="#a54e09" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+</defs>
+<rect width="1000" height="430" fill="#ffffff"/>
+<text x="32" y="40" font-size="17" font-weight="600" fill="#152133">Before or after the date?</text>
+<text x="32" y="62" font-size="12" fill="#5d6778">The Scheduled column is left-aligned, like Status, Property and Assignee. Only some rows get the icon.</text>
+
+<!-- Before -->
+<rect x="24" y="84" width="460" height="322" rx="12" fill="#ffffff" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="48" y="114" font-size="14" font-weight="600" fill="#152133">Before the date</text>
+<g transform="translate(48 132)">
+  <text x="0" y="14" font-size="12" font-weight="600" fill="#152133">Scheduled</text>
+  <line x1="0" y1="26" x2="200" y2="26" stroke="#e7e5e0"/>
+  <text x="0" y="52" font-size="13" fill="#152133">Nov 17</text>
+  <line x1="0" y1="66" x2="200" y2="66" stroke="#e7e5e0"/>
+  <use href="#warn" transform="translate(0 80) scale(0.6)"/>
+  <text x="20" y="92" font-size="13" fill="#152133">Nov 21</text>
+  <line x1="0" y1="106" x2="200" y2="106" stroke="#e7e5e0"/>
+  <text x="0" y="132" font-size="13" fill="#152133">Nov 23</text>
+  <line x1="0" y1="146" x2="200" y2="146" stroke="#e7e5e0"/>
+  <use href="#warn" transform="translate(0 160) scale(0.6)"/>
+  <text x="20" y="172" font-size="13" fill="#152133">Dec 2</text>
+  <line x1="0" y1="186" x2="200" y2="186" stroke="#e7e5e0"/>
+  <line x1="-4" y1="34" x2="-4" y2="182" stroke="#b4452b" stroke-dasharray="3 3"/>
+  <line x1="16" y1="74" x2="16" y2="182" stroke="#b4452b" stroke-dasharray="3 3"/>
+</g>
+<text x="270" y="160" font-size="12" font-weight="600" fill="#152133">Dates stop lining up</text>
+<text x="270" y="178" font-size="11.5" fill="#424e61">A flagged date starts 20px to</text>
+<text x="270" y="194" font-size="11.5" fill="#424e61">the right of the rest, so the</text>
+<text x="270" y="210" font-size="11.5" fill="#424e61">column zigzags.</text>
+<text x="270" y="236" font-size="11.5" fill="#424e61">Before only works when every</text>
+<text x="270" y="252" font-size="11.5" fill="#424e61">row has an icon, as in Vanta's</text>
+<text x="270" y="268" font-size="11.5" fill="#424e61">status column.</text>
+<text x="48" y="352" font-size="11.5" fill="#424e61">This is what the column in the last mockup did. The other</text>
+<text x="48" y="368" font-size="11.5" fill="#424e61">spots put it after, so the mockups didn't agree.</text>
+
+<!-- After -->
+<rect x="516" y="84" width="460" height="322" rx="12" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<text x="540" y="114" font-size="14" font-weight="600" fill="#152133">After the date (recommended)</text>
+<g transform="translate(540 132)">
+  <text x="0" y="14" font-size="12" font-weight="600" fill="#152133">Scheduled</text>
+  <line x1="0" y1="26" x2="200" y2="26" stroke="#e7e5e0"/>
+  <text x="0" y="52" font-size="13" fill="#152133">Nov 17</text>
+  <line x1="0" y1="66" x2="200" y2="66" stroke="#e7e5e0"/>
+  <text x="0" y="92" font-size="13" fill="#152133">Nov 21</text>
+  <use href="#warn" transform="translate(50 80) scale(0.6)"/>
+  <line x1="0" y1="106" x2="200" y2="106" stroke="#e7e5e0"/>
+  <text x="0" y="132" font-size="13" fill="#152133">Nov 23</text>
+  <line x1="0" y1="146" x2="200" y2="146" stroke="#e7e5e0"/>
+  <text x="0" y="172" font-size="13" fill="#152133">Dec 2</text>
+  <use href="#warn" transform="translate(42 160) scale(0.6)"/>
+  <line x1="0" y1="186" x2="200" y2="186" stroke="#e7e5e0"/>
+  <line x1="-4" y1="34" x2="-4" y2="182" stroke="#2f6b47" stroke-dasharray="3 3"/>
+</g>
+<text x="762" y="160" font-size="12" font-weight="600" fill="#152133">Every date lines up</text>
+<text x="762" y="178" font-size="11.5" fill="#424e61">The icon reads as a note on</text>
+<text x="762" y="194" font-size="11.5" fill="#424e61">that date, the way the ⓘ on</text>
+<text x="762" y="210" font-size="11.5" fill="#424e61">your CapEx rules sits after</text>
+<text x="762" y="226" font-size="11.5" fill="#424e61">its label.</text>
+<text x="762" y="252" font-size="11.5" fill="#424e61">Ref: Dialpad, Deel and</text>
+<text x="762" y="268" font-size="11.5" fill="#424e61">Evernote put occasional</text>
+<text x="762" y="284" font-size="11.5" fill="#424e61">icons after the text.</text>
+<text x="540" y="352" font-size="11.5" fill="#424e61">One rule everywhere: the column, the phone lists ("Scheduled</text>
+<text x="540" y="368" font-size="11.5" fill="#424e61">Sat, Nov 21 ⚠ · 56 Tamarack St"), your task page and theirs.</text>
+</svg>

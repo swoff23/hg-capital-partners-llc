@@ -45,16 +45,17 @@ const dateChanges = z
 
 /**
  * Move one or more tasks to a date (null clears it). `which` is "due" for
- * staff tasks and "target" for a contractor's job (the visit date while
- * Scheduled). Returns the dates as they were, for Undo.
+ * any row's date chip, contractor jobs included, and "scheduled" for the
+ * Tasks page's Scheduled column (bulk.ts moveTaskDates). Returns the dates as
+ * they were, for Undo.
  */
-export async function rescheduleTasks(ids: string[], to: string | null, which: "due" | "target"): Promise<ActionResult<DateChange[]>> {
+export async function rescheduleTasks(ids: string[], to: string | null, which: "due" | "scheduled"): Promise<ActionResult<DateChange[]>> {
   return withResult("rescheduleTasks", async () => {
     const user = await requireUser();
     return moveTaskDates(
       z.array(taskId).min(1).max(500).parse(ids),
       ymd.parse(to),
-      z.enum(["due", "target"]).parse(which),
+      z.enum(["due", "scheduled"]).parse(which),
       tasks.staffPrincipal(user),
     );
   });
@@ -261,15 +262,14 @@ export async function undoBulkProperty(changes: PropertyChange[]): Promise<Actio
 }
 
 /**
- * One date for every pick (null clears): a contractor's job (`jobs`) moves
- * its target, any other task its due date, each row's date chip rule. Closed
- * tasks are skipped, and so is clearing a Scheduled job's visit date. Undo is
+ * One due date for every pick (null clears), contractor jobs included: their
+ * scheduled day is never moved in bulk. Closed tasks are skipped. Undo is
  * undoBulkDue with the moves it returns.
  */
-export async function bulkDue(taskIds: string[], jobs: string[], to: string | null): Promise<ActionResult<BulkAnswer<DateMove>>> {
+export async function bulkDue(taskIds: string[], to: string | null): Promise<ActionResult<BulkAnswer<DateMove>>> {
   return withResult("bulkDue", async () => {
     const user = await requireUser();
-    return bulkMoveDates(ids.parse(taskIds), z.array(taskId).max(500).parse(jobs), ymd.parse(to), tasks.staffPrincipal(user));
+    return bulkMoveDates(ids.parse(taskIds), ymd.parse(to), tasks.staffPrincipal(user));
   });
 }
 

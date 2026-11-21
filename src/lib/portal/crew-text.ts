@@ -16,6 +16,8 @@ export function crewText(input: {
   where: string;
   /** "Fri, Nov 20", or null with no date. */
   due: string | null;
+  /** Their scheduled day, which leads instead of Due when there is one (docs/specs/contractor-scheduled-date.md). */
+  scheduled?: string | null;
   /** The notes, codes already masked. */
   notes: string | null;
   /** The checklist's items not done yet. */
@@ -26,7 +28,7 @@ export function crewText(input: {
 }): string {
   const notes = input.notes ? oneLine(input.notes) : "";
   const cut = notes.length > CREW_NOTES_MAX ? `${notes.slice(0, CREW_NOTES_MAX - 1).replace(/\s+\S*$/, "")}…` : notes;
-  const head = [oneLine(input.title), input.where, input.due ? `Due ${input.due}` : ""].filter(Boolean).join("\n");
+  const head = [oneLine(input.title), input.where, input.scheduled ? `Scheduled ${input.scheduled}` : input.due ? `Due ${input.due}` : ""].filter(Boolean).join("\n");
   const todo = input.todo.map(oneLine).filter(Boolean);
   return [
     head,

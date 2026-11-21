@@ -4,6 +4,7 @@ import { firstName as greetingName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
 import { STATUS_LABEL, isActiveStatus } from "@/lib/task-scope";
 import { contractorMaySetDate, jobLinkUrl, type JobLinkStep } from "@/lib/portal/job-link-paths";
+import { isAfterDue } from "@/lib/tasks/rules";
 import { reminderFor } from "./reminder-rules";
 import { addressLine, firstName, joinNames, nextStep } from "@/lib/portal/job-view";
 
@@ -31,14 +32,14 @@ export interface OutboxItem {
   eventId?: string;
   /** A send-back's note comment: its text is inside the STATUS summary, and the drain rebuilds or strips it. */
   noteEventId?: string;
-  /** TARGET: the date that moved is the booked visit. Absent on old rows, which read neutrally. */
+  /** Legacy TARGET rows (before Nov 21) only: present means the line names the due date. */
   visit?: boolean;
-  /** DUE_TODAY and OVERDUE (reminders.ts): the date the reminder is for. */
+  /** The 8 am lines (reminders.ts): the day the reminder is for, which keeps each to once per kind and day. */
   due?: string;
   /**
-   * TARGET, NOTES and STATUS: what the job had before this change, so a change
-   * put back before the email goes is dropped (undoneDropped). TARGET: the
-   * date the contractor saw, "" for none. NOTES: notesFingerprint of the
+   * TARGET, DAY, NOTES and STATUS: what the job had before this change, so a
+   * change put back before the email goes is dropped (undoneDropped). TARGET:
+   * the due date, DAY: the scheduled day, "" for none. NOTES: notesFingerprint of the
    * notes. STATUS: the status. Absent on rows queued before Nov 15.
    */
   from?: string;
@@ -47,7 +48,10 @@ export interface OutboxItem {
 }
 
 /** Lines that are the job's own news, with nobody's name in front: the 8 am emails. */
-const UNSIGNED_KINDS = new Set(["DUE_TODAY", "OVERDUE"]);
+const UNSIGNED_KINDS = new Set(["SCHEDULED_TODAY", "SCHEDULED_TOMORROW", "DUE_TODAY", "DUE_TOMORROW", "OVERDUE"]);
+
+/** The 24-hour notice heads-up (docs/specs/contractor-scheduled-date.md, Q6). */
+const NOTICE_KINDS = new Set(["SCHEDULED_TOMORROW", "DUE_TOMORROW"]);
 
 /** The items column, keeping only well-formed entries. */
 export function parseItems(json: unknown): OutboxItem[] {
@@ -222,13 +226,13 @@ function withSendBackNote(item: OutboxItem, note: EventSnapshot | undefined): Ou
 }
 
 /**
- * The job as a contractor knows it, in one string: its status, the date they
- * see (its target) and a fingerprint of its notes. A "took you off" line
+ * The job as a contractor knows it, in one string: its status, its due date,
+ * their scheduled day and a fingerprint of its notes. A "took you off" line
  * carries it (core.ts notifyOff), so the send run can tell whether the job
  * changed while it was someone else's.
  */
-export function jobKey(job: { status: string; target: Ymd | null; notes: string | null | undefined }): string {
-  return `${job.status}|${job.target ?? ""}|${notesFingerprint(job.notes)}`;
+export function jobKey(job: { status: string; due: Ymd | null; scheduled: Ymd | null; notes: string | null | undefined }): string {
+  return `${job.status}|${job.due ?? ""}|${job.scheduled ?? ""}|${notesFingerprint(job.notes)}`;
 }
 
 /**
@@ -264,13 +268,17 @@ export function offItems(items: readonly OutboxItem[], now: { hasAccess: boolean
 }
 
 /**
- * The 8 am lines (reminders.ts) at send time: a "Due today" or "Due yesterday" goes only while it is still true. The
- * job still waits on the contractor (not In review, Done or Canceled) and its date is still the one the line was for,
- * on the day it says. A line the job has moved past is dropped; a bundle left empty closes as "nothing to send".
+ * The 8 am lines (reminders.ts) at send time: each goes only while it is still the one reminderFor picks for the job
+ * now, for the same day. The job still waits on the contractor (not In review, Done or Canceled) and its dates are
+ * still the ones the line was for. A line the job has moved past is dropped; a bundle left empty closes as "nothing
+ * to send". `needsNotice` is whether the home still needs 24 hours' notice.
  */
-export function liveReminders(items: readonly OutboxItem[], now: { status: TaskStatus; due: Ymd | null; today: Ymd }): OutboxItem[] {
-  const want = contractorMaySetDate(now.status) ? reminderFor(now.due, now.today) : null;
-  return items.filter((i) => !UNSIGNED_KINDS.has(i.kind) || (i.kind === want && i.due === now.due));
+export function liveReminders(
+  items: readonly OutboxItem[],
+  now: { status: TaskStatus; due: Ymd | null; scheduled: Ymd | null; needsNotice: boolean; today: Ymd },
+): OutboxItem[] {
+  const want = reminderFor(now, now.today);
+  return items.filter((i) => !UNSIGNED_KINDS.has(i.kind) || (!!want && i.kind === want.kind && i.due === want.day));
 }
 
 /**
@@ -295,7 +303,7 @@ export function notesFingerprint(notes: string | null | undefined): string {
 }
 
 /** The kinds a later change can put back as they were, and what each is compared on. */
-const UNDOABLE_KINDS = ["TARGET", "NOTES", "STATUS"] as const;
+const UNDOABLE_KINDS = ["TARGET", "DAY", "NOTES", "STATUS"] as const;
 
 /**
  * Changes put back before the email goes (Connor, Nov 15): a date moved and
@@ -309,8 +317,16 @@ const UNDOABLE_KINDS = ["TARGET", "NOTES", "STATUS"] as const;
  * STATUS line); the note comment itself stays on the job. Approve's Undo
  * deletes its line, which reconcileItems already drops.
  */
-export function undoneDropped(items: readonly OutboxItem[], now: { due: Ymd | null; notes: string | null; status: TaskStatus }): OutboxItem[] {
-  const current: Record<(typeof UNDOABLE_KINDS)[number], string> = { TARGET: now.due ?? "", NOTES: notesFingerprint(now.notes), STATUS: now.status };
+export function undoneDropped(
+  items: readonly OutboxItem[],
+  now: { due: Ymd | null; scheduled: Ymd | null; notes: string | null; status: TaskStatus },
+): OutboxItem[] {
+  const current: Record<(typeof UNDOABLE_KINDS)[number], string> = {
+    TARGET: now.due ?? "",
+    DAY: now.scheduled ?? "",
+    NOTES: notesFingerprint(now.notes),
+    STATUS: now.status,
+  };
   const undone = new Set<string>(UNDOABLE_KINDS.filter((kind) => {
     const first = items.find((i) => i.kind === kind);
     return first?.from !== undefined && first.from === current[kind];
@@ -362,11 +378,18 @@ export function itemText(item: OutboxItem, title?: string): string {
     case "NOTES":
       return "updated the notes";
     case "TARGET": {
-      // Every job has one date and emails call it the due date, a scheduled job's included: never "visit" or
-      // "target" (docs/specs/contractor-job-emails.md). A row queued before core.ts recorded which reads neutrally.
+      // The due date (docs/specs/contractor-scheduled-date.md); never "visit" or "target". A row queued before
+      // core.ts recorded which date it was reads neutrally.
       const m = /^moved ".*" to (.+)$/.exec(s);
-      if (m && m[1] !== "no date") return `moved the ${item.visit === undefined ? "date" : "due date"} to ${m[1]}`;
-      return `cleared the ${item.visit === undefined ? "date" : "due date"}`;
+      const what = item.visit === undefined && item.from === undefined ? "date" : "due date";
+      if (m && m[1] !== "no date") return `moved the ${what} to ${m[1]}`;
+      return `cleared the ${what}`;
+    }
+    case "DAY": {
+      // The contractor's scheduled day; a contractor's own move carries "(was Tue, Nov 17)".
+      const m = /^moved ".*" to (.+)$/.exec(s);
+      if (m && m[1] !== "no date") return `moved the scheduled day to ${m[1]}`;
+      return "cleared the scheduled day";
     }
     case "COMMENT": {
       const files = /^added files \(\+(\d+) files?\)$/.exec(s);
@@ -375,7 +398,7 @@ export function itemText(item: OutboxItem, title?: string): string {
     }
     case "STATUS": {
       const scheduled = /^scheduled ".*" for (.+)$/.exec(s);
-      if (scheduled) return `set the due date to ${scheduled[1]}`;
+      if (scheduled) return `scheduled it for ${scheduled[1]}`;
       if (/^approved ".*"$/.test(s)) return "approved it";
       // Only the contractor's own Start reads as starting the job (core.ts statusSummary).
       if (/^started ".*"$/.test(s)) return "started the job";
@@ -389,8 +412,14 @@ export function itemText(item: OutboxItem, title?: string): string {
       if (/^sent ".*" for review$/.test(s)) return "sent it for review";
       return s.replace(/"[^"]*"/, "it");
     }
+    case "SCHEDULED_TODAY":
+      return "Scheduled today";
+    case "SCHEDULED_TOMORROW":
+      return "Scheduled tomorrow";
     case "DUE_TODAY":
       return "Due today";
+    case "DUE_TOMORROW":
+      return "Due tomorrow";
     case "OVERDUE":
       return "Due yesterday";
     case "OFF":
@@ -436,7 +465,7 @@ export function itemLine(item: OutboxItem, title?: string): string {
 }
 
 /** Lines that say only their latest: a date, the notes, and an assignment (a picker's Undo and re-pick hands it over twice). */
-const LATEST_ONLY = new Set(["TARGET", "NOTES", "ASSIGNED"]);
+const LATEST_ONLY = new Set(["TARGET", "DAY", "NOTES", "ASSIGNED"]);
 
 /** Target, notes and assignment changes say only their latest; everything else is kept, oldest first. */
 function latestOnly(items: OutboxItem[]): OutboxItem[] {
@@ -444,7 +473,21 @@ function latestOnly(items: OutboxItem[]): OutboxItem[] {
   items.forEach((it, i) => {
     if (LATEST_ONLY.has(it.kind)) lastOf.set(it.kind, i);
   });
-  return items.filter((it, i) => (LATEST_ONLY.has(it.kind) ? lastOf.get(it.kind) === i : true));
+  const firstDay = items.find((it) => it.kind === "DAY");
+  return items
+    .filter((it, i) => (LATEST_ONLY.has(it.kind) ? lastOf.get(it.kind) === i : true))
+    .map((it) => (it.kind === "DAY" && firstDay && it !== firstDay ? { ...it, summary: wasFrom(it.summary, firstDay.summary) } : it));
+}
+
+/**
+ * A contractor's day moved twice in one email reads from the day the reader last saw: the latest line's "(was …)"
+ * becomes the first line's, or goes when the first move set a day where there was none.
+ */
+function wasFrom(latest: string, first: string): string {
+  const was = / \(was [^)]*\)$/;
+  const base = latest.replace(was, "");
+  const m = was.exec(first);
+  return m ? `${base}${m[0]}` : base;
 }
 
 /**
@@ -471,7 +514,7 @@ export function whatsNew(items: OutboxItem[], title?: string): { headline: strin
   let at = kept.findLastIndex((i) => i.kind === "STATUS");
   if (at < 0) at = kept.findIndex((i) => i.kind === "ASSIGNED");
   if (at < 0) at = kept.findLastIndex((i) => UNSIGNED_KINDS.has(i.kind));
-  if (at < 0) at = kept.findLastIndex((i) => i.kind === "TARGET");
+  if (at < 0) at = kept.findLastIndex((i) => i.kind === "TARGET" || i.kind === "DAY");
   if (at < 0) at = 0;
   const lines = kept.map((it) => asSentence(itemLine(it, title)));
   return { headline: lines[at] ?? "", lines: lines.filter((_, i) => i !== at) };
@@ -512,16 +555,17 @@ export function jobSubject(input: { word: string; title: string; where: string }
  * goes; Review on a partner's email while it still waits on their review
  * (docs/specs/send-for-review.md, section 4), the email that carries Approve
  * and Send back; New for an email that hands the contractor the job, with its
- * due date written the brand's way ("New, due Friday", dates.ts dueLabel); Due
- * today or Due yesterday for the 8 am lines; then Update. Removed is
+ * due date written the brand's way ("New, due Friday", dates.ts dueLabel); the
+ * 8 am line's own words (Scheduled today, Scheduled tomorrow, Due today, Due
+ * tomorrow, Due yesterday); then Update. Removed is
  * offEmail's, and Error is the reply path's (replies.ts).
  */
 export function subjectWord(input: { items: readonly OutboxItem[]; status: TaskStatus; due: Ymd | null; today: Ymd; audience: Audience }): string {
   if (input.status === "DONE") return "Done";
   if (input.audience === "staff" && input.status === "REVIEW") return "Review";
   if (input.items.some((i) => i.kind === "ASSIGNED")) return input.due ? `New, due ${dueLabel(input.due, input.today)}` : "New";
-  if (input.items.some((i) => i.kind === "DUE_TODAY")) return "Due today";
-  if (input.items.some((i) => i.kind === "OVERDUE")) return "Due yesterday";
+  const reminder = input.items.find((i) => UNSIGNED_KINDS.has(i.kind));
+  if (reminder) return itemText(reminder);
   return "Update";
 }
 
@@ -557,8 +601,12 @@ export interface JobFacts {
   directionsUrl: string | null;
   /** The building's front photo, a public image. Null when none. */
   photoUrl: string | null;
-  /** The date the contractor sees, written out ("Mon, Nov 23"). */
+  /** The due date, written out ("Mon, Nov 23"). */
   due: string | null;
+  /** The contractor's scheduled day while the job is Scheduled, written out; null otherwise. */
+  scheduled?: string | null;
+  /** That day lands after the due date: the row says so in words, since an email has no hover. */
+  scheduledAfterDue?: boolean;
   /** Contractor only: the notes, with this property's lockbox codes masked. */
   notes: string | null;
   /** Contractor only: the checklist. */
@@ -571,7 +619,7 @@ export interface JobFacts {
   accessUrl: string | null;
   /** Contractor only, with a job link and a date: the .ics for Add to calendar. */
   calendarUrl: string | null;
-  /** Contractor only, with a job link, while the job takes a new date: Change date (section 7). */
+  /** Contractor only, with a job link, while they can set or move their day: Change day (docs/specs/contractor-scheduled-date.md). */
   dateUrl: string | null;
   /** Contractor only: HG's photos on the job, beyond the ones What's new shows. */
   photos: EmailPhoto[];
@@ -588,6 +636,8 @@ export interface TaskEmail {
   /** What's new's photos: the bundle's own, up to four, then "+N". */
   photos: EmailPhoto[];
   morePhotos: number;
+  /** The 24-hour notice line under What's new (Q6), or none. */
+  notice?: string;
   /** The next step; null on an email with nothing left to do (taken off the job). */
   primary: EmailButton | null;
   secondary: EmailButton[];
@@ -630,6 +680,8 @@ function buttons(input: {
   taskId: string;
   items: OutboxItem[];
   linkToken: string | null;
+  /** Contractor: the job page shows the tenants or a lockbox code. */
+  hasAccess?: boolean;
 }): { primary: EmailButton | null; secondary: EmailButton[] } {
   const updateId = firstUpdateId(input.items);
   if (input.audience === "staff") {
@@ -642,11 +694,16 @@ function buttons(input: {
   const token = input.linkToken;
   const to = (step: JobLinkStep | null, update: string | null = null) =>
     token ? jobLinkUrl(input.appUrl, token, step, update) : openUrl(input.appUrl, "contractor", input.taskId, update);
-  // The morning after the due date (reminders.ts): the next step, or a new date, and nothing else.
+  const changeDay = token && contractorMaySetDate(input.status) ? [{ label: "Change day", url: to("date") }] : [];
+  // The 24-hour notice heads-up (Q6): reach the tenant (the job opens at its Tenants), or pick another day.
+  if (input.items.some((i) => NOTICE_KINDS.has(i.kind)) && token && input.hasAccess) {
+    return { primary: { label: "Text the tenant", url: to("access") }, secondary: changeDay };
+  }
+  // The morning after the due date (reminders.ts): the next step, or a new day, and nothing else.
   const overdue = input.items.some((i) => i.kind === "OVERDUE");
   const extras: EmailButton[] =
-    overdue && token && contractorMaySetDate(input.status)
-      ? [{ label: "Change date", url: to("date") }]
+    overdue && changeDay.length
+      ? changeDay
       : [{ label: "Add photos", url: to("photos") }, ...(token ? [{ label: "Text to my crew", url: to("share") }] : [])];
   const step = nextStep(input.status);
   if (step === "start") return { primary: { label: "Start job", url: to(null) }, secondary: extras };
@@ -746,6 +803,20 @@ export function offEmail(title: string, where: string, taskId: string): TaskEmai
 }
 
 /**
+ * The 24-hour notice line (docs/specs/contractor-scheduled-date.md, Q6 and
+ * Q7): on a contractor's heads-up the day before, and on the morning of their
+ * day, at a home where someone lives and Permission to enter is off.
+ */
+function noticeFor(input: { audience: Audience; items: readonly OutboxItem[]; needsNotice?: boolean }): { notice?: string } {
+  if (input.audience !== "contractor" || !input.needsNotice) return {};
+  if (input.items.some((i) => NOTICE_KINDS.has(i.kind))) {
+    return { notice: "Tell the tenant today. They need 24 hours' notice, and you don't have permission to let yourself in." };
+  }
+  if (input.items.some((i) => i.kind === "SCHEDULED_TODAY")) return { notice: "Only go in if the tenant said yes. You don't have permission to let yourself in." };
+  return {};
+}
+
+/**
  * One email about a job (docs/specs/contractor-job-emails.md): the subject
  * (subjectWord), the preview line, What's new, the next step's buttons and
  * the job.
@@ -769,8 +840,12 @@ export function taskEmail(input: {
   taskId: string;
   /** The job's status when the email is sent. */
   status: TaskStatus;
-  /** The date the contractor sees (rules.ts targetDate), as a day. */
+  /** The due date, as a day. */
   due?: Ymd | null;
+  /** The contractor's scheduled day while the job is Scheduled (rules.ts scheduledDay). */
+  scheduled?: Ymd | null;
+  /** Contractor: someone lives there and Permission to enter is off (the notice line, Q6). */
+  needsNotice?: boolean;
   /** Today in Buffalo, for writing the date (a year only when it isn't this one). */
   today: Ymd;
   notes?: string | null;
@@ -793,13 +868,15 @@ export function taskEmail(input: {
 }): TaskEmail {
   const where = jobWhere(input.address, input.unitLabel);
   const contractor = input.audience === "contractor";
-  const due = input.due ? fmtDay(input.due, { weekday: true, year: "auto", now: input.today }) : null;
+  const day = (d: Ymd) => fmtDay(d, { weekday: true, year: "auto", now: input.today });
+  const due = input.due ? day(input.due) : null;
+  const scheduled = input.scheduled ? day(input.scheduled) : null;
   const { headline, lines } = whatsNew(input.items, input.title);
   const checklist = input.checklist ?? [];
   const notes = input.notes?.trim() ? keepBreaks(input.notes) : null;
   if (contractor && input.items.some((i) => i.kind === "OFF")) return offEmail(input.title, where, input.taskId);
   const token = input.linkToken ?? null;
-  const btns = buttons({ audience: input.audience, status: input.status, appUrl: input.appUrl, taskId: input.taskId, items: input.items, linkToken: token });
+  const btns = buttons({ audience: input.audience, status: input.status, appUrl: input.appUrl, taskId: input.taskId, items: input.items, linkToken: token, hasAccess: input.hasAccess });
   // Tapping a photo opens the job: the contractor's through their link, a partner's on the task page.
   const photoHref = contractor ? (token ? jobLinkUrl(input.appUrl, token, null, firstUpdateId(input.items)) : openUrl(input.appUrl, "contractor", input.taskId)) : openUrl(input.appUrl, "staff", input.taskId, firstUpdateId(input.items));
   // A contractor's link stops opening a closed job, thumbnails included, so a closed job's email shows none.
@@ -814,6 +891,7 @@ export function taskEmail(input: {
     lines,
     photos: fresh.photos,
     morePhotos: fresh.morePhotos,
+    ...noticeFor(input),
     ...btns,
     job: {
       title: oneLine(input.title),
@@ -821,12 +899,14 @@ export function taskEmail(input: {
       directionsUrl: directionsUrl(input.address),
       photoUrl: input.photoUrl ?? null,
       due,
+      scheduled,
+      scheduledAfterDue: isAfterDue(input.scheduled, input.due),
       notes: contractor ? notes : null,
       checklist: contractor ? checklist : [],
       contractor: contractor ? null : input.contractorName ? oneLine(input.contractorName) : null,
       checklistLine: contractor ? null : checklistLine(checklist),
       accessUrl: contractor && token && input.hasAccess && isActiveStatus(input.status) ? jobLinkUrl(input.appUrl, token, "access") : null,
-      calendarUrl: contractor && token && input.due && isActiveStatus(input.status) ? `${jobLinkUrl(input.appUrl, token)}/calendar` : null,
+      calendarUrl: contractor && token && (input.scheduled || input.due) && isActiveStatus(input.status) ? `${jobLinkUrl(input.appUrl, token)}/calendar` : null,
       dateUrl: contractor && token && contractorMaySetDate(input.status) ? jobLinkUrl(input.appUrl, token, "date") : null,
       photos: older.photos,
       morePhotos: older.morePhotos,

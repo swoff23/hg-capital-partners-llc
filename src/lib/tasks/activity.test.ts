@@ -173,12 +173,12 @@ test("a due date moved several times reads from where it started to where it end
   assert.deepEqual(texts(build(circle)), ["Connor moved the due date 3 times"]);
 });
 
-test("a visit moved twice reads as one move", () => {
+test("a scheduled day moved twice reads as one move", () => {
   const out = build([
     ev("SCHEDULED", { from: "2026-10-22", to: "2026-10-23" }, { createdAt: at(0) }),
     ev("SCHEDULED", { from: "2026-10-23", to: "2026-10-24" }, { createdAt: at(10) }),
   ]);
-  assert.deepEqual(texts(out), ["Connor moved the visit from Thu, Oct 22 to Sat, Oct 24"]);
+  assert.deepEqual(texts(out), ["Connor moved the scheduled day from Thu, Oct 22 to Sat, Oct 24"]);
 });
 
 test("a status that went there and back, and one that moved three times", () => {

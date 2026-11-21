@@ -13,8 +13,8 @@ import {
   doneMessage,
   movedAllMessage,
   movedMessage,
-  targetField,
   tickPlan,
+  toastDay,
   type DateChange,
   type ListAssignee,
   type ListPatch,
@@ -54,8 +54,8 @@ interface TaskListApi {
   peopleRows: { pinned: OptionItem[]; sections: OptionSection[] } | null;
   /** Reassign from the row: the task service refuses it when someone else reassigned the task since the list loaded. */
   assign: (task: ListTask, to: AssigneeValue) => void;
-  /** "due" for staff tasks; "target" moves a contractor job's visit date while it's Scheduled. */
-  reschedule: (task: ListTask, to: Ymd | null, which: "due" | "target") => void;
+  /** "due" moves the due date; "scheduled" moves a Scheduled job's day (never cleared). */
+  reschedule: (task: ListTask, to: Ymd | null, which: "due" | "scheduled") => void;
   moveAllToToday: (tasks: ListTask[]) => void;
   setDone: (task: ListTask, done: boolean) => void;
   approve: (task: ListTask) => void;
@@ -172,8 +172,12 @@ export function TaskListProvider({
       );
     },
     reschedule(task, to, which) {
-      const field = which === "target" ? targetField(task) : "dueDate";
-      run({ kind: "dates", changes: [{ id: task.id, field, value: to }] }, () => rescheduleTasks([task.id], to, which), moved(movedMessage(to)));
+      const field = which === "scheduled" ? "scheduledFor" : "dueDate";
+      run(
+        { kind: "dates", changes: [{ id: task.id, field, value: to }] },
+        () => rescheduleTasks([task.id], to, which),
+        moved(which === "scheduled" && to ? `Scheduled for ${toastDay(to)}` : movedMessage(to)),
+      );
     },
     moveAllToToday(list) {
       if (!list.length) return;

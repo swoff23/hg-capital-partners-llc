@@ -10,7 +10,7 @@ import { SEEABLE_FILE, contractorMaySee } from "@/lib/attachments/access";
 import { CODE_MASK, lockboxMasker, readJobAccess } from "@/lib/portal/access-code";
 import { mintJobLink } from "@/lib/portal/job-links";
 import { staffFirstNames } from "@/lib/portal/queries";
-import { targetDate } from "@/lib/tasks/rules";
+import { scheduledDay } from "@/lib/tasks/rules";
 import {
   DAILY_EMAIL_CAP,
   deliveryFor,
@@ -277,17 +277,22 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       continue;
     }
     const task = { ...row.task, status: fresh.status, dueDate: fresh.dueDate, scheduledFor: fresh.scheduledFor, description: fresh.description };
-    const due = toYmd(targetDate(task));
+    const due = toYmd(task.dueDate);
+    const scheduled = toYmd(scheduledDay(task));
+    // Who lives there, for the 24-hour notice (docs/specs/contractor-scheduled-date.md, Q6): read once for a contractor.
+    const jobAccess = delivery.audience === "contractor" && row.recipientContactId ? await readJobAccess(prisma, task) : null;
     const kept =
       delivery.audience === "contractor"
-        ? liveReminders(offItems(live.items, { hasAccess: !!accessRow, canceled: task.status === "CANCELED", job: jobKey({ status: task.status, target: due, notes: task.description }) }), {
+        ? liveReminders(offItems(live.items, { hasAccess: !!accessRow, canceled: task.status === "CANCELED", job: jobKey({ status: task.status, due, scheduled, notes: task.description }) }), {
             status: task.status,
             due,
+            scheduled,
+            needsNotice: !!jobAccess?.needsNotice,
             today: todayYmdEastern(now),
           })
         : live.items;
     // A date, the notes or a status put back as they were before the bundle's first change says nothing (undoneDropped).
-    const items = undoneDropped(kept, { due, notes: task.description, status: task.status });
+    const items = undoneDropped(kept, { due, scheduled, notes: task.description, status: task.status });
     const off = items.some((i) => i.kind === "OFF");
     if (items.length === 0) {
       await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: now, lastError: "nothing to send" } });
@@ -315,7 +320,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
         ? await mintJobLink(prisma, { taskId: row.taskId, kind: "STAFF", userId: row.recipientUserId })
         : null;
     // "Show access" when the job page would show the tenants or the lockbox (docs/specs/tenant-contact.md section 3).
-    const access = contractorId ? await readJobAccess(prisma, task) : null;
+    const access = contractorId ? jobAccess : null;
     const hasAccess = !!access && (!!access.lockbox || access.tenants.length > 0);
     // Its own reply address, while replies by email are on (section 5): a reply posts to this job as this recipient.
     const replyConfig = getEnv().email;
@@ -334,7 +339,9 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       appUrl,
       taskId: row.taskId,
       status: task.status,
-      due: toYmd(targetDate(task)),
+      due,
+      scheduled,
+      needsNotice: !!access?.needsNotice,
       today: todayYmdEastern(now),
       notes,
       checklist: task.checklist,

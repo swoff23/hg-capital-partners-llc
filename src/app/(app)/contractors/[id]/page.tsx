@@ -19,7 +19,10 @@ import { dayLabel, fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { portalAccess } from "@/lib/portal/access-state";
 import { STATUS_LABEL, isActiveStatus, statusRank } from "@/lib/task-scope";
-import { isTargetLate, targetOf } from "@/lib/tasks/list";
+import { AfterDueMark } from "@/components/after-due-mark";
+import { fmtShortDay } from "@/lib/tasks/activity";
+import { isOverdue } from "@/lib/tasks/list";
+import { isAfterDue, scheduledDay } from "@/lib/tasks/rules";
 import { docOnFile, splitDocLines } from "@/lib/contacts";
 import { setupProgressLine } from "@/lib/contractors/onboarding";
 import { TRADE_LINKS, tradeLine } from "@/lib/contractors/trades";
@@ -275,19 +278,26 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
             // lines: the mark leads, and the word and date move into the subline.
             <ul className="@container divide-y divide-border">
               {tasks.map((t) => {
+                const anyScheduled = tasks.some((j) => j.status === "SCHEDULED" && j.scheduledFor);
                 const closed = !isActiveStatus(t.status);
-                // Their jobs show the Target (D7): the visit date while
-                // Scheduled, otherwise Due. A closed job shows the day it closed.
-                const dates = { status: t.status, scheduledFor: toYmd(t.scheduledFor), due: toYmd(t.dueDate) };
-                const late = !closed && isTargetLate(dates, today);
+                // Their jobs show Due; a closed job the day it closed. A Scheduled job's day rides with its status.
+                const dues = toYmd(t.dueDate);
+                const late = !closed && isOverdue({ status: t.status, due: dues }, today);
                 // completedAt is an instant: the Buffalo day it fell on.
-                const day = closed ? (t.completedAt ? todayYmdEastern(t.completedAt) : null) : targetOf(dates);
+                const day = closed ? (t.completedAt ? todayYmdEastern(t.completedAt) : null) : dues;
+                const scheduled = scheduledDay({ status: t.status, scheduledFor: toYmd(t.scheduledFor) });
+                const scheduledText = scheduled ? fmtShortDay(scheduled, today) : null;
+                const mark = scheduled && dues && isAfterDue(scheduled, dues) ? <AfterDueMark due={dues} today={today} /> : null;
                 // Late shows the real date in --destructive (section 3).
                 const date = day ? (late ? fmtDay(day, { year: "auto", now: today }) : dayLabel(day, today)) : null;
                 return (
                   <li
                     key={t.id}
-                    className="relative grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 py-2.5 transition-colors hover:bg-muted pointer-coarse:py-3 @min-[30rem]:grid-cols-[7rem_minmax(0,1fr)_6rem] @min-[30rem]:items-center"
+                    className={cn(
+                      "relative grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 py-2.5 transition-colors hover:bg-muted pointer-coarse:py-3 @min-[30rem]:items-center",
+                      // 13rem only when a job shows its scheduled day beside the status; otherwise the 7rem it was.
+                      anyScheduled ? "@min-[30rem]:grid-cols-[13rem_minmax(0,1fr)_6rem]" : "@min-[30rem]:grid-cols-[7rem_minmax(0,1fr)_6rem]",
+                    )}
                   >
                     {/* The whole row opens the job, as TaskRow does; the place's link sits above it. */}
                     <Link href={`/tasks/${t.id}`} className="absolute inset-0 -outline-offset-2">
@@ -296,6 +306,8 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                     <span className="flex h-5 items-center pointer-coarse:h-5.5">
                       <StatusMark status={t.status} className="@min-[30rem]:hidden" />
                       <StatusBadge status={t.status} className="hidden @min-[30rem]:inline-flex" />
+                      {scheduledText && <span className="hidden min-w-0 truncate pl-1.5 text-meta text-muted-foreground @min-[30rem]:inline">{scheduledText}</span>}
+                      {mark && <span className="relative hidden pl-1.5 @min-[30rem]:inline-flex">{mark}</span>}
                     </span>
                     <div className="min-w-0">
                       <p aria-hidden="true" className={cn("truncate text-body", closed ? "text-muted-foreground line-through" : "text-foreground")}>
@@ -304,6 +316,8 @@ export default async function ContractorPage({ params }: PageProps<"/contractors
                       {/* Always there on a narrow row, where it carries the status word; a wide row shows it only for a place. */}
                       <p className={cn("truncate text-meta text-muted-foreground", !t.property && "@min-[30rem]:hidden")}>
                         <span className={cn("@min-[30rem]:hidden", STATUS_TONE[t.status])}>{STATUS_LABEL[t.status]}</span>
+                        {scheduledText && <span className="@min-[30rem]:hidden"> {scheduledText}</span>}
+                        {mark && <span className="relative ml-1.5 inline-flex align-middle @min-[30rem]:hidden">{mark}</span>}
                         {t.property && (
                           <>
                             <span className="@min-[30rem]:hidden"> · </span>

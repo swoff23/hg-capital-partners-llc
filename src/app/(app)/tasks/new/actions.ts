@@ -60,7 +60,7 @@ export async function createTask(formData: FormData): Promise<ActionResult<Creat
     const user = await requireUser();
     const p = newTaskSchema.parse(formToObject(formData));
     const assignee = pickedAssignee(p.assignee, p.assigneeUserId);
-    if (p.status === "SCHEDULED" && !p.scheduledFor) throw new tasks.TaskRuleError("Pick the visit date.");
+    if (p.status === "SCHEDULED" && !p.scheduledFor) throw new tasks.TaskRuleError("Pick the scheduled day.");
     // Make task: each Missing info row becomes a checklist item that ticks itself once it's filled in.
     const checklist = p.missing ? await makeTaskChecklist(p.missing.split(",").filter(Boolean), user) : undefined;
     const task = await tasks.createTask(
