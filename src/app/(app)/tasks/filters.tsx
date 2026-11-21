@@ -8,12 +8,19 @@ import type { PropertyOption } from "@/lib/picker-options-shape";
 import type { TaskView } from "@/lib/tasks/list-query";
 import { DEFAULT_TASK_SORT, TASK_SORT_CHOICES, taskSortPhrase } from "@/lib/tasks/list-sort";
 import { countTasksAction } from "./filter-actions";
+import { NewTaskButton } from "./select-all";
 
 const VIEWS: { key: TaskView; label: string }[] = [
   { key: "open", label: "Open" },
   { key: "done", label: "Done" },
   { key: "all", label: "All" },
 ];
+
+/**
+ * The bar sticks under the app bar, New task at its end (docs/specs/sticky-task-header.md).
+ * Where the wide list's column headers show, their bottom line is the divider, so the bar draws none.
+ */
+const STICKY = { divider: "lg:@min-[60rem]:hidden" } as const;
 
 /** Open is the list's opening view, so it stays out of the URL. */
 const DEFAULTS = { status: "open" } as const;
@@ -104,6 +111,8 @@ export function TaskFilters({ data, children }: { data: TaskFilterData; children
         facets={facets}
         sort={{ param: "sort", default: DEFAULT_TASK_SORT, choices: TASK_SORT_CHOICES, phrase: taskSortPhrase }}
         wide="60rem"
+        sticky={STICKY}
+        action={<NewTaskButton />}
         shown={data.shown}
         count={countTasksAction}
       />
@@ -130,6 +139,8 @@ export function TaskFiltersPlaceholder() {
       ]}
       sort={{ param: "sort", default: DEFAULT_TASK_SORT }}
       wide="60rem"
+      sticky={STICKY}
+      action={<NewTaskButton />}
     />
   );
 }

@@ -1,236 +1,203 @@
-# Contractor invoices: plan
+# Contractor invoices: MVP
 
-**Status:** spec, agreed in grilling on 2026-10-23. Planning only: the build starts after the Nov 1 Asana cutover, and only after an explicit "build it".
+**Status:** spec, agreed Nov 20, 2026; every screen and small call settled Nov 21 (section 6). Waits for an explicit "build it". It replaces the Oct 23 plan, which now lives at [specs/contractor-invoices/full-plan.md](specs/contractor-invoices/full-plan.md) with its Nov 20 re-review, for the pieces this MVP leaves for later (section 9).
 
-**Note (Nov 20, 2026).** Rehab costs, planned after the rehab draws MVP ([specs/rehab-draws.md](specs/rehab-draws.md), section 9), would tie invoices and materials receipts to a rehab and a budget line. That reopens I4 (no reconciling to properties) and I11 (contractor invoices only). Settle it when costs get their own planning pass.
+**The idea in one line:** contractors upload, reply with or forward an invoice; Connor or Pieter loads it, tacks it onto jobs, approves it and marks it paid; the contractor sees where it stands.
+
+Drawing: [specs/contractor-invoices/01-mvp-flow.svg](specs/contractor-invoices/01-mvp-flow.svg).
 
 ---
 
 ## 1. Goal
 
-Every contractor invoice lands in one place, tied to the jobs it covers, so Connor and Pieter can see what's owed, what's paid, and which finished jobs still have no invoice.
-
-- **Three ways in:** a contractor sends one in the portal; an email reaches `invoices@hgcapitalpartners.com` (forwarded by staff, or sent straight from a contractor's own invoicing system); or staff enter one by hand.
-- **Money doesn't move in the app.** Connor pays in Baseline as today, then marks the invoice paid.
-- **Optional for contractors.** Nobody has to change how they bill. Those with their own systems point them at the inbox, or keep emailing and Connor forwards.
-
----
-
-## 2. What we found
-
-**How contractors bill today:** texts and emails with an amount, or PDFs from their own systems. Payment details live in Baseline; the app's contacts only say "Check", "Zelle" or "Venmo" and never hold account numbers.
-
-**The domain is free for an inbox.** `hgcapitalpartners.com` has no MX records (`dig MX` on 2026-10-23), so nobody receives mail there today and an inbox address breaks nothing. Remember the near-identical `hgcapitalpartnersllc.com` zone: the live one is on nameservers ns19/ns20.
-
-**Resend can receive mail.** We already chose Resend for outgoing email. Its inbound feature takes mail for a domain and calls a webhook with an `email.received` event; the webhook carries attachment metadata only, and the app fetches the files through Resend's API. Inbound is included on every plan; whether received mail counts toward the free plan's 100 a day needs checking in the build (Pro is $20 a month if it does). [Receiving](https://resend.com/docs/dashboard/inbound/introduction), [email.received](https://resend.com/docs/webhooks/inboxes/email-received.md), [pricing](https://resend.com/pricing).
-
-**Ramp and QuickBooks work the same way.** Ramp gives each business an AP address, reads every attachment, pre-fills a draft bill, and someone reviews it before approval and payment. [Ramp AP email forwarding](https://support.ramp.com/hc/en-us/articles/35659701397395-Bill-Pay-AP-Email-Forwarding). One difference for us: invoicing systems (QuickBooks, Square, Jobber) send from their own address, so the contractor has to be worked out from the invoice itself, not just the sender.
-
-**Reading invoices.** Claude Opus 5.5 (`claude-opus-5-5`, $4 in / $20 out per million tokens) takes PDFs and photos directly and returns structured output against a schema. A one-to-two-page invoice with its email is roughly 5,000 tokens in; both passes (section 6.4) come to about **5 to 10 cents an invoice**, or $3 to $5 a month at 50 invoices. The daily cap (I9) bounds the worst case.
-
-**Mobbin.** References for every screen are linked in section 5. Ramp, Bill.com and Housecall Pro aren't on Mobbin; Mercury, Shopify Bill Pay, Xero, QuickBooks, Airwallex, Remote, Jobber and Turo are.
+- **One place for every contractor invoice,** so nobody hunts through texts and email to see what's owed or paid.
+- **Light for contractors.** Nobody changes how they bill. They can tap Send invoice on a job, reply to a job email with the bill attached, or forward it to the invoice address.
+- **Money doesn't move in the app.** Connor or Pieter pays in Baselane (or by check) as today, marking the invoice paid in the app as they send the money (M8).
+- **No AI and no new setup.** A person types the few fields. Reading invoices with Claude comes later if volume asks for it.
 
 ---
 
-## 3. Decisions (all settled 2026-10-23)
+## 2. What we found (Nov 20)
+
+- **Receiving mail already works.** Resend receives for `mail.hgcapitalpartners.com` (MX live since Nov 14) and posts every email to one webhook, `src/app/api/email/inbound/route.ts`, which checks the Svix signature with `RESEND_WEBHOOK_SECRET` and hands job replies to `src/lib/email/replies.ts`. Anything else is answered 200 and dropped today. So `invoices@mail.hgcapitalpartners.com` works with no DNS change.
+- **A reply on a closed job** (Done or Canceled) is forwarded to both partners with its files and posts nothing (replies.ts, rule 3). A reply on an active job, In review included, posts as a comment.
+- **A From line can be forged.** The reply path trusts a sender only when Resend reports `authentication.dmarc === "pass"` and the From holds a single address (`replies.ts`, `inbound.ts` `singleAddress`). Invoices follow the same rule.
+- **Received mail counts toward Resend's quota** (3,000 a month and 100 a day on Free, shared with job emails). At MVP volume that's fine; go Pro ($20 a month) if the daily cap gets close.
+- **Who jobs sit on (prod, Nov 20):** 11 of 40 jobs finished since June have a contractor assigned and 27 sit on Connor or Pieter (28 of the 40 came from Asana). 21 of 114 open jobs have a contractor. So an invoice must be linkable to any job, whoever it sits on.
+- **Job links get forwarded to crews.** A job-email link opens a one-job session (`PortalSession.onlyTaskId`, `src/lib/portal/job-link-paths.ts`). Whoever holds it isn't necessarily the contractor.
+- **PDFs can't go in a sandboxed frame:** a sandbox blanks the browser's PDF viewer, which is why `src/lib/attachments/headers.ts` leaves it off PDFs. Lightbox's `DocumentStage` already shows a PDF in a frame on a mouse device and as a file card on touch.
+
+---
+
+## 3. Decisions
 
 | # | Topic | Decision |
 |---|---|---|
-| I1 | Payments | Paid in Baseline, outside the app. The app records the date, method and a note |
-| I2 | Contractor use | Optional. Every contractor with a portal login can send invoices; there's no per-contractor switch |
-| I3 | Ways in | Portal, the invoice inbox, and staff entry by hand |
-| I4 | Shape | A total plus the jobs it covers. No per-job split; the app isn't for reconciling to properties |
-| I5 | Stages | **To review**, then **To pay**, then **Paid**. Side exits: **Sent back** (portal invoices, with a note) and **Not an invoice** (junk). Either partner moves any invoice |
-| I6 | Which jobs | Any job assigned to that contractor that isn't canceled, open or done. A job can have several invoices (deposit, then final) |
-| I7 | Timing | After the Nov 1 cutover |
-| I8 | Address | `invoices@hgcapitalpartners.com`. If the domain ever gets its own email (Google Workspace), that host forwards this address on |
-| I9 | Who can send | Anyone. A daily cap of 50 emails; invoices the app can't match to a contractor are flagged "Who's this from?" |
-| I10 | Review | A person always confirms an emailed invoice before To pay, however confident the match |
-| I11 | Scope | Contractor invoices only. Other bills (utilities, insurance, taxes) get "Not a contractor invoice" and are set aside |
-| I12 | Coverage | A **No invoice** list: done contractor jobs with no invoice. Each has **No invoice needed** with an optional reason (warranty, covered by another bill, paid on the spot) |
-| I13 | Duplicates | Flag a **possible duplicate** beside the total when the contractor and invoice number match, or the contractor and total match within 30 days. Staff choose "Same invoice" (merged, its file kept on the original) or "Keep both". Never merged automatically |
-| I14 | Mark paid | Tick several in To pay, any mix of contractors, and mark them paid in one step: one date (Today by default), one method, an optional note. The button shows the total ("Mark 3 paid · $2,450.00"); a toast offers Undo |
-| I15 | Partial payments | Not tracked. An invoice is paid or not; a partial payment goes in the note. A deposit is its own invoice |
-| I16 | Contractor view | The portal lists all of a contractor's invoices with their status, including emailed ones once staff confirm them. Emailed invoices still in To review stay hidden. Each job shows its invoices |
-| I17 | Contractor emails | **Sent back** (with the note) and **Paid** (date, method, invoice number), to anyone with an email on file, login or not. Several of one contractor's invoices marked paid at once make one email. Nothing for To pay, and no receipt on arrival |
-| I18 | Staff emails | A new invoice in To review emails both partners, bundled over 10 minutes, except ones a partner forwarded. The Invoices menu item shows the To review count |
-| I19 | Changes | Contractors edit or withdraw a portal invoice only while it's in To review. Staff edit anything until it's paid; "Undo paid" puts it back in To pay. Every change is recorded on the invoice's history |
-| I20 | Work not listed | A contractor can pick "Work not listed" (a short description and the property). Emailed invoices with no job match are flagged "No job". On review, staff link a job or tap **Create job**, which makes a done job from the invoice (property, description as title, contractor as assignee) and links it |
-| I21 | Menu | Invoices gets its own menu item between Tasks and Contractors, with the To review count |
-| I22 | Invoices page | **Total cards that filter the list:** To review, To pay, Paid, No invoice, each with a count and amount. Four across on computer and tablet; two by two on a phone |
-| I23 | Time period | A period menu on the page: This month, Last month, Last 90 days (default), This year, Last year, All time. Kept in the URL |
-| I24 | Open items | To review, To pay and No invoice always show everything still open; the period changes Paid only. When open items predate the period, the card says so ("5 · $3,651, 1 from before Jul 25") |
-| I25 | Review screen | Its own page per invoice (`/invoices/[id]`): the document on the left, the fields on the right, flags beside the field they concern, and **Confirm, next**. Tablet and phone put the document on top (a thumbnail on a phone) with a fixed Confirm bar. The same page serves every stage |
-| I26 | Portal home | A bottom bar with **Jobs** and **Invoices** |
-| I27 | Bottom bar scope | The bar shows on the two lists only. Job and invoice pages hide it and keep their Back link and their own action bar |
-| I28 | Send invoice form | One screen: jobs (finished with no invoice first, then open, then "Work not listed"), total, their invoice number (optional), photo or PDF (optional), and **Send invoice · $850.00**. Opened from a job, that job is ticked |
-| I29 | Task page | An **Invoice** row in the side rail (a chip on tablet and phone), only when a contractor is assigned. Stage as plain text, never a badge. With none: "None yet" opens Link an invoice, Enter an invoice, No invoice needed |
-| I30 | Contractor page | An **Invoices** card under Jobs: "$850 to pay · $9,240 paid in 2026" in the header, the latest invoices, and "See all on Invoices" (the Invoices page filtered to them) |
-
-### Defaults I filled in (confirm or correct)
-
-1. **Contractor wording.** The portal shows Received (To review), Approved (To pay), Paid with date and method, and Sent back. "To pay" reads oddly from the contractor's side.
-2. **Payment methods:** Baseline transfer (the default), Check, Zelle, Venmo, Cash, Other.
-3. **The No invoice list starts at cutover:** jobs finished on or after Nov 1, 2026.
-4. **Over the daily cap,** extra emails wait and are read the next day. A line on the Invoices page says how many are waiting.
-5. **Files the app reads:** PDF, JPG, PNG and HEIC, within the existing document size limits. Anything else (Word, Excel) is kept but not read, and the invoice lands in To review flagged "Couldn't read".
-6. **Not an invoice and withdrawn items** are kept for 30 days, then deleted with their files.
-7. **Due dates** come from the invoice file or from staff. The portal form doesn't ask for one.
-8. **Gmail auto-forward.** Gmail's "confirm forwarding" email shows in To review as its own row with the link, so Connor can finish setting up an automatic forward for chosen senders.
-9. **Deleting.** Staff can delete an invoice (soft delete, recorded in its history); contractors can only withdraw.
-10. **Reassigning a job** keeps its invoice links. The earlier contractor still sees their invoice with the job's title, without a link to the job.
-11. **Build order:** the staff side first, then the inbox, then the portal (section 8).
+| M1 | Scope | A lightweight MVP. Everything in section 9 waits until real use shows a need |
+| M2 | Ways in | (a) **Send invoice** in a portal job's bottom bar once the job is In review or Done, signed in. (b) **Reply** to a Done job's email with the bill attached. (c) **Forward** to `invoices@mail.hgcapitalpartners.com`, by a contractor or a partner. (d) **Staff enter** one: New invoice, or **Use as invoice** on any job file |
+| M3 | Fields | Contractor, invoice number (optional), invoice date (defaults to the day it arrived), total, jobs (zero or more), a note only staff see, and the files (zero or more: an emailed amount or a "View invoice" link with no PDF still lands, and New invoice saves with no file; picked Nov 21, [13-no-file.svg](specs/contractor-invoices/13-no-file.svg), A). The portal's Send invoice still needs one file |
+| M4 | Stages | **To review**, then **To pay**, then **Paid**. **Not an invoice** clears junk, work photos and duplicates (soft delete, staff only). Contractors see **Received**, **Approved**, **Paid** |
+| M5 | Approve | Needs a contractor and a total above zero. Jobs are optional. Either partner approves or pays any invoice |
+| M6 | Staff entry | An invoice a partner enters, or makes with Use as invoice, is a To review invoice like any other: its fields save as you leave them, and the partner's own **Approve** moves it to To pay. One tap, no second partner, no staff email. A half-entered one waits in To review (picked Nov 21, [12-new-invoice.svg](specs/contractor-invoices/12-new-invoice.svg), A) |
+| M7 | Which jobs | Staff can tack on any job that isn't Canceled, whoever it's assigned to. A contractor's Send invoice links the job they sent it from, and shows only on their jobs In review or Done (picked Nov 21). A job can have several invoices |
+| M8 | Mark paid | **Mark it paid in the app as you send the money** (picked Nov 21, [14-pay-once.svg](specs/contractor-invoices/14-pay-once.svg), A): open the invoice, Mark paid, then send it in Baselane, so the other partner sees Paid before paying too. A working rule for Connor and Pieter, in the launch note, not UI copy. One invoice at a time: paid date (today by default), method, and an optional check number or note. A toast offers Undo; **Undo paid** in the ⋯ menu puts it back in To pay |
+| M9 | Methods | Baselane transfer (default), Check, Zelle, Venmo, Cash, Card, Other. Card stays separate because card payments are reported on 1099-K, not 1099-NEC |
+| M10 | Duplicates | "Possible duplicate" shows on the invoice when the same contractor and invoice number (compared ignoring case, spaces, hyphens and leading zeros) or the exact same file (SHA-256) already exists, linking the other one. It warns; it never merges or blocks |
+| M11 | Sender | A forwarded or emailed invoice gets its contractor only when DMARC passes, the From is a single address, and it matches exactly one contractor's login email (`PortalAccount.email`) or contact email (`Contact.email`), compared case-insensitively with `escapeLike` as `replies.ts` does. Otherwise the contractor is blank with "Who's this from?", and staff pick one. The picker lists every unarchived contact, active contractors first, plus the invoice's current contact. Review never creates a contractor |
+| M12 | Staff hear | One email to both partners, bundled over 10 minutes, for new invoices in To review. Skipped for a partner's own forward (DMARC-verified), for job replies (their forward already went) and for a partner's own entries (source `STAFF`). At send it drops any invoice no longer in To review. Home's Needs you shows one roll-up row, "2 invoices to review" |
+| M13 | Task page | A job's invoices list on its task page, one line each: number, total, stage |
+| M14 | Contractor view | Each invoice on its job page with Received, Approved or Paid. A **Your invoices** page (`/p/invoices`), opened from a new item in the account menu with My jobs as the way back, lists all of theirs, with or without a job (picked Nov 21). A portal invoice shows at once as Received, in every stage but Not an invoice; every other source (email, reply, staff entry) shows only while it's in To pay or Paid, so a misfiled or half-entered invoice never shows to the wrong contractor. The job page's Invoices section shows only when that job has an invoice of theirs, and never in a link session |
+| M15 | Contractor email | A **Paid** email (subject "Paid: Invoice #1043, $850.00", or "Paid: Invoice, $850.00" with no number; the date and method in the body), under the job email rules they already have: only when `jobEmailState` is on (a login, signed in once, Job emails switch on). Its one button opens Your invoices (`/p/invoices`, through sign-in), never a job link, and it carries no reply token, so a "thanks" reply goes to the plain reply address. It waits out the Undo window and re-checks the stage before it sends. The portal shows Paid only after the same window. Nothing on arrival or approval |
+| M16 | Link sessions | A one-job link session never sees invoice amounts, files or the Your invoices list. Send invoice from one asks them to sign in (the existing `/login?next=` redirect). Replying to the job email works for everyone |
+| M17 | No edits by contractors | A contractor who sent the wrong file sends again; staff mark the old one Not an invoice |
+| M18 | Nav | **Invoices** in the staff nav between Tasks and Contractors, with no count (Needs you carries it) |
 
 ---
 
-## 4. Out of scope (later, if wanted)
+## 4. How each way in works
 
-- Moving money, or reading payments back from Baseline.
-- Writing bills to QuickBooks, or matching paid invoices to QuickBooks transactions. QuickBooks stays read-only.
-- Partial payments (I15), per-job amounts (I4) and property cost rollups.
-- 1099 reports. The contractor card's "paid in 2026" is the starting point.
-- Bills that aren't from contractors (I11).
+### 4.1 Send invoice (portal)
 
----
+In the job page's bottom bar, for a signed-in contractor, once the job is In review or Done (picked Nov 21, [09-send-invoice-bar.svg](specs/contractor-invoices/09-send-invoice-bar.svg), B1). In review, Send invoice takes the place of today's disabled "In review" button, beside Add photo/video while that still shows; on a Done job it gets the bar to itself (Done jobs have no bar today, so the bar is new there, and its sheet and uploader live outside `JobActions`, which Done jobs don't render). To do, Scheduled, Waiting and In progress jobs show no Send invoice; replying to the job email works at any status. A sheet: files (PDF or photo, at least one, through `useMediaUploader` and `MediaUploadTray`, held by `LeaveGuard` while they go up), invoice number (optional), total (optional), **Send invoice**. The sent state follows the Sent screen pattern (components.md): "Thanks, Zack!", "Sent to Connor and Pieter. You'll get an email when it's paid." (or "Check back here to see when it's paid." from `payoffLine`'s `getsEmail` branch), and the invoice as it now shows on the job, Received.
 
-## 5. Screens
+### 4.2 Reply to a done job's email
 
-Mockups were reviewed in chat on 2026-10-23. All sizes: laptop 1280x800, tablet 768x1024 (touch layout), phone 375x667, checked down to 320.
+In `replies.ts`, a reply on a Done job that carries a PDF or image keeps today's forward to both partners, now with a line "Added to Invoices to review", and also creates a To review invoice linked to that job. Its contractor comes from the reply token (already proven), its files are saved as invoice files. Fields start empty except the contractor and job. Replies on active jobs stay comments; staff use Use as invoice on the file. A work photo that lands this way gets Not an invoice. Idempotent per Resend email id.
 
-### 5.1 Invoices page (`/invoices`)
+### 4.3 Forward to invoices@
 
-- **Header:** "Invoices", the period menu (I23), the inbox address with a copy button, and **New invoice**. On a phone the title row keeps the period and "+", and the address moves into a ⋯ menu ("Copy invoice email").
-- **Four cards** (I22) act as the page's one switch: one picked at a time, marked by its fill alone, `aria-pressed`. The picked card is in the URL (`?view=review|pay|paid|missing`).
-- **List:** a table on computer and tablet (contractor, jobs, date, due, total, flags); cards on a phone (contractor and total, then jobs, then dates and flags). Flags are amber badges beside the total: Possible duplicate, Who's this from?, Couldn't read. "No job" is gray.
-- **To pay** adds checkboxes. Ticking raises a floating bar: "2 selected · Mark 2 paid · $2,450.00", which opens the Mark paid sheet (I14).
-- **No invoice** lists jobs, using the task row: title, property, contractor, finished date. Row actions: Enter invoice (prefilled), No invoice needed (optional reason), each with Undo.
-- **Filtered to a contractor** with `?contact=<id>` (from the contractor card), shown as a removable chip.
+`/api/email/inbound` routes by recipient before the reply path: `r+<token>@` and `jobs@` go to `replies.ts` as today; the invoice address goes to `src/lib/invoices/inbound.ts`. It fetches the email and its files from Resend inline (as replies.ts does), stores an `InboundEmail`, and creates one To review invoice with the body text and files, once per Resend id, with or without files (M3). The invoice keeps the whole text body, not `replyBody`'s cut at "Forwarded message", and keeps its links (`htmlToText` strips them today, so the HTML's `href`s are kept alongside), so a forward's invoice text and a Square or Jobber "View invoice" link survive. Auto-replies are ignored (`isAutoReply`). The contractor is set per M11. Past 50 invoice emails a day (Eastern), or 10 from one sender, the rest are dropped and counted, and the Invoices page says how many. A DMARC-verified forward from a partner's own address counts toward neither cap, so a launch-day backlog of forwards all lands. Make the router generic, since `deals@` (roadmap) and `draws@` (rehab-draws.md) are planned on the same webhook.
 
-References: [Mercury Bill Pay](https://mobbin.com/screens/d989795f-1f53-4ea4-9f9e-bf05ab5fa6ca) (total cards, stage tabs, AP address chip), [Shopify Bill Pay](https://mobbin.com/screens/2b2c6bc8-1991-4cce-8a70-cc056d32facc) (selection bar, "Mark as paid"), [Deel](https://mobbin.com/screens/86a99ed6-787f-4a21-89e3-741c5162723d) (cards as filters), [HoneyBook](https://mobbin.com/screens/4a1b5a54-7cf4-4c16-88ae-ae508ade10c3) (total in the mark-paid button), [Jobber "Requires invoicing"](https://mobbin.com/screens/839dd83a-4d45-424f-8a1b-ec841114a7d6) (the No invoice idea).
+### 4.4 Staff entry
 
-### 5.2 Invoice page (`/invoices/[id]`, `/invoices/new`)
-
-- **Computer:** the document on the left half (zoom, download; images through the existing `Lightbox`), fields on the right: contractor, invoice number, date, due, total, jobs (ticked suggestions, Add job, Create job), note. A quiet line names where it came from ("Read from the email Zack sent Oct 20").
-- **Flags sit beside their field** (Mercury, Brex): Who's this from? on the contractor, Possible duplicate on the total (links to the match, with Same invoice and Keep both), No job on jobs.
-- **Footer by stage:** To review: ⋯ (Not an invoice, Delete), Send back (portal invoices only), **Confirm, next**. To pay: ⋯, **Mark paid**. Paid: the date, method and note, with Undo paid in ⋯.
-- **History** below the fields (`ActivityTimeline`): arrived, read, confirmed, edited, sent back, paid, undone.
-- **Tablet:** the document as a tall preview on top, fields below. **Phone:** a thumbnail that opens the document full screen, fields, then a fixed bottom bar.
-- **New invoice** is the same page, empty, with a drop zone for the file.
-
-References: [Airwallex review bill](https://mobbin.com/screens/d6fa70dc-46b6-41e0-9771-d61e758980a3), [Remote](https://mobbin.com/screens/5a02d53a-4cc4-411a-ba45-3d0b7c1f0f54), [Mercury review flow](https://mobbin.com/flows/332881d8-7f08-46ec-bc6d-5a669ea56e0d) and [similar payment](https://mobbin.com/screens/1dcf0c8a-337d-4423-afe8-a734d8e5099f), [GoPay phone review](https://mobbin.com/screens/465e2773-660b-4a11-b7af-fb9747fef87e).
-
-### 5.3 Task page and contractor page
-
-- **Task page:** the Invoice row in the side rail (I29). Several invoices list one per line.
-- **Contractor page:** the Invoices card (I30). Tablet and phone stack Contact, Portal access, Jobs, Invoices.
-
-References: [Shopify vendor page](https://mobbin.com/screens/9f3014fa-f713-4fa5-b224-1568668c36e7), [HoneyBook "paid of"](https://mobbin.com/screens/cb2a2f0f-f8c9-49c5-82b8-e6fa97903d77).
-
-### 5.4 Portal
-
-- **Bottom bar** (I26, I27) on `/p` and `/p/invoices`: Jobs and Invoices with line icons. The portal is one centered column at every size, so the bar sits at the column's width on tablet and computer.
-- **Invoices list** (`/p/invoices`): cards with invoice number and jobs, total, sent or paid date, and status; **Send invoice** at the top.
-- **Send invoice** (`/p/invoices/new?job=<id>`): the one-screen form (I28). Uploads use `MediaUploader` with documents allowed, held by `LeaveGuard` while they go up.
-- **Sent screen:** reuses the Mark done payoff: "Thanks, Zack!", "Connor or Pieter will review it. You'll get an email when it's paid." (names from the user table), and the invoice card with its first status. Line spot art when that gap is filled (components.md, Known gaps).
-- **Invoice detail** (`/p/invoices/[id]`): Received, Approved, Paid as steps, jobs, file, note, and any sent-back note. Edit and Withdraw while Received.
-- **Shortcuts:** "Send an invoice" on the Mark done payoff and on each finished job's page, with that job ticked.
-
-References: [Turo repair invoice](https://mobbin.com/screens/4c38490a-a4aa-446d-bb11-d55fd5c25bb5), [Jobber new expense](https://mobbin.com/screens/7f8a7d6c-bfcb-4347-abe3-b0a9b26603d1), [Mercury submitted](https://mobbin.com/screens/bba69488-ff37-4905-9c3d-161c1e489f39), [Remote invoice list](https://mobbin.com/screens/9d28f831-4dbd-438f-83c7-466dcad13a7f); bottom bar per Apple HIG tab bars and Material navigation bar (top-level destinations only).
+**New invoice** on the Invoices page opens the invoice page empty, with a drop zone for the file; the row is made in To review when the first file drops or the first field saves, so the upload has an invoice to belong to (`invoice-upload`'s parent). **Use as invoice** in a job file's menu (`FilesList`'s row menu and `MediaGrid`'s `menuItems`, so the task page's Photos and files and the Activity strips; images and documents, never videos or links) opens it with that file and job filled in. The file is copied server-side (one Blob copy) into the invoice's own private path, so removing the job's file or deleting the job never touches the invoice. Both are To review invoices until the partner taps Approve (M6).
 
 ---
 
-## 6. Architecture
+## 5. Data and code
 
-### 6.1 Data
+### 5.1 Tables
 
-New tables, with RLS like every new table (README, Rules of the road). Money as `Decimal(12, 2)` like the rest of the schema.
+New tables, with RLS like every new table (README, Rules of the road). Money as `Decimal(12, 2)`.
 
-- **`Invoice`:** contact (null until matched), source (`PORTAL | EMAIL | STAFF`), stage (`REVIEW | TO_PAY | PAID | SENT_BACK | NOT_INVOICE | WITHDRAWN`), contractor's invoice number, invoice date, due date, total, note, description and property (for work not listed), duplicate-of, sent-back note, paid date, method (`BASELINE | CHECK | ZELLE | VENMO | CASH | OTHER`), paid note, paid by, confirmed at and by, creator (user or contact, one of them, CHECK), inbound email, `extraction` JSON (what the model read and which model), timestamps, `deletedAt`.
-- **`InvoiceTask`:** invoice and task, unique together. Keeps the job title at link time for display after a reassignment.
-- **`InvoiceFile`:** private Blob metadata, the same shape as `TaskAttachment`'s file fields.
-- **`InvoiceEvent`:** the history (kind, actor user or contact, actor label, data, time).
-- **`InboundEmail`:** Resend's email id (unique, for idempotency), from, reply-to, subject, received time, text body, status (`QUEUED | READ | HELD_CAP | FAILED | GMAIL_CONFIRM`), error, invoice.
-- **`Task`** gains `invoiceNotNeededAt`, `invoiceNotNeededReason`, `invoiceNotNeededByUserId`.
+- **`Invoice`:** contact (null until known), source (`PORTAL | REPLY | EMAIL | STAFF`), stage (`REVIEW | TO_PAY | PAID | NOT_INVOICE`), invoice number, `invoiceNumberNormalized`, invoice date, total, note, approved at and by, paid date, method (`BASELANE | CHECK | ZELLE | VENMO | CASH | CARD | OTHER`), paid note (check number), paid by, creator (at most one of user or contact, CHECK; neither for an emailed invoice or a system write, where `InboundEmail.from` or the event's actor label says who), inbound email, timestamps, `deletedAt`. The invoice number is saved without a leading "#"; `invoiceNumberNormalized` keeps letters and digits only, lowercased, leading zeros dropped.
+- **`InvoiceTask`:** invoice and task, unique together; keeps the job title at link time. `taskId` is nullable with `onDelete: SetNull`, so a deleted job reads as its kept title with no link.
+- **`InvoiceFile`:** private Blob metadata (the same shape as `TaskAttachment`'s file fields), always the invoice's own copy, plus `sha256`.
+- **`InvoiceEvent`:** the history (kind, actor user or contact, both nullable, actor label always set, data, time): arrived, edited, file added, approved, reopened (Back to review), paid, undone, not an invoice, restored.
+- **`InboundEmail`:** Resend email id (unique), recipient local part, from, subject, received time, text body, DMARC result, status, and a nullable invoice link. Generic so other inboxes can use it later.
 
-### 6.2 Services
+### 5.2 Services and access
 
-All writes go through `src/lib/invoices/service.ts` (stage moves, links, Create job, mark paid and undo, duplicates, not-needed), each writing its `InvoiceEvent` in the same transaction. Create job calls `src/lib/tasks/core.ts`, never Prisma directly. Reads in `queries.ts` (staff) and `src/lib/portal/` (contractor). Nothing under `src/lib/invoices/` imports staff auth or QuickBooks, so the portal can use it (`src/lib/auth-guard.test.ts`).
-
-### 6.3 Access
-
+- **All writes** go through `src/lib/invoices/service.ts`, each writing its `InvoiceEvent` in the same transaction. Nothing under `src/lib/invoices/` imports staff auth, QuickBooks, `tasks/service` or `tasks/attachments`, so the portal can use it; `src/lib/auth-guard.test.ts` adds `src/lib/invoices` to `PORTAL_DIRS` to hold that.
+- **Concurrency:** every stage move (Approve, Back to review, Mark paid, Undo paid, Not an invoice, Undo) updates only a row still in the stage it expects, and a field save only a row still in To review, so two partners acting at once can't double-pay, double-undo or reopen a paid invoice; the second gets "Pieter already marked this paid". Back to review clears approved at and by. This guards the app's record only: money moves in Baselane, so the rule for paying is in M8.
+- **Money math:** list counts and totals come from SQL sums of the Decimal column; any sum in JS counts integer cents, as `src/lib/draws/figures.ts` does. Totals are always positive; parse typed totals strictly (not `parseAmount`, which takes "k" and a minus sign).
 - **Staff:** `requireUser()` on every page, action and route.
-- **Contractors:** `requirePortalPrincipal()`; only invoices with their contact id, never `NOT_INVOICE`, and emailed ones only once confirmed. Linking jobs in the portal is limited to jobs they have live `TaskAccess` to.
-- **Files** through `/api/files/invoice/<id>` with the same checks, served with the existing safe headers (`src/lib/attachments/headers.ts`). Emailed PDFs are untrusted: shown in a sandboxed frame, never as same-origin HTML.
+- **Contractors:** `requirePortalPrincipal()`; only invoices with their contact id, never Not an invoice, non-portal ones only in To pay or Paid (M14), nothing at all in a link session (M16). Send invoice can link only a job they have live `TaskAccess` to; `portal-invoice-upload` takes that job's id as its parent, already access-checked, and the send records the files onto the new invoice.
+- **View-as** (docs/specs/view-as.md) refuses Send invoice, with a test, in whichever feature lands second.
+- **Files** through `/api/files/invoice/<id>` with the same checks and `fileResponseHeaders` unchanged; a new private upload kind pair (`invoice-upload` for staff, `portal-invoice-upload` for contractors) in `src/lib/attachments/upload-kinds.ts`. HEIC from the portal converts in the browser as today; an emailed HEIC is stored and downloads.
 
-### 6.4 The inbox
+### 5.3 Emails
 
-1. **Receive.** Resend posts `email.received` to `/api/inbound/resend`. The route verifies the signature (`RESEND_WEBHOOK_SECRET`), stores an `InboundEmail` once per Resend id, and answers 200 at once.
-2. **Fetch and store.** The once-a-minute cron (the existing outbox pattern) picks up queued rows, fetches the body and attachments from Resend's API, and saves readable files to private Blob.
-3. **Cap.** Past 50 a day (Eastern), rows wait as `HELD_CAP` for the next day.
-4. **Read, pass one.** One Claude call with the email text, the files, and the active contractor list (name, company, emails). Structured output: is it an invoice; original sender (for forwards); contractor match; invoice number; dates; total; line descriptions; property guess. The schema has no bank or payment fields, and the system prompt treats everything in the email as data, never instructions. A forward from a partner's own address is marked as theirs (no staff email, I18).
-5. **Read, pass two.** With a contractor matched, a short call with that contractor's jobs (not canceled, last 120 days, plus open ones) returns suggested job ids. None found means "No job".
-6. **Check.** Code (not the model) re-checks the contractor by exact email first, runs the duplicate test (I13), and lands the invoice in To review with its flags.
-7. **Model call details.** `claude-opus-5-5`, effort set explicitly (start at `low`; measure on real invoices), `output_config.format` for the schema, server-side `fallbacks: "default"` for refusals, typed SDK errors, retried by the cron on failure.
+- **The drain needs an invoice branch.** As built, `drainDue` (`src/lib/notifications/outbox.ts`) closes any row with no task ("no task") and any contractor row without live `TaskAccess` to that task (`deliveryFor`, "no access"), and the rest of the drain reads the task. Invoice rows carry an `invoiceId` and no `taskId` and take their own short branch: no task read, no `TaskAccess` check.
+- **Staff (M12):** one bundle row per partner (`u:<id>:invoices`), "3 new invoices to review", linking to `/invoices?view=review`; it needs only the recipient user.
+- **Paid (M15):** one row per invoice for its contractor, sent when `jobEmailState` is on, after the Undo window, and only if the invoice is still Paid and still that contractor's. Its link is `/p/invoices`.
+- **Toasts say who heard,** read from the same `jobEmailState` with the words `comment-card.tsx` already uses: "Marked paid · Zack gets an email", "· Zack hasn't signed in yet", "· Zack's emails are off", "· Zack has no login yet", with Undo.
 
-### 6.5 Emails
+---
 
-- **Staff (I18):** `NotificationOutbox` gains an optional invoice and a bundle key per partner (`u:<id>:invoices`), so new invoices within 10 minutes become one email ("3 new invoices to review").
-- **Contractors (I17):** Sent back and Paid rows keyed per contractor, so one Mark paid action makes one email per contractor. Sent through the existing Resend sender and templates in `src/lib/email/` and `src/lib/notifications/content.ts`.
+## 6. Screens
 
-### 6.6 Environment
+All sizes: laptop 1280x800, tablet 768x1024 (touch layout), phone 375x667, checked down to 320. Drawn Nov 21 in [specs/contractor-invoices/](specs/contractor-invoices/) (02 to 11); where a screen had options, the pick is named below. The drawings are the reference for the build, except where 6.1 and drawing 11 changed them later: the ⋯ menu's place and Paid's bar in 03 and 04, Mark paid's title, its closing on a conflict and its focus in 04. 01 is the Nov 20 scope sketch, superseded by 02 to 11.
 
-Added to `src/lib/env.ts`: `ANTHROPIC_API_KEY`, `RESEND_WEBHOOK_SECRET`, `INVOICE_INBOX_ADDRESS`. A new dependency, `@anthropic-ai/sdk`.
+1. **Invoices page** (`/invoices`): header with **New invoice**; a `SegmentedControl` with counts, To review · To pay · Paid, the pick in the URL (`?view=`), as the Draws page does; one list (contractor, invoice number, jobs, date, total, flags) as a table on computer and tablet, rows on a phone. Paid lists newest first. Flags are an icon plus one word in `--warn` (Possible duplicate, Who's this from?), never a fill alone, and sit under the contractor's name in the first column; on a phone they lead the row's second line (picked Nov 21, [02-invoices-page.svg](specs/contractor-invoices/02-invoices-page.svg), option A). Empty states: "Nothing to review. New invoices land here." and one line for each other view. A line when invoice emails were dropped over the cap.
+2. **Invoice page** (`/invoices/[id]`, `/invoices/new`): the file beside the fields on computer, the PDF in a frame on the left and the fields in a 420px column on the right, so the file stays in view while you type (picked Nov 21, [03-invoice-page.svg](specs/contractor-invoices/03-invoice-page.svg), option A; Lightbox's `DocumentStage`; images through `Lightbox`); a file card on top on tablet and phone, then the fields, then a fixed bottom bar. The bar holds only the next step: **Approve** in To review, **Mark paid** in To pay, and no bar once Paid (the paid line sits under the title). The ⋯ menu is on the title line (6.1, item 1). History below. A forwarded invoice shows "From the email Zack sent Nov 18" and its body text, three lines with Show more. With no file, the email card takes the file's place. While in To review, **Add the invoice file** sits under the file or the email card, so a PDF that turns up later can be dropped on (a "file added" history line); To pay and Paid are read-only, and Back to review reopens them. References: [Airwallex review bill](https://mobbin.com/screens/d6fa70dc-46b6-41e0-9771-d61e758980a3), [Remote](https://mobbin.com/screens/5a02d53a-4cc4-411a-ba45-3d0b7c1f0f54).
+3. **Mark paid** in a `FormSheet`: date, method, check number or note, **Mark paid · $850.00**. Reference: [HoneyBook](https://mobbin.com/screens/4a1b5a54-7cf4-4c16-88ae-ae508ade10c3) (the total in the button).
+4. **Task page:** the job's invoices (M13) in their own Invoices section in the main column, between Checklist and Photos and files, with rows like the files list (number, then total and stage in fixed columns). The same at every size, one line at 320 (picked Nov 21, [05-task-page.svg](specs/contractor-invoices/05-task-page.svg), option B).
+5. **Portal job page:** Send invoice in the bottom bar (4.1), the sheet and its sent state, and the job's invoices listed in an Invoices section with no button of its own ([06-portal-job.svg](specs/contractor-invoices/06-portal-job.svg), option B, and 09-send-invoice-bar.svg, B1). References: [Turo repair invoice](https://mobbin.com/screens/4c38490a-a4aa-446d-bb11-d55fd5c25bb5), [Mercury submitted](https://mobbin.com/screens/bba69488-ff37-4905-9c3d-161c1e489f39).
+6. **Your invoices** at `/p/invoices` (M14): its own list page from the account menu, newest first, each row the invoice number, the job or "No job", the total and the stage word with its date in one fixed spot; empty, "Invoices you send show up here." ([07-your-invoices.svg](specs/contractor-invoices/07-your-invoices.svg), option C). Under the title, one quiet line with the invoice address and **Copy** ("Or email them to invoices@mail.hgcapitalpartners.com" on laptop and tablet, the address alone on a phone); the empty state adds "You can also email them to" the address with **Copy address** (picked Nov 21, [15-invoice-address.svg](specs/contractor-invoices/15-invoice-address.svg), B). Reference: [Remote invoice list](https://mobbin.com/screens/9d28f831-4dbd-438f-83c7-466dcad13a7f).
+7. **Home:** the Needs you roll-up row.
+
+
+### 6.1 Small calls (all decided Nov 21)
+
+Most are already drawn this way in the screens; 1 and 2 have their alternative in [10-small-visual-calls.svg](specs/contractor-invoices/10-small-visual-calls.svg).
+
+1. **Decided Nov 21 (1A).** **The invoice page's ⋯ menu** sits on the title line, as on every other record page (`RecordMoreMenu`); the bottom bar holds only the next step. It holds, by stage ([11-more-menu.svg](specs/contractor-invoices/11-more-menu.svg)): To review: Copy link, then Not an invoice. To pay: Back to review, Copy link, then Not an invoice. Paid: Undo paid, Copy link (no bar, and no Not an invoice once it's paid). Not an invoice is red, after a line, and goes at once with a toast and Undo.
+2. **Decided Nov 21 (2A).** **Stages read as one plain word** everywhere, the contractor's job page included: Received, Approved, Paid with its date.
+3. **Decided Nov 21, as drawn.** **Invoices page:** Paid has no count in the switch (three counts overflow at 320). To review and To pay sort oldest first; Paid sorts newest first and its Date column is the paid date. A row with no contractor shows the sender's email in `--muted-foreground` where the name goes, or "No contractor" for a staff entry. Empty lines: "Nothing to pay. Approved invoices land here." and "No paid invoices yet." The cap line shows on the day it happened: "4 invoice emails over today's limit weren't saved." Nav icon: lucide `ReceiptText`.
+4. **Decided Nov 21, as drawn.** **Invoice page:** the title is "Invoice #1043", or "Invoice from Zack", or "Invoice". To review fields save as you leave each one; after Approve they turn read-only and Back to review reopens them. Several files show as a file switch above the frame (file cards stacked on touch). Possible duplicate stays until the invoice is gone; no dismiss in the MVP. Not an invoice is a toast with Undo, no confirm. A disabled Approve says why under the buttons: "Add a contractor and a total to approve." A forwarded email's body shows three lines with Show more.
+5. **Decided Nov 21, as drawn.** **Mark paid:** the sheet's title is "Invoice #1043 paid" (Draws' "Draw 3 funded" pattern) with the primary "Mark paid · $850.00". It doesn't put focus in the optional note, so a phone keyboard doesn't jump up. If the other partner already marked it paid, the sheet closes, the page shows Paid, and the toast says "Pieter already marked this paid."
+6. **Decided Nov 21, as drawn.** **Task page:** a line shows the contractor's first name only when a job's invoices come from more than one contractor. An invoice with no number shows its invoice date. No flags here. **New invoice** sits first in the task's ⋯ menu, above Copy link and Delete task, and opens New invoice with this job ticked; the Invoices section itself shows only when the job has an invoice (picked Nov 21, [16-task-new-invoice.svg](specs/contractor-invoices/16-task-new-invoice.svg), A). A canceled job still lists its invoices. Paid keeps `--ok` next to the Done mark, since both mean finished. Invoice events don't post to the job's Activity in the MVP.
+7. **Decided Nov 21, as drawn.** **Contractor job page:** the Invoices section sits after Checklist and before Photos and files. Tapping an invoice opens its file in the viewer (signed in only). The sheet keeps one way to add a file. The sent screen's button is "Back to my jobs", the art is the building photo or the job-done `SpotArt`, and `payoffLine` gains the invoice pair. After sign-in from a job link, `?do=invoice` reopens the sheet.
+8. **Decided Nov 21, as drawn.** **Your invoices:** each row's date is the day it was sent. The page shows Paid only once the Undo window has passed, so a contractor never sees Paid flip back. A Received invoice sent with no number or total reads "Invoice" and a dash.
+9. **Decided Nov 21, as drawn.** **Home:** the invoices row sits right after stuck draws, before sign-ups. Its detail line names the senders, oldest first, two names then "and N more"; no dollar figure, since emailed invoices have no total until someone types it. It ships without snooze (snooze and dismiss isn't built yet); once that lands, a new invoice in To review ends a snooze.
 
 ---
 
 ## 7. Reuse check
 
 **Reused as is**
-- `Sheet` (Mark paid, No invoice needed reason), `Menu`, `useToast` with Undo, `DueDatePicker` (paid date, due date), `Badge`, `Card`, `Table`, `PageHeader`, `EmptyState`, `BackLink`, `LeaveGuard`, `ActivityTimeline` (history), `Lightbox` (image invoices).
-- `MediaUploader` with `"file"` (portal attach), `Attachments` (staff upload).
-- `AssigneePicker`'s Contractors list for the contractor field.
-- Private Blob and `src/lib/attachments/` (content types, limits, safe headers).
-- `NotificationOutbox`, the cron drain, the Resend sender, `src/lib/email/render.ts`.
-- `requirePortalPrincipal()`, `src/lib/task-scope.ts`, `src/lib/money.ts`, `src/lib/dates.ts` (Eastern days).
-- `src/lib/tasks/core.ts` for Create job.
+- `/api/email/inbound` and its signature check; `isAutoReply`, `fromAddress`, `singleAddress` (`src/lib/email/inbound.ts`); the DMARC rule in `replies.ts`.
+- `SegmentedControl` (as on Draws), `Table`, `PageHeader`, `EmptyState`, `BackLink`, `Menu`, `DatePicker` with `variant="field"`, `useToast` with Undo and a detail clause, `ActivityTimeline` with `collapseStretches`, `Lightbox`, `FilesList`, `LeaveGuard`, `useMediaUploader` and `MediaUploadTray`, `AssigneePicker`'s Contractors list, `OptionList` with search for the job picker.
+- Private Blob, `src/lib/attachments/` (content types, limits, `fileResponseHeaders`).
+- The Resend sender, `src/lib/email/render.ts`, `jobEmailState`.
+- `requireUser()`, `requirePortalPrincipal()`, `linkSessionMayOpen`, `src/lib/task-scope.ts`, `src/lib/dates.ts` (Eastern days), cents math as in `src/lib/draws/figures.ts`.
 
 **Extended**
-- `SideNav` links (Invoices with a count).
-- `/api/files/[kind]` and `/api/blob/[kind]` (an `invoice` kind).
-- `NotificationOutbox` (optional invoice, bundle keys).
-- `TaskFields` on the task page (Invoice row); the contractor page (Invoices card).
-- The portal: `/p` gets the bottom bar; the Mark done payoff and finished job pages get "Send an invoice". The payoff moves to `components/` on this third use (components.md, Sent screen).
-- `Kpi` moves from Financials to `components/` for the card figures.
-- `src/lib/env.ts`; the static auth guard test covers the new routes.
+- `/api/email/inbound`: routes by recipient. `resendGet` and `sortFile` move out of `replies.ts` into a shared module.
+- `replies.ts`: a Done-job reply with a file also makes an invoice (4.2).
+- `/api/files/[kind]` and `/api/blob/[kind]`: an `invoice` kind. `upload-kinds.ts`: two invoice kinds.
+- `NotificationOutbox` and `drainDue`: an optional invoice, bundle keys and the invoice branch (5.3).
+- `FormSheet` (HG's own component, not a stock file): a prop to open with no field focused, for Mark paid.
+- `DocumentStage`: exported from `lightbox.tsx` for the invoice page.
+- `RecordMoreMenu`: a way to replace its Archive item, so the invoice's ⋯ reads as 6.1 item 1.
+- `MediaGrid` `menuItems` and `FilesList`'s row menu: Use as invoice.
+- `job-link-paths.ts`: an `invoice` step in `JOB_LINK_STEPS` (`?do=invoice` after sign-in). The portal account menu: Your invoices.
+- `STAFF_SECTIONS` and the proxy matcher: `/invoices`. `auth-guard.test.ts`: `src/lib/invoices` in `PORTAL_DIRS`.
+- `payoffLine`: the invoice pair of lines.
+- Home's Needs you (`src/lib/home/needs-you.ts`): an `invoice` roll-up kind, snooze-only per snooze-dismiss.md D3.
+- `nav.tsx`: the Invoices link.
+- The task page (its Invoices section, and New invoice in `tasks/[id]/header.tsx`'s ⋯ menu); the portal job page; job file menus (Use as invoice).
+- The invoice sent state reuses the Mark done payoff's pieces where they sit and gets named in components.md's Sent screen row; sharing that screen across features waits for its own change, since it would restyle shipped screens.
 
-**New (no existing component does the job)**
-- **Filter cards:** total cards that act as the page's switch. Mercury and Deel, linked in 5.1.
-- **Selection bar:** row checkboxes and a floating action bar, the first in the app. Shopify Bill Pay.
-- **Document pane:** a PDF beside a form. Airwallex and Remote, linked in 5.2.
-- **Portal bottom bar.** Apple HIG tab bars and Material navigation bar.
-- **Job multi-picker** with suggestions (review page and portal form). Jobber's select-jobs-to-invoice.
-- The inbox webhook, the reading step, matching and duplicates.
+**New**
+- The invoice page layout: a document beside a form (Airwallex, Remote above).
+- `src/lib/invoices/` (service, queries, inbound).
 
-New general-purpose components (filter cards, selection bar, document pane, bottom bar) go in `src/components/` with a row in docs/components.md in the same commit.
+Built on whatever the design foundation (docs/specs/design-foundation.md) has landed by build day: re-run this check against main and docs/components.md the day work starts.
 
 ---
 
 ## 8. Build order
 
-Each step is usable on its own.
+1. **Staff side:** tables and service, New invoice and Use as invoice, the Invoices page, the invoice page, Approve, Mark paid and Undo, Not an invoice, duplicates, the task page list, Needs you.
+2. **Ways in and the contractor side:** the forward inbox, the Done-job reply path, Send invoice in the portal, the job page and Your invoices, staff emails, the Paid email.
 
-1. **Staff side:** schema and services, New invoice by hand, the Invoices page, the invoice page, Mark paid and Undo, No invoice and "No invoice needed", the task rail row, the contractor card, staff emails.
-2. **The inbox:** DNS and Resend receiving, the webhook, the cron step, reading, matching, duplicates, the cap, Gmail confirm rows.
-3. **The portal:** the bottom bar, the Invoices list, Send invoice, the sent screen, detail with edit and withdraw, shortcuts, Sent back and Paid emails.
+Each step ends with `npm run typecheck`, `npm run lint`, `npm test` and `npm run test:devices`, with `SAMPLE_PARAMS` for `/invoices/[id]`. No local DB has invoices, so `tests/devices/setup.ts` seeds one per stage and one portal invoice for the fixture contractor, written by a system actor so no email is queued.
 
-Each step ends with `npm run typecheck`, `npm run lint`, `npm test` and `npm run test:devices`, with new samples in `SAMPLE_PARAMS` for `/invoices/[id]` and `/p/invoices/[id]`.
+**Tests worth having:** stage moves and who may make them; two partners marking one invoice paid at once; Undo paid before and after the Paid email; a forged From with DMARC failing never setting the contractor or skipping the staff email; an invoice email never reaching the reply path, and a reply never reaching the invoice path; one email delivered twice making one invoice; a Done-job reply with a PDF making one invoice and one forward, an active-job reply making none; the portal never showing another contractor's invoices, Not an invoice items, or emailed ones before approval; a link session seeing no invoice; the duplicate rule (normalized numbers, same file); the cap; a negative or "1.2k" total refused; a Paid email for a No job invoice and for one on a job that sits on Connor both send; a staff bundle with no task sends; a staff entry sends no staff email; deleting a job keeps its invoice and file; a DMARC-verified partner forward skips the cap; "#1043" and "1043" match as duplicates.
 
-**Tests worth having:** stage moves and who may make them; the portal never showing emailed invoices in To review or another contractor's invoices; the duplicate rule; the cap; webhook signature and idempotency; matching on exact email before the model's guess; Undo paid; Create job.
+**Proof before step 2 ships:** once the address receives, send one forward from the Gmail test contractor account and one from a partner's address, read the stored `InboundEmail` DMARC result, and record it here. If Gmail doesn't report "pass", M11 already falls back to "Who's this from?", and M12's partner skip needs a second rule.
+
+**Launch note (Connor and Pieter, the day it goes live):** text each contractor once (draft in 15-invoice-address.svg): "Hi Zack, you can now send HG Capital your invoices in the app. Tap Send invoice on a finished job, reply to the job email with the bill, or forward it to invoices@mail.hgcapitalpartners.com. When we pay it, you get an email. Connor". And between the two of you: mark an invoice paid in the app as you send the money (M8).
+
+**Setup Connor does:** nothing before the build. Watch Resend's daily use after launch; go Pro if it nears 100 a day.
 
 ---
 
-## 9. Setup Connor does (before step 2)
+## 9. Later (not in the MVP)
 
-- **Anthropic API key:** create one in the Claude Console and add `ANTHROPIC_API_KEY` in Vercel.
-- **Resend receiving:** add receiving for `hgcapitalpartners.com` in Resend, then its MX record in GoDaddy on the **ns19/ns20 zone** (not `...llc.com`). Add the `email.received` webhook to `https://www.hgcapitalpartners.com/api/inbound/resend`, and its secret as `RESEND_WEBHOOK_SECRET` in Vercel.
-- **Optional:** in Gmail, a filter that auto-forwards chosen contractors' emails to the inbox (default 8 shows the confirm email).
+Each has notes in [specs/contractor-invoices/full-plan.md](specs/contractor-invoices/full-plan.md), section 10.
+
+- **Claude reading invoices** (fills number, dates and total): needs `ANTHROPIC_API_KEY`, checks on what the model returns, HEIC and size limits, a cheaper-model test, and a "asks to be paid a new way" flag.
+- **The No invoice list** that chases finished contractor jobs with no invoice: start it on its launch day, store "No invoice needed" through the snooze and dismiss store.
+- **Mark several paid at once,** picking rows the way Tasks does with the bulk bar.
+- **Totals and filters:** figures above the list, a period menu, a contractor filter.
+- **Pay-by dates** and overdue marks.
+- **Contractor edit, withdraw and Send back.**
+- **Deposits, credits, revised invoices.**
+- **A rehab link** on invoices for rehab costs (rehab-draws.md, section 9).
+- **Payment-method tags** shared with the contractor page, a "No W-9" flag, and a check photo attached to the invoice it paid (roadmap, Check photos).
+- **Invoices on the contractor page,** and ⌘K search by invoice number.
+- **A root-domain address** (`invoices@hgcapitalpartners.com`), which needs an MX on the ns19/ns20 zone.
+- **1099s** come from QuickBooks (roadmap, 1099 list), not from invoices.

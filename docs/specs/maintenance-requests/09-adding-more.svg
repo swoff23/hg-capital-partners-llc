@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Question 8: adding to a request after sending. A: an Add photos or a note button, and email replies land on the task too. B (recommended): the button only; emails say to text the group chat. C: nothing after sending. Below, how an addition shows on your task.</title>
+<rect width="1000" height="700" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Question 8: what if they have more to add after sending?</text>
+<text x="32" y="56" font-size="11" fill="#424e61">Another photo, "it got worse," "the plumber can't come Tuesday." Their request page on a phone, and the bottom of the emails they get.</text>
+
+<!-- A -->
+<g transform="translate(32 76)">
+<rect x="0" y="0" width="300" height="430" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">A. Add on the page, or reply by email</text>
+<rect x="20" y="48" width="196" height="232" rx="18" fill="#ffffff" stroke="#152133"/>
+<text x="36" y="76" font-size="13" font-weight="600" fill="#152133">Kitchen sink leaks</text>
+<circle cx="42" cy="100" r="5" fill="#152133"/><text x="54" y="104" font-size="10.5" font-weight="500" fill="#152133">Received</text>
+<line x1="42" y1="106" x2="42" y2="124" stroke="#d9dde3"/>
+<circle cx="42" cy="130" r="5" fill="#ffffff" stroke="#8f99a8"/><text x="54" y="134" font-size="10.5" fill="#8f99a8">Scheduled</text>
+<text x="36" y="166" font-size="9.5" font-weight="500" fill="#424e61">What you sent</text>
+<rect x="36" y="176" width="34" height="28" rx="4" fill="#e6e9ee"/>
+<rect x="36" y="222" width="164" height="30" rx="8" fill="#ffffff" stroke="#152133"/>
+<text x="118" y="241" font-size="10.5" font-weight="500" fill="#152133" text-anchor="middle">Add photos or a note</text>
+<rect x="20" y="296" width="260" height="40" rx="8" fill="#f5f6f8"/>
+<text x="32" y="313" font-size="9.5" fill="#424e61">Email footer</text>
+<text x="32" y="328" font-size="10" fill="#152133">Reply to this email to add to your request.</text>
+<text x="20" y="362" font-size="10.5" fill="#152133">• Two ways in. A reply's text and photos</text>
+<text x="28" y="376" font-size="10.5" fill="#152133">post to the task, like contractor replies.</text>
+<text x="20" y="396" font-size="10.5" fill="#152133">• Email replies drag in signatures and</text>
+<text x="28" y="410" font-size="10.5" fill="#152133">quoted text, and add to the build.</text>
+</g>
+
+<!-- B -->
+<g transform="translate(350 76)">
+<rect x="0" y="0" width="300" height="430" rx="10" fill="none" stroke="#c9a96a" stroke-width="1.5"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">B. Add on the page only</text>
+<rect x="188" y="16" width="92" height="20" rx="10" fill="#f6efe1"/>
+<text x="234" y="30" font-size="10" font-weight="500" fill="#8a6d2f" text-anchor="middle">Recommended</text>
+<rect x="20" y="48" width="196" height="232" rx="18" fill="#ffffff" stroke="#152133"/>
+<text x="36" y="76" font-size="13" font-weight="600" fill="#152133">Kitchen sink leaks</text>
+<circle cx="42" cy="100" r="5" fill="#152133"/><text x="54" y="104" font-size="10.5" font-weight="500" fill="#152133">Received</text>
+<line x1="42" y1="106" x2="42" y2="124" stroke="#d9dde3"/>
+<circle cx="42" cy="130" r="5" fill="#ffffff" stroke="#8f99a8"/><text x="54" y="134" font-size="10.5" fill="#8f99a8">Scheduled</text>
+<text x="36" y="166" font-size="9.5" font-weight="500" fill="#424e61">What you sent</text>
+<rect x="36" y="176" width="34" height="28" rx="4" fill="#e6e9ee"/>
+<rect x="36" y="222" width="164" height="30" rx="8" fill="#ffffff" stroke="#152133"/>
+<text x="118" y="241" font-size="10.5" font-weight="500" fill="#152133" text-anchor="middle">Add photos or a note</text>
+<rect x="20" y="296" width="260" height="40" rx="8" fill="#f5f6f8"/>
+<text x="32" y="313" font-size="9.5" fill="#424e61">Email footer</text>
+<text x="32" y="328" font-size="10" fill="#152133">Questions? Text us in our group chat.</text>
+<text x="20" y="362" font-size="10.5" fill="#152133">• One way in: the button reuses the form's</text>
+<text x="28" y="376" font-size="10.5" fill="#152133">note box and photo picker.</text>
+<text x="20" y="396" font-size="10.5" fill="#152133">• Emails point questions to the group chat,</text>
+<text x="28" y="410" font-size="10.5" fill="#152133">the same rule as emergencies.</text>
+</g>
+
+<!-- C -->
+<g transform="translate(668 76)">
+<rect x="0" y="0" width="300" height="430" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">C. Nothing after sending</text>
+<rect x="20" y="48" width="196" height="232" rx="18" fill="#ffffff" stroke="#152133"/>
+<text x="36" y="76" font-size="13" font-weight="600" fill="#152133">Kitchen sink leaks</text>
+<circle cx="42" cy="100" r="5" fill="#152133"/><text x="54" y="104" font-size="10.5" font-weight="500" fill="#152133">Received</text>
+<line x1="42" y1="106" x2="42" y2="124" stroke="#d9dde3"/>
+<circle cx="42" cy="130" r="5" fill="#ffffff" stroke="#8f99a8"/><text x="54" y="134" font-size="10.5" fill="#8f99a8">Scheduled</text>
+<text x="36" y="166" font-size="9.5" font-weight="500" fill="#424e61">What you sent</text>
+<rect x="36" y="176" width="34" height="28" rx="4" fill="#e6e9ee"/>
+<rect x="20" y="296" width="260" height="40" rx="8" fill="#f5f6f8"/>
+<text x="32" y="313" font-size="9.5" fill="#424e61">Email footer</text>
+<text x="32" y="328" font-size="10" fill="#152133">Questions? Text us in our group chat.</text>
+<text x="20" y="362" font-size="10.5" fill="#152133">• Least to build.</text>
+<text x="20" y="382" font-size="10.5" fill="#152133">• A second photo goes to the group chat,</text>
+<text x="28" y="396" font-size="10.5" fill="#152133">so it never lands on the task.</text>
+</g>
+
+<!-- staff side -->
+<g transform="translate(32 528)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">On your task (A and B): their addition in its Activity, unread for you</text>
+<rect x="0" y="22" width="560" height="96" rx="10" fill="#ffffff" stroke="#d9dde3"/>
+<circle cx="24" cy="46" r="10" fill="#e6e9ee"/>
+<text x="24" y="50" font-size="9" fill="#424e61" text-anchor="middle">D</text>
+<text x="44" y="44" font-size="10.5" font-weight="500" fill="#152133">Dana (resident) added a note and 2 photos</text>
+<text x="44" y="58" font-size="9.5" fill="#8f99a8">Sat, Nov 22, 9:14 am</text>
+<text x="44" y="78" font-size="10.5" fill="#152133">It's dripping into the cabinet now.</text>
+<rect x="44" y="86" width="36" height="26" rx="4" fill="#e6e9ee"/>
+<rect x="86" y="86" width="36" height="26" rx="4" fill="#e6e9ee"/>
+<text x="590" y="44" font-size="10.5" fill="#152133">• Their photos reach the contractor on the job,</text>
+<text x="598" y="58" font-size="10.5" fill="#152133">like the ones they sent first.</text>
+<text x="590" y="78" font-size="10.5" fill="#152133">• Your comments still never reach them.</text>
+<text x="590" y="98" font-size="10.5" fill="#152133">• Only while it's open, not once Done or Closed.</text>
+</g>
+
+<text x="32" y="672" font-size="11" fill="#424e61">Sizes: the button sits under What you sent on every screen; tapping it opens the note and photo picker in a bottom sheet on phones, a dialog on tablet and laptop.</text>
+</svg>

@@ -1,0 +1,624 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1419" height="2643" viewBox="0 0 1419 2643">
+<title>Invoices page (/invoices)</title>
+<rect width="1419" height="2643" fill="#ffffff"/>
+<defs><clipPath id="c1"><rect x="0" y="0" width="1280" height="800"/></clipPath><clipPath id="c2"><rect x="0" y="0" width="768" height="1024"/></clipPath><clipPath id="c3"><rect x="0" y="0" width="375" height="667"/></clipPath><clipPath id="c4"><rect x="0" y="0" width="1280" height="800"/></clipPath><clipPath id="c5"><rect x="0" y="0" width="768" height="1024"/></clipPath><clipPath id="c6"><rect x="0" y="0" width="375" height="667"/></clipPath><clipPath id="c7"><rect x="0" y="0" width="1280" height="800"/></clipPath><clipPath id="c8"><rect x="0" y="0" width="768" height="1024"/></clipPath><clipPath id="c9"><rect x="0" y="0" width="375" height="667"/></clipPath><clipPath id="c10"><rect x="0" y="0" width="1280" height="800"/></clipPath><clipPath id="c11"><rect x="0" y="0" width="768" height="1024"/></clipPath><clipPath id="c12"><rect x="0" y="0" width="375" height="667"/></clipPath></defs>
+<text x="32" y="40" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="18" font-weight="600" fill="#152133">Invoices page (/invoices)</text>
+<text x="32" y="62" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Contractor invoices MVP, screen 1. To review, To pay and the empty queue at laptop, tablet and phone. Built like Draws: heading, switch in the URL, one table.</text>
+<text x="32" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">A. Flag under the contractor</text>
+<rect x="248.98400000000004" y="71" width="104" height="18" rx="9" fill="#152133"/>
+<text x="300.98400000000004" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#ffffff" text-anchor="middle">Recommended</text>
+<text x="32" y="104" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">The flag sits under the name in the first column; Invoice, Jobs, Date and Total keep their room at every size.</text>
+<text x="32" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">?view=review, the default</text>
+<g transform="translate(32.0,152.0) scale(0.55)"><g clip-path="url(#c1)"><rect x="0" y="0" width="1280" height="800" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="1280" height="56" rx="0" fill="#ffffff"/>
+<line x1="0" y1="56" x2="1280" y2="56" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="20" y="16" width="24" height="24" rx="5" fill="#152133"/>
+<text x="32.0" y="31.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="52" y="33" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="134.616" y="10" width="448" height="36" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(144.616,20) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="166.616" y="33" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<rect x="548.616" y="18" width="26" height="20" rx="4" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="561.616" y="32" font-size="11" font-weight="500" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">⌘K</text>
+<rect x="0" y="56" width="64" height="744" rx="0" fill="#f8f7f3"/>
+<line x1="64" y1="56" x2="64" y2="800" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(24,104) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .7-1.5l7-6a2 2 0 0 1 2.6 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g>
+<g transform="translate(24,138) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></g>
+<g transform="translate(24,172) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4M10 10h4M10 14h4M10 18h4"/></g>
+<g transform="translate(24,206) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 16 6 6"/><circle cx="16" cy="9" r="2.9"/><circle cx="6" cy="5" r="3"/></g>
+<g transform="translate(24,240) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></g>
+<g transform="translate(24,274) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9M13 17V5M8 17v-3"/></g>
+<g transform="translate(24,308) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></g>
+<rect x="8" y="334" width="48" height="32" rx="6" fill="#e7e5e0"/>
+<rect x="8" y="342" width="2" height="16" rx="0" fill="#152133"/>
+<g transform="translate(24,342) scale(0.6667)" fill="none" stroke="#152133" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8M16 12H8M13 16H8"/></g>
+<g transform="translate(24,376) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"/></g>
+<g transform="translate(24,410) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></g>
+<line x1="8" y1="744" x2="56" y2="744" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="32" cy="772" r="14" fill="#f2f0ec"/>
+<text x="32" y="775.5" font-size="10" font-weight="600" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">CS</text>
+<text x="96" y="116.4" font-size="24" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<rect x="1114.7168000000001" y="88" width="133.28319999999997" height="36" rx="6" fill="#152133"/>
+<g transform="translate(1128.7168000000001,98.0) scale(0.6667)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="1150.7168000000001" y="110.9" font-size="14" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="96" y="144" width="250.3552" height="36" rx="6" fill="#f2f0ec"/>
+<rect x="98" y="146" width="105.392" height="32" rx="4" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="110" y="166.9" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<text x="182.43200000000002" y="166.9" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="217.392" y="166.9" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="267.984" y="166.9" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="302.94399999999996" y="166.9" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<rect x="96" y="196" width="1152" height="34" rx="6" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(108,206.0) scale(0.5833)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></g>
+<text x="130" y="217.55" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">4 invoice emails over today's limit weren't saved.</text>
+<text x="96" y="267.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="368" y="267.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice</text>
+<text x="488" y="267.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="988" y="267.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Date</text>
+<text x="1248" y="267.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<line x1="96" y1="280" x2="1248" y2="280" stroke="#d5d1ca" stroke-width="1"/>
+<text x="96" y="312.9" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave Kim</text>
+<text x="368" y="312.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">#2207</text>
+<text x="488" y="312.9" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#424e61" font-weight="400">Replace water heater</tspan><tspan fill="#5b6576" font-weight="400"> · 82 Hill St</tspan></text>
+<text x="988" y="312.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 17</text>
+<text x="1248" y="312.9" font-size="14" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$1,975.00</text>
+<line x1="96" y1="336" x2="1248" y2="336" stroke="#e7e5e0" stroke-width="1"/>
+<text x="96" y="358.9" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<g transform="translate(96,368.0) scale(0.5833)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></g>
+<text x="116" y="379.55" font-size="13" font-weight="500" fill="#a54e09" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Possible duplicate</text>
+<text x="368" y="368.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">#1043</text>
+<text x="488" y="368.9" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#424e61" font-weight="400">Fix leak, Unit 2</tspan><tspan fill="#5b6576" font-weight="400"> · 15 Oxford Ave</tspan></text>
+<text x="988" y="368.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<text x="1248" y="368.9" font-size="14" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<line x1="96" y1="392" x2="1248" y2="392" stroke="#e7e5e0" stroke-width="1"/>
+<text x="96" y="414.9" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">billing@ridgelineroof.com</text>
+<g transform="translate(96,424.0) scale(0.5833)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></g>
+<text x="116" y="435.55" font-size="13" font-weight="500" fill="#a54e09" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Who's this from?</text>
+<text x="368" y="424.9" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">—</text>
+<text x="488" y="424.9" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#5b6576" font-weight="400">—</tspan></text>
+<text x="988" y="424.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<text x="1248" y="424.9" font-size="14" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">—</text></g><rect x="0" y="0" width="1280" height="800" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<g transform="translate(776.0,138.0) scale(0.45)"><g clip-path="url(#c2)"><rect x="0" y="0" width="768" height="1024" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="768" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="768" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="98" y="31.5" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="190.704" y="4" width="448" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(200.704,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="226.704" y="31.5" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<text x="24" y="112.8" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<rect x="598.8192" y="76" width="145.18079999999998" height="44" rx="6" fill="#152133"/>
+<g transform="translate(612.8192,90.0) scale(0.6667)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="634.8192" y="103.6" font-size="16" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="24" y="140" width="273.54879999999997" height="44" rx="6" fill="#f2f0ec"/>
+<rect x="26" y="142" width="116.44800000000001" height="40" rx="4" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="38" y="167.6" font-size="16" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<text x="120.20800000000001" y="167.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="156.448" y="167.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="213.696" y="167.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="249.93599999999998" y="167.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<rect x="24" y="200" width="720" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(36,210.0) scale(0.6667)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></g>
+<text x="60" y="222.9" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">4 invoice emails over today's limit weren't saved.</text>
+<text x="24" y="274.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="226" y="274.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice</text>
+<text x="302" y="274.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="564" y="274.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Date</text>
+<text x="744" y="274.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<line x1="24" y1="288" x2="744" y2="288" stroke="#d5d1ca" stroke-width="1"/>
+<text x="24" y="323.6" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave Kim</text>
+<text x="226" y="323.6" font-size="16" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">#2207</text>
+<text x="302" y="323.6" font-size="16" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#424e61" font-weight="400">Replace water heater</tspan><tspan fill="#5b6576" font-weight="400"> · 82 Hil…</tspan></text>
+<text x="564" y="323.6" font-size="16" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 17</text>
+<text x="744" y="323.6" font-size="16" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$1,975.00</text>
+<line x1="24" y1="348" x2="744" y2="348" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="372.6" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<g transform="translate(24,382.0) scale(0.6667)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></g>
+<text x="46" y="394.9" font-size="14" font-weight="500" fill="#a54e09" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Possible duplicate</text>
+<text x="226" y="383.6" font-size="16" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">#1043</text>
+<text x="302" y="383.6" font-size="16" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#424e61" font-weight="400">Fix leak, Unit 2</tspan><tspan fill="#5b6576" font-weight="400"> · 15 Oxford A…</tspan></text>
+<text x="564" y="383.6" font-size="16" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<text x="744" y="383.6" font-size="16" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<line x1="24" y1="408" x2="744" y2="408" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="432.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">billing@ridgelineroof.co…</text>
+<g transform="translate(24,442.0) scale(0.6667)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></g>
+<text x="46" y="454.9" font-size="14" font-weight="500" fill="#a54e09" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Who's this from?</text>
+<text x="226" y="443.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">—</text>
+<text x="302" y="443.6" font-size="16" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#5b6576" font-weight="400">—</tspan></text>
+<text x="564" y="443.6" font-size="16" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<text x="744" y="443.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">—</text></g><rect x="0" y="0" width="768" height="1024" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1161.6" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Flag leads the second line</text>
+<g transform="translate(1161.6,152.0) scale(0.6)"><g clip-path="url(#c3)"><rect x="0" y="0" width="375" height="667" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="375" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="375" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<rect x="102" y="4" width="257" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(112,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="138" y="31.5" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<text x="16" y="104.8" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<rect x="213.81920000000002" y="68" width="145.18079999999998" height="44" rx="6" fill="#152133"/>
+<g transform="translate(227.81920000000002,82.0) scale(0.6667)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="249.81920000000002" y="95.6" font-size="16" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="16" y="132" width="273.54879999999997" height="44" rx="6" fill="#f2f0ec"/>
+<rect x="18" y="134" width="116.44800000000001" height="40" rx="4" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="30" y="159.6" font-size="16" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<text x="112.20800000000001" y="159.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="148.448" y="159.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="205.696" y="159.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="241.93599999999998" y="159.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<rect x="16" y="192" width="343" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(28,202.0) scale(0.6667)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></g>
+<text x="52" y="214.9" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">4 emails over the limit weren't saved.</text>
+<text x="16" y="266.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="359" y="266.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<line x1="16" y1="280" x2="359" y2="280" stroke="#d5d1ca" stroke-width="1"/>
+<text x="359" y="305" font-size="16" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$1,975.00</text>
+<text x="359" y="326" font-size="14" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 17</text>
+<text x="16" y="305" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave Kim</text>
+<text x="16" y="326" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#5b6576" font-weight="400">#2207 · Replace water heater · 82 Hill St</tspan></text>
+<line x1="16" y1="340" x2="359" y2="340" stroke="#e7e5e0" stroke-width="1"/>
+<text x="359" y="365" font-size="16" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="359" y="386" font-size="14" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<text x="16" y="365" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<g transform="translate(16,373.1) scale(0.6667)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></g>
+<text x="38" y="386" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#a54e09" font-weight="500">Possible duplicate</tspan><tspan fill="#5b6576" font-weight="400"> · #1043 · Fix lea…</tspan></text>
+<line x1="16" y1="400" x2="359" y2="400" stroke="#e7e5e0" stroke-width="1"/>
+<text x="359" y="425" font-size="16" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">—</text>
+<text x="359" y="446" font-size="14" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<text x="16" y="425" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">billing@ridgelineroof.com</text>
+<g transform="translate(16,433.1) scale(0.6667)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></g>
+<text x="38" y="446" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#a54e09" font-weight="500">Who's this from?</tspan></text></g><rect x="0" y="0" width="375" height="667" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="646.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">B. Flags column at the row's end</text>
+<text x="32" y="666.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">The spec's column order. Flags get a column after Total; it drops when no row in the view has one.</text>
+<text x="32" y="690.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<g transform="translate(32.0,700.8) scale(0.55)"><g clip-path="url(#c4)"><rect x="0" y="0" width="1280" height="800" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="1280" height="56" rx="0" fill="#ffffff"/>
+<line x1="0" y1="56" x2="1280" y2="56" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="20" y="16" width="24" height="24" rx="5" fill="#152133"/>
+<text x="32.0" y="31.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="52" y="33" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="134.616" y="10" width="448" height="36" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(144.616,20) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="166.616" y="33" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<rect x="548.616" y="18" width="26" height="20" rx="4" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="561.616" y="32" font-size="11" font-weight="500" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">⌘K</text>
+<rect x="0" y="56" width="64" height="744" rx="0" fill="#f8f7f3"/>
+<line x1="64" y1="56" x2="64" y2="800" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(24,104) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .7-1.5l7-6a2 2 0 0 1 2.6 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g>
+<g transform="translate(24,138) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></g>
+<g transform="translate(24,172) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4M10 10h4M10 14h4M10 18h4"/></g>
+<g transform="translate(24,206) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 16 6 6"/><circle cx="16" cy="9" r="2.9"/><circle cx="6" cy="5" r="3"/></g>
+<g transform="translate(24,240) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></g>
+<g transform="translate(24,274) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9M13 17V5M8 17v-3"/></g>
+<g transform="translate(24,308) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></g>
+<rect x="8" y="334" width="48" height="32" rx="6" fill="#e7e5e0"/>
+<rect x="8" y="342" width="2" height="16" rx="0" fill="#152133"/>
+<g transform="translate(24,342) scale(0.6667)" fill="none" stroke="#152133" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8M16 12H8M13 16H8"/></g>
+<g transform="translate(24,376) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"/></g>
+<g transform="translate(24,410) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></g>
+<line x1="8" y1="744" x2="56" y2="744" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="32" cy="772" r="14" fill="#f2f0ec"/>
+<text x="32" y="775.5" font-size="10" font-weight="600" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">CS</text>
+<text x="96" y="116.4" font-size="24" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<rect x="1114.7168000000001" y="88" width="133.28319999999997" height="36" rx="6" fill="#152133"/>
+<g transform="translate(1128.7168000000001,98.0) scale(0.6667)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="1150.7168000000001" y="110.9" font-size="14" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="96" y="144" width="250.3552" height="36" rx="6" fill="#f2f0ec"/>
+<rect x="98" y="146" width="105.392" height="32" rx="4" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="110" y="166.9" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<text x="182.43200000000002" y="166.9" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="217.392" y="166.9" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="267.984" y="166.9" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="302.94399999999996" y="166.9" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<rect x="96" y="196" width="1152" height="34" rx="6" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(108,206.0) scale(0.5833)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></g>
+<text x="130" y="217.55" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">4 invoice emails over today's limit weren't saved.</text>
+<text x="96" y="267.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="336" y="267.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice</text>
+<text x="456" y="267.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="856" y="267.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Date</text>
+<text x="1054" y="267.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<line x1="96" y1="280" x2="1248" y2="280" stroke="#d5d1ca" stroke-width="1"/>
+<text x="96" y="312.9" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave Kim</text>
+<text x="336" y="312.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">#2207</text>
+<text x="456" y="312.9" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#424e61" font-weight="400">Replace water heater</tspan><tspan fill="#5b6576" font-weight="400"> · 82 Hill St</tspan></text>
+<text x="856" y="312.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 17</text>
+<text x="1054" y="312.9" font-size="14" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$1,975.00</text>
+<line x1="96" y1="336" x2="1248" y2="336" stroke="#e7e5e0" stroke-width="1"/>
+<text x="96" y="368.9" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="336" y="368.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">#1043</text>
+<text x="456" y="368.9" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#424e61" font-weight="400">Fix leak, Unit 2</tspan><tspan fill="#5b6576" font-weight="400"> · 15 Oxford Ave</tspan></text>
+<text x="856" y="368.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<text x="1054" y="368.9" font-size="14" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<g transform="translate(1078,357.0) scale(0.5833)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></g>
+<text x="1098" y="368.55" font-size="13" font-weight="500" fill="#a54e09" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Possible duplicate</text>
+<line x1="96" y1="392" x2="1248" y2="392" stroke="#e7e5e0" stroke-width="1"/>
+<text x="96" y="424.9" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">billing@ridgelineroof.com</text>
+<text x="336" y="424.9" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">—</text>
+<text x="456" y="424.9" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#5b6576" font-weight="400">—</tspan></text>
+<text x="856" y="424.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<text x="1054" y="424.9" font-size="14" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">—</text>
+<g transform="translate(1078,413.0) scale(0.5833)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></g>
+<text x="1098" y="424.55" font-size="13" font-weight="500" fill="#a54e09" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Who's this from?</text></g><rect x="0" y="0" width="1280" height="800" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="690.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<text x="776.0" y="705.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Date drops to make room</text>
+<g transform="translate(776.0,714.8) scale(0.45)"><g clip-path="url(#c5)"><rect x="0" y="0" width="768" height="1024" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="768" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="768" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="98" y="31.5" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="190.704" y="4" width="448" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(200.704,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="226.704" y="31.5" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<text x="24" y="112.8" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<rect x="598.8192" y="76" width="145.18079999999998" height="44" rx="6" fill="#152133"/>
+<g transform="translate(612.8192,90.0) scale(0.6667)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="634.8192" y="103.6" font-size="16" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="24" y="140" width="273.54879999999997" height="44" rx="6" fill="#f2f0ec"/>
+<rect x="26" y="142" width="116.44800000000001" height="40" rx="4" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="38" y="167.6" font-size="16" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<text x="120.20800000000001" y="167.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="156.448" y="167.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="213.696" y="167.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="249.93599999999998" y="167.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<rect x="24" y="200" width="720" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(36,210.0) scale(0.6667)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></g>
+<text x="60" y="222.9" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">4 invoice emails over today's limit weren't saved.</text>
+<text x="24" y="274.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="194" y="274.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice</text>
+<text x="270" y="274.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="566" y="274.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<line x1="24" y1="288" x2="744" y2="288" stroke="#d5d1ca" stroke-width="1"/>
+<text x="24" y="323.6" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave Kim</text>
+<text x="194" y="323.6" font-size="16" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">#2207</text>
+<text x="270" y="323.6" font-size="16" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#424e61" font-weight="400">Replace water heater</tspan><tspan fill="#5b6576" font-weight="400"> · 8…</tspan></text>
+<text x="566" y="323.6" font-size="16" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$1,975.00</text>
+<line x1="24" y1="348" x2="744" y2="348" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="383.6" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="194" y="383.6" font-size="16" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">#1043</text>
+<text x="270" y="383.6" font-size="16" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#424e61" font-weight="400">Fix leak, Unit 2</tspan><tspan fill="#5b6576" font-weight="400"> · 15 Oxf…</tspan></text>
+<text x="566" y="383.6" font-size="16" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<g transform="translate(590,370.0) scale(0.6667)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></g>
+<text x="612" y="382.9" font-size="14" font-weight="500" fill="#a54e09" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Possible duplicate</text>
+<line x1="24" y1="408" x2="744" y2="408" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="443.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">billing@ridgelinero…</text>
+<text x="194" y="443.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">—</text>
+<text x="270" y="443.6" font-size="16" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#5b6576" font-weight="400">—</tspan></text>
+<text x="566" y="443.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">—</text>
+<g transform="translate(590,430.0) scale(0.6667)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></g>
+<text x="612" y="442.9" font-size="14" font-weight="500" fill="#a54e09" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Who's this from?</text></g><rect x="0" y="0" width="768" height="1024" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="690.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1161.6" y="705.8" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">Same as A</text>
+<g transform="translate(1161.6,714.8) scale(0.6)"><g clip-path="url(#c6)"><rect x="0" y="0" width="375" height="667" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="375" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="375" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<rect x="102" y="4" width="257" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(112,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="138" y="31.5" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<text x="16" y="104.8" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<rect x="213.81920000000002" y="68" width="145.18079999999998" height="44" rx="6" fill="#152133"/>
+<g transform="translate(227.81920000000002,82.0) scale(0.6667)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="249.81920000000002" y="95.6" font-size="16" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="16" y="132" width="273.54879999999997" height="44" rx="6" fill="#f2f0ec"/>
+<rect x="18" y="134" width="116.44800000000001" height="40" rx="4" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="30" y="159.6" font-size="16" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<text x="112.20800000000001" y="159.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="148.448" y="159.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="205.696" y="159.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="241.93599999999998" y="159.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<rect x="16" y="192" width="343" height="36" rx="6" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(28,202.0) scale(0.6667)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></g>
+<text x="52" y="214.9" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">4 emails over the limit weren't saved.</text>
+<text x="16" y="266.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="359" y="266.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<line x1="16" y1="280" x2="359" y2="280" stroke="#d5d1ca" stroke-width="1"/>
+<text x="359" y="305" font-size="16" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$1,975.00</text>
+<text x="359" y="326" font-size="14" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 17</text>
+<text x="16" y="305" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave Kim</text>
+<text x="16" y="326" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#5b6576" font-weight="400">#2207 · Replace water heater · 82 Hill St</tspan></text>
+<line x1="16" y1="340" x2="359" y2="340" stroke="#e7e5e0" stroke-width="1"/>
+<text x="359" y="365" font-size="16" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="359" y="386" font-size="14" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 18</text>
+<text x="16" y="365" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<g transform="translate(16,373.1) scale(0.6667)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></g>
+<text x="38" y="386" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#a54e09" font-weight="500">Possible duplicate</tspan><tspan fill="#5b6576" font-weight="400"> · #1043 · Fix lea…</tspan></text>
+<line x1="16" y1="400" x2="359" y2="400" stroke="#e7e5e0" stroke-width="1"/>
+<text x="359" y="425" font-size="16" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">—</text>
+<text x="359" y="446" font-size="14" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 19</text>
+<text x="16" y="425" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">billing@ridgelineroof.com</text>
+<g transform="translate(16,433.1) scale(0.6667)" fill="none" stroke="#a54e09" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></g>
+<text x="38" y="446" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#a54e09" font-weight="500">Who's this from?</tspan></text></g><rect x="0" y="0" width="375" height="667" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="1223.6" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">To pay view (with A)</text>
+<text x="32" y="1243.6" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Approved invoices, oldest first. No cap line. The whole row opens the invoice, where Mark paid lives.</text>
+<text x="32" y="1267.6" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="1282.6" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">?view=to-pay</text>
+<g transform="translate(32.0,1291.6) scale(0.55)"><g clip-path="url(#c7)"><rect x="0" y="0" width="1280" height="800" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="1280" height="56" rx="0" fill="#ffffff"/>
+<line x1="0" y1="56" x2="1280" y2="56" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="20" y="16" width="24" height="24" rx="5" fill="#152133"/>
+<text x="32.0" y="31.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="52" y="33" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="134.616" y="10" width="448" height="36" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(144.616,20) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="166.616" y="33" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<rect x="548.616" y="18" width="26" height="20" rx="4" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="561.616" y="32" font-size="11" font-weight="500" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">⌘K</text>
+<rect x="0" y="56" width="64" height="744" rx="0" fill="#f8f7f3"/>
+<line x1="64" y1="56" x2="64" y2="800" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(24,104) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .7-1.5l7-6a2 2 0 0 1 2.6 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g>
+<g transform="translate(24,138) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></g>
+<g transform="translate(24,172) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4M10 10h4M10 14h4M10 18h4"/></g>
+<g transform="translate(24,206) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 16 6 6"/><circle cx="16" cy="9" r="2.9"/><circle cx="6" cy="5" r="3"/></g>
+<g transform="translate(24,240) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></g>
+<g transform="translate(24,274) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9M13 17V5M8 17v-3"/></g>
+<g transform="translate(24,308) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></g>
+<rect x="8" y="334" width="48" height="32" rx="6" fill="#e7e5e0"/>
+<rect x="8" y="342" width="2" height="16" rx="0" fill="#152133"/>
+<g transform="translate(24,342) scale(0.6667)" fill="none" stroke="#152133" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8M16 12H8M13 16H8"/></g>
+<g transform="translate(24,376) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"/></g>
+<g transform="translate(24,410) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></g>
+<line x1="8" y1="744" x2="56" y2="744" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="32" cy="772" r="14" fill="#f2f0ec"/>
+<text x="32" y="775.5" font-size="10" font-weight="600" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">CS</text>
+<text x="96" y="116.4" font-size="24" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<rect x="1114.7168000000001" y="88" width="133.28319999999997" height="36" rx="6" fill="#152133"/>
+<g transform="translate(1128.7168000000001,98.0) scale(0.6667)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="1150.7168000000001" y="110.9" font-size="14" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="96" y="144" width="250.3552" height="36" rx="6" fill="#f2f0ec"/>
+<text x="110" y="166.9" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<text x="182.43200000000002" y="166.9" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<rect x="205.392" y="146" width="83.55199999999999" height="32" rx="4" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="217.392" y="166.9" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="267.984" y="166.9" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="302.94399999999996" y="166.9" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<text x="96" y="217.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="368" y="217.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice</text>
+<text x="488" y="217.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="988" y="217.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Date</text>
+<text x="1248" y="217.55" font-size="13" font-weight="500" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<line x1="96" y1="230" x2="1248" y2="230" stroke="#d5d1ca" stroke-width="1"/>
+<text x="96" y="262.9" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Maria Lopez</text>
+<text x="368" y="262.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">#227</text>
+<text x="488" y="262.9" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#424e61" font-weight="400">Paint hallway</tspan><tspan fill="#5b6576" font-weight="400"> · 82 Hill St</tspan></text>
+<text x="988" y="262.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 12</text>
+<text x="1248" y="262.9" font-size="14" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$640.00</text>
+<line x1="96" y1="286" x2="1248" y2="286" stroke="#e7e5e0" stroke-width="1"/>
+<text x="96" y="318.9" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Ray Ortiz</text>
+<text x="368" y="318.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">#5531</text>
+<text x="488" y="318.9" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#424e61" font-weight="400">Roof patch</tspan><tspan fill="#5b6576" font-weight="400"> · 9 Birch Rd</tspan><tspan fill="#5b6576" font-weight="500" font-size="13">  +1</tspan></text>
+<text x="988" y="318.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 13</text>
+<text x="1248" y="318.9" font-size="14" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$2,300.00</text>
+<line x1="96" y1="342" x2="1248" y2="342" stroke="#e7e5e0" stroke-width="1"/>
+<text x="96" y="374.9" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="368" y="374.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">#1043</text>
+<text x="488" y="374.9" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#424e61" font-weight="400">Fix leak, Unit 2</tspan><tspan fill="#5b6576" font-weight="400"> · 15 Oxford Ave</tspan></text>
+<text x="988" y="374.9" font-size="14" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 16</text>
+<text x="1248" y="374.9" font-size="14" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text></g><rect x="0" y="0" width="1280" height="800" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="1267.6" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<g transform="translate(776.0,1277.6) scale(0.45)"><g clip-path="url(#c8)"><rect x="0" y="0" width="768" height="1024" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="768" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="768" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="98" y="31.5" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="190.704" y="4" width="448" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(200.704,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="226.704" y="31.5" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<text x="24" y="112.8" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<rect x="598.8192" y="76" width="145.18079999999998" height="44" rx="6" fill="#152133"/>
+<g transform="translate(612.8192,90.0) scale(0.6667)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="634.8192" y="103.6" font-size="16" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="24" y="140" width="273.54879999999997" height="44" rx="6" fill="#f2f0ec"/>
+<text x="38" y="167.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<text x="120.20800000000001" y="167.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<rect x="144.448" y="142" width="91.48799999999999" height="40" rx="4" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="156.448" y="167.6" font-size="16" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="213.696" y="167.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="249.93599999999998" y="167.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<text x="24" y="222.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="226" y="222.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice</text>
+<text x="302" y="222.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Jobs</text>
+<text x="564" y="222.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Date</text>
+<text x="744" y="222.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<line x1="24" y1="236" x2="744" y2="236" stroke="#d5d1ca" stroke-width="1"/>
+<text x="24" y="271.6" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Maria Lopez</text>
+<text x="226" y="271.6" font-size="16" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">#227</text>
+<text x="302" y="271.6" font-size="16" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#424e61" font-weight="400">Paint hallway</tspan><tspan fill="#5b6576" font-weight="400"> · 82 Hill St</tspan></text>
+<text x="564" y="271.6" font-size="16" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 12</text>
+<text x="744" y="271.6" font-size="16" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$640.00</text>
+<line x1="24" y1="296" x2="744" y2="296" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="331.6" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Ray Ortiz</text>
+<text x="226" y="331.6" font-size="16" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">#5531</text>
+<text x="302" y="331.6" font-size="16" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#424e61" font-weight="400">Roof patch</tspan><tspan fill="#5b6576" font-weight="400"> · 9 Birch Rd</tspan><tspan fill="#5b6576" font-weight="500" font-size="14">  +1</tspan></text>
+<text x="564" y="331.6" font-size="16" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 13</text>
+<text x="744" y="331.6" font-size="16" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$2,300.00</text>
+<line x1="24" y1="356" x2="744" y2="356" stroke="#e7e5e0" stroke-width="1"/>
+<text x="24" y="391.6" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="226" y="391.6" font-size="16" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">#1043</text>
+<text x="302" y="391.6" font-size="16" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#424e61" font-weight="400">Fix leak, Unit 2</tspan><tspan fill="#5b6576" font-weight="400"> · 15 Oxford A…</tspan></text>
+<text x="564" y="391.6" font-size="16" font-weight="400" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 16</text>
+<text x="744" y="391.6" font-size="16" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text></g><rect x="0" y="0" width="768" height="1024" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="1267.6" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<g transform="translate(1161.6,1277.6) scale(0.6)"><g clip-path="url(#c9)"><rect x="0" y="0" width="375" height="667" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="375" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="375" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<rect x="102" y="4" width="257" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(112,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="138" y="31.5" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<text x="16" y="104.8" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<rect x="213.81920000000002" y="68" width="145.18079999999998" height="44" rx="6" fill="#152133"/>
+<g transform="translate(227.81920000000002,82.0) scale(0.6667)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="249.81920000000002" y="95.6" font-size="16" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="16" y="132" width="273.54879999999997" height="44" rx="6" fill="#f2f0ec"/>
+<text x="30" y="159.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<text x="112.20800000000001" y="159.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<rect x="136.448" y="134" width="91.48799999999999" height="40" rx="4" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="148.448" y="159.6" font-size="16" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="205.696" y="159.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="241.93599999999998" y="159.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<text x="16" y="214.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<text x="359" y="214.9" font-size="14" font-weight="500" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<line x1="16" y1="228" x2="359" y2="228" stroke="#d5d1ca" stroke-width="1"/>
+<text x="359" y="253" font-size="16" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$640.00</text>
+<text x="359" y="274" font-size="14" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 12</text>
+<text x="16" y="253" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Maria Lopez</text>
+<text x="16" y="274" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#5b6576" font-weight="400">#227 · Paint hallway · 82 Hill St</tspan></text>
+<line x1="16" y1="288" x2="359" y2="288" stroke="#e7e5e0" stroke-width="1"/>
+<text x="359" y="313" font-size="16" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$2,300.00</text>
+<text x="359" y="334" font-size="14" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 13</text>
+<text x="16" y="313" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Ray Ortiz</text>
+<text x="16" y="334" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#5b6576" font-weight="400">#5531 · Roof patch · 9 Birch Rd  +1</tspan></text>
+<line x1="16" y1="348" x2="359" y2="348" stroke="#e7e5e0" stroke-width="1"/>
+<text x="359" y="373" font-size="16" font-weight="400" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="359" y="394" font-size="14" font-weight="400" fill="#5b6576" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Nov 16</text>
+<text x="16" y="373" font-size="16" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Zack Reading</text>
+<text x="16" y="394" font-size="14" font-family="Geist, -apple-system, system-ui, sans-serif" style="white-space:pre"><tspan fill="#5b6576" font-weight="400">#1043 · Fix leak, Unit 2 · 15 Oxford Ave</tspan></text></g><rect x="0" y="0" width="375" height="667" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="1786.3999999999999" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">Empty To review</text>
+<text x="32" y="1806.3999999999999" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">The all-clear art over the spec's line, as Missing and Home's Mine column do for an empty queue.</text>
+<text x="32" y="1830.3999999999999" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<g transform="translate(32.0,1840.4) scale(0.55)"><g clip-path="url(#c10)"><rect x="0" y="0" width="1280" height="800" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="1280" height="56" rx="0" fill="#ffffff"/>
+<line x1="0" y1="56" x2="1280" y2="56" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="20" y="16" width="24" height="24" rx="5" fill="#152133"/>
+<text x="32.0" y="31.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="52" y="33" font-size="14" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="134.616" y="10" width="448" height="36" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(144.616,20) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="166.616" y="33" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<rect x="548.616" y="18" width="26" height="20" rx="4" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<text x="561.616" y="32" font-size="11" font-weight="500" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">⌘K</text>
+<rect x="0" y="56" width="64" height="744" rx="0" fill="#f8f7f3"/>
+<line x1="64" y1="56" x2="64" y2="800" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(24,104) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .7-1.5l7-6a2 2 0 0 1 2.6 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g>
+<g transform="translate(24,138) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></g>
+<g transform="translate(24,172) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4M10 10h4M10 14h4M10 18h4"/></g>
+<g transform="translate(24,206) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 16 6 6"/><circle cx="16" cy="9" r="2.9"/><circle cx="6" cy="5" r="3"/></g>
+<g transform="translate(24,240) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></g>
+<g transform="translate(24,274) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9M13 17V5M8 17v-3"/></g>
+<g transform="translate(24,308) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></g>
+<rect x="8" y="334" width="48" height="32" rx="6" fill="#e7e5e0"/>
+<rect x="8" y="342" width="2" height="16" rx="0" fill="#152133"/>
+<g transform="translate(24,342) scale(0.6667)" fill="none" stroke="#152133" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8M16 12H8M13 16H8"/></g>
+<g transform="translate(24,376) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"/></g>
+<g transform="translate(24,410) scale(0.6667)" fill="none" stroke="#5b6576" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></g>
+<line x1="8" y1="744" x2="56" y2="744" stroke="#e7e5e0" stroke-width="1"/>
+<circle cx="32" cy="772" r="14" fill="#f2f0ec"/>
+<text x="32" y="775.5" font-size="10" font-weight="600" fill="#424e61" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">CS</text>
+<text x="96" y="116.4" font-size="24" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<rect x="1114.7168000000001" y="88" width="133.28319999999997" height="36" rx="6" fill="#152133"/>
+<g transform="translate(1128.7168000000001,98.0) scale(0.6667)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="1150.7168000000001" y="110.9" font-size="14" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="96" y="144" width="250.3552" height="36" rx="6" fill="#f2f0ec"/>
+<rect x="98" y="146" width="105.392" height="32" rx="4" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="110" y="166.9" font-size="14" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<text x="182.43200000000002" y="166.9" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">0</text>
+<text x="217.392" y="166.9" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="267.984" y="166.9" font-size="14" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="302.94399999999996" y="166.9" font-size="14" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<g transform="translate(624.0,228) scale(1.0000)" fill="none" stroke="#152133" stroke-width="1.50" stroke-linecap="round" stroke-linejoin="round"><rect x="58" y="69" width="7" height="15" rx="0.75" fill="#c8a765"/><path d="M10 84h76"/><path d="M20 40 48 14l28 26"/><path d="M24 36.3V84M72 36.3V84M24 40h48"/><rect x="44" y="25" width="8" height="8" rx="0.75"/><rect x="30" y="44" width="11" height="11" rx="0.75"/><rect x="55" y="44" width="11" height="11" rx="0.75"/><path d="M24 58h48M30 58v6M36 58v6M42 58v6M48 58v6M54 58v6M60 58v6M66 58v6"/><path d="M20 64h56"/><rect x="31" y="69" width="12" height="10" rx="0.75"/><rect x="48" y="69" width="7" height="15" rx="0.75"/></g>
+<text x="672.0" y="351" font-size="14" font-weight="400" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Nothing to review. New invoices land here.</text></g><rect x="0" y="0" width="1280" height="800" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="1830.3999999999999" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<g transform="translate(776.0,1840.4) scale(0.45)"><g clip-path="url(#c11)"><rect x="0" y="0" width="768" height="1024" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="768" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="768" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<text x="98" y="31.5" font-size="16" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">HG Capital</text>
+<rect x="190.704" y="4" width="448" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(200.704,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="226.704" y="31.5" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<text x="24" y="112.8" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<rect x="598.8192" y="76" width="145.18079999999998" height="44" rx="6" fill="#152133"/>
+<g transform="translate(612.8192,90.0) scale(0.6667)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="634.8192" y="103.6" font-size="16" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="24" y="140" width="273.54879999999997" height="44" rx="6" fill="#f2f0ec"/>
+<rect x="26" y="142" width="116.44800000000001" height="40" rx="4" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="38" y="167.6" font-size="16" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<text x="120.20800000000001" y="167.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">0</text>
+<text x="156.448" y="167.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="213.696" y="167.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="249.93599999999998" y="167.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<g transform="translate(336.0,232) scale(1.0000)" fill="none" stroke="#152133" stroke-width="1.50" stroke-linecap="round" stroke-linejoin="round"><rect x="58" y="69" width="7" height="15" rx="0.75" fill="#c8a765"/><path d="M10 84h76"/><path d="M20 40 48 14l28 26"/><path d="M24 36.3V84M72 36.3V84M24 40h48"/><rect x="44" y="25" width="8" height="8" rx="0.75"/><rect x="30" y="44" width="11" height="11" rx="0.75"/><rect x="55" y="44" width="11" height="11" rx="0.75"/><path d="M24 58h48M30 58v6M36 58v6M42 58v6M48 58v6M54 58v6M60 58v6M66 58v6"/><path d="M20 64h56"/><rect x="31" y="69" width="12" height="10" rx="0.75"/><rect x="48" y="69" width="7" height="15" rx="0.75"/></g>
+<text x="384.0" y="355" font-size="16" font-weight="400" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Nothing to review. New invoices land here.</text></g><rect x="0" y="0" width="768" height="1024" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="1830.3999999999999" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1161.6" y="1845.3999999999999" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">One line at 375, two at 320</text>
+<g transform="translate(1161.6,1854.4) scale(0.6)"><g clip-path="url(#c12)"><rect x="0" y="0" width="375" height="667" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="375" height="52" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="52" x2="375" y2="52" stroke="#e7e5e0" stroke-width="1"/>
+<g transform="translate(22,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+<rect x="66" y="14" width="24" height="24" rx="5" fill="#152133"/>
+<text x="78.0" y="29.5" font-size="10" font-weight="600" fill="#c8a765" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">HG</text>
+<rect x="102" y="4" width="257" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<g transform="translate(112,16) scale(0.8333)" fill="none" stroke="#5b6576" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+<text x="138" y="31.5" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Search</text>
+<text x="16" y="104.8" font-size="28" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices</text>
+<rect x="213.81920000000002" y="68" width="145.18079999999998" height="44" rx="6" fill="#152133"/>
+<g transform="translate(227.81920000000002,82.0) scale(0.6667)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<text x="249.81920000000002" y="95.6" font-size="16" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">New invoice</text>
+<rect x="16" y="132" width="273.54879999999997" height="44" rx="6" fill="#f2f0ec"/>
+<rect x="18" y="134" width="116.44800000000001" height="40" rx="4" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="30" y="159.6" font-size="16" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To review</text>
+<text x="112.20800000000001" y="159.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">0</text>
+<text x="148.448" y="159.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">To pay</text>
+<text x="205.696" y="159.6" font-size="16" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">3</text>
+<text x="241.93599999999998" y="159.6" font-size="16" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Paid</text>
+<g transform="translate(151.5,224) scale(0.7500)" fill="none" stroke="#152133" stroke-width="2.00" stroke-linecap="round" stroke-linejoin="round"><rect x="58" y="69" width="7" height="15" rx="0.75" fill="#c8a765"/><path d="M10 84h76"/><path d="M20 40 48 14l28 26"/><path d="M24 36.3V84M72 36.3V84M24 40h48"/><rect x="44" y="25" width="8" height="8" rx="0.75"/><rect x="30" y="44" width="11" height="11" rx="0.75"/><rect x="55" y="44" width="11" height="11" rx="0.75"/><path d="M24 58h48M30 58v6M36 58v6M42 58v6M48 58v6M54 58v6M60 58v6M66 58v6"/><path d="M20 64h56"/><rect x="31" y="69" width="12" height="10" rx="0.75"/><rect x="48" y="69" width="7" height="15" rx="0.75"/></g>
+<text x="187.5" y="323" font-size="16" font-weight="400" fill="#5b6576" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif">Nothing to review. New invoices land here.</text></g><rect x="0" y="0" width="375" height="667" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="2349.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#152133">Notes</text>
+<circle cx="40" cy="2367.2" r="8" fill="#c8a765"/>
+<text x="40" y="2371.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">1</text>
+<text x="56" y="2371.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Header, switch and table follow Draws: PageHeader with New invoice (primary, Plus), SegmentedControl md, Table with RowCell rows.</text>
+<circle cx="40" cy="2387.2" r="8" fill="#c8a765"/>
+<text x="40" y="2391.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">2</text>
+<text x="56" y="2391.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Paid shows no count (needs Connor's OK): once Paid passes 99, a third count pushes the switch past 288px at 320.</text>
+<circle cx="40" cy="2407.2" r="8" fill="#c8a765"/>
+<text x="40" y="2411.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">3</text>
+<text x="56" y="2411.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">At 320 (Geist, touch sizes) the switch is about 260px and the title with New invoice about 265px of 288, so nothing wraps.</text>
+<circle cx="40" cy="2427.2" r="8" fill="#c8a765"/>
+<text x="40" y="2431.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">4</text>
+<text x="56" y="2431.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Phone (below 640): two lines a row. Invoice, Jobs and Date fold into the second line; Total keeps its own column.</text>
+<circle cx="40" cy="2447.2" r="8" fill="#c8a765"/>
+<text x="40" y="2451.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">5</text>
+<text x="56" y="2451.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">On a phone the flag leads the second line, as a contractor's status does on Contractors; the job truncates first.</text>
+<circle cx="40" cy="2467.2" r="8" fill="#c8a765"/>
+<text x="40" y="2471.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">6</text>
+<text x="56" y="2471.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Over the cap: one Notice under the switch, To review only. The phone's shorter line holds one line at 320 up to 9 emails.</text>
+<circle cx="40" cy="2487.2" r="8" fill="#c8a765"/>
+<text x="40" y="2491.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">7</text>
+<text x="56" y="2491.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">No contractor yet: the sender's address shows in --muted-foreground where the name goes (needs Connor's call).</text>
+<circle cx="40" cy="2507.2" r="8" fill="#c8a765"/>
+<text x="40" y="2511.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">8</text>
+<text x="56" y="2511.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">To pay can show Possible duplicate too: a partner's own entry lands there straight away (M6). Who's this from? can't (M5).</text>
+<circle cx="40" cy="2527.2" r="8" fill="#c8a765"/>
+<text x="40" y="2531.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">9</text>
+<text x="56" y="2531.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">To review and To pay sort oldest first so nothing sits; Paid sorts newest first (spec).</text>
+<circle cx="40" cy="2547.2" r="8" fill="#c8a765"/>
+<text x="40" y="2551.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">10</text>
+<text x="56" y="2551.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">The whole row opens the invoice. No hover-only controls, so touch loses nothing.</text>
+<circle cx="40" cy="2567.2" r="8" fill="#c8a765"/>
+<text x="40" y="2571.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">11</text>
+<text x="56" y="2571.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Option B on a tablet drops Date to fit Flags; at 1280 it squeezes Jobs to about 370px.</text>
+<circle cx="40" cy="2587.2" r="8" fill="#c8a765"/>
+<text x="40" y="2591.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">12</text>
+<text x="56" y="2591.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">At 1920 the list stops at 1600 wide, anchored to the rail, as every list does.</text>
+<circle cx="40" cy="2607.2" r="8" fill="#c8a765"/>
+<text x="40" y="2611.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">13</text>
+<text x="56" y="2611.2" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">References: Shopify Bill Pay (Enter missing details under the vendor), Brex and Rocket Money phone lists (name over detail, amount right).</text>
+</svg>

@@ -296,6 +296,17 @@ export type FilterBarProps = {
   shown?: number;
   /** How many rows a staged query leaves (a server action). Without it the sheet reads "Show tasks". */
   count?: (query: string) => Promise<number>;
+  /** At the bar's right end: the page's main action (the Tasks list's New task). */
+  action?: ReactNode;
+  /**
+   * The bar holds under the app bar while the list scrolls
+   * (docs/specs/sticky-task-header.md). Below sm the views keep a row of their
+   * own under it, which scrolls away. Once stuck, a 1px --border line marks its
+   * bottom edge; `divider` adds classes to that line (Tasks hides it where its
+   * column headers draw their own). Its height is `--list-bar-h` on the page,
+   * for headers that stick under it.
+   */
+  sticky?: { divider?: string };
   className?: string;
 };
 
@@ -303,7 +314,7 @@ export type FilterBarProps = {
  * What a loading screen passes for `placeholder`: the bar's shape, with no
  * counts, no option lists and nothing to call (docs/specs/performance.md 4.2).
  */
-export type FilterBarFrameProps = Pick<FilterBarProps, "search" | "wide" | "className"> & {
+export type FilterBarFrameProps = Pick<FilterBarProps, "search" | "wide" | "action" | "sticky" | "className"> & {
   views?: Omit<NonNullable<FilterBarProps["views"]>, "options" | "resets"> & { options: readonly { key: string; label: string; mark?: ReactNode }[] };
   facets?: readonly { kind: "multi" | "toggle"; param: string; label: string }[];
   sort?: Pick<FilterSort, "param" | "default">;
@@ -321,11 +332,12 @@ export function FilterBar(props: (FilterBarProps & { placeholder?: false }) | (F
   return props.placeholder ? <FilterBarFrame {...props} /> : <LiveFilterBar {...props} />;
 }
 
-function LiveFilterBar({ noun, search, views, facets = [], sort, wide, shown, count, className }: FilterBarProps) {
+function LiveFilterBar({ noun, search, views, facets = [], sort, wide, shown, count, action, sticky, className }: FilterBarProps) {
   const scope = useFilterScope();
   const { query, update } = scope;
   const classes = WIDE[wide];
   const bar = useRef<HTMLDivElement>(null);
+  const { sentinel, stuck } = useStickyBar(bar, Boolean(sticky));
   const searchInput = useRef<HTMLInputElement>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [staged, setStaged] = useState(() => new URLSearchParams());
@@ -368,10 +380,29 @@ function LiveFilterBar({ noun, search, views, facets = [], sort, wide, shown, co
     : null;
   // A bar with views on a row of their own below sm: the search and Filters share row one.
   const phoneRows = Boolean(search && views && !views.menu);
+  const layout = barLayout(phoneRows, Boolean(sticky), Boolean(action));
 
   return (
-    <div ref={bar} className={cn("@container", className)}>
-      <div className={cn("flex items-center gap-2", phoneRows && "max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto]")}>
+    <BarShell
+      barRef={bar}
+      sentinel={sentinel}
+      sticky={sticky}
+      stuck={stuck}
+      className={className}
+      after={
+        layout.split && viewSegments && views ? (
+          <SegmentedControl
+            aria-label={views.label}
+            options={viewSegments}
+            value={view}
+            onChange={pickView}
+            fullWidth="below-sm"
+            className="mt-2 sm:hidden"
+          />
+        ) : null
+      }
+    >
+      <div className={layout.row}>
         {search && (
           <SearchInput
             size="sm"
@@ -392,8 +423,8 @@ function LiveFilterBar({ noun, search, views, facets = [], sort, wide, shown, co
               options={viewSegments}
               value={view}
               onChange={pickView}
-              fullWidth={phoneRows ? "below-sm" : false}
-              className={cn(phoneRows && "max-sm:order-last max-sm:col-span-2", views.menu && cn("hidden", classes.inline))}
+              fullWidth={layout.grid ? "below-sm" : false}
+              className={cn(layout.views, views.menu && cn("hidden", classes.inline))}
             />
             {views.menu && (
               <ViewMenu
@@ -437,6 +468,8 @@ function LiveFilterBar({ noun, search, views, facets = [], sort, wide, shown, co
             {filterCount > 0 && <Badge className="num">{filterCount}</Badge>}
           </Button>
         )}
+
+        {action && <div className="ml-auto flex shrink-0 items-center">{action}</div>}
       </div>
 
       {hasSheet && (
@@ -457,14 +490,105 @@ function LiveFilterBar({ noun, search, views, facets = [], sort, wide, shown, co
           }}
         />
       )}
-    </div>
+    </BarShell>
   );
+}
+
+/**
+ * Where the bar's pieces go. Below sm a bar with views puts them on a row of
+ * their own: inside the bar's grid (`grid`), or, when the bar is sticky, as a
+ * row after it that scrolls away (`split`), so the stuck bar is one row.
+ */
+function barLayout(phoneRows: boolean, sticky: boolean, action: boolean) {
+  const split = sticky && phoneRows;
+  const grid = phoneRows && !split;
+  return {
+    split,
+    grid,
+    row: cn(
+      "flex items-center gap-2",
+      grid && "max-sm:grid",
+      grid && (action ? "max-sm:grid-cols-[minmax(0,1fr)_auto_auto]" : "max-sm:grid-cols-[minmax(0,1fr)_auto]"),
+    ),
+    views: cn(grid && "max-sm:order-last max-sm:col-span-full", split && "max-sm:hidden"),
+  };
+}
+
+/** The sticky bar: its top edge just under the app bar, with 8px above and below the controls that the margins give back at rest. */
+const STICKY_BAR = "sticky top-(--app-bar-h) z-20 -my-2 bg-background py-2";
+
+/**
+ * The bar's box. Sticky, a mark sits in the page where the bar starts, so the
+ * bar can tell it has stuck, and the stuck bar draws its divider.
+ */
+function BarShell({
+  barRef,
+  sentinel,
+  sticky,
+  stuck,
+  inert,
+  className,
+  after,
+  children,
+}: {
+  barRef?: React.Ref<HTMLDivElement>;
+  sentinel: React.Ref<HTMLDivElement>;
+  sticky: FilterBarProps["sticky"];
+  stuck: boolean;
+  inert?: boolean;
+  className?: string;
+  after?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      {sticky && <div ref={sentinel} aria-hidden="true" />}
+      <div ref={barRef} inert={inert} className={cn("@container", sticky && STICKY_BAR, className)}>
+        {children}
+        {sticky && stuck && <div aria-hidden="true" className={cn("absolute inset-x-0 bottom-0 h-px bg-border", sticky.divider)} />}
+      </div>
+      {after}
+    </>
+  );
+}
+
+/**
+ * A sticky bar's state. It has stuck once it sits lower against its mark than
+ * at rest (the page scrolled it against the app bar). Its height goes on the
+ * page as `--list-bar-h`, for column headers that stick under it, and comes off
+ * when the bar goes.
+ */
+function useStickyBar(bar: React.RefObject<HTMLDivElement | null>, enabled: boolean) {
+  const sentinel = useRef<HTMLDivElement>(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const el = bar.current;
+    const mark = sentinel.current;
+    if (!enabled || !el || !mark) return;
+    const root = document.documentElement;
+    // At rest the bar starts its negative top margin above the mark; stuck, it holds while the mark scrolls on.
+    let rest = 0;
+    const measure = () => setStuck(el.getBoundingClientRect().top - mark.getBoundingClientRect().top > rest + 0.5);
+    const size = new ResizeObserver(() => {
+      rest = parseFloat(getComputedStyle(el).marginTop) || 0;
+      root.style.setProperty("--list-bar-h", `${el.offsetHeight}px`);
+      measure();
+    });
+    size.observe(el);
+    window.addEventListener("scroll", measure, { passive: true });
+    return () => {
+      size.disconnect();
+      window.removeEventListener("scroll", measure);
+      root.style.removeProperty("--list-bar-h");
+    };
+  }, [bar, enabled]);
+  return { sentinel, stuck };
 }
 
 const ignore = () => {};
 
 /** The bar as a loading screen draws it: LiveFilterBar's boxes and classes, inert, read from the URL alone. */
-function FilterBarFrame({ search, views, facets = [], sort, wide, className }: FilterBarFrameProps) {
+function FilterBarFrame({ search, views, facets = [], sort, wide, action, sticky, className }: FilterBarFrameProps) {
   const params = useSearchParams();
   const classes = WIDE[wide];
   const view = views ? (params.get(views.param) ?? views.default) : null;
@@ -472,72 +596,94 @@ function FilterBarFrame({ search, views, facets = [], sort, wide, className }: F
   const filterCount = setFilterCount(params, facets, sort);
   const hasSheet = facets.length > 0 || sort !== undefined;
   const phoneRows = Boolean(search && views && !views.menu);
+  const layout = barLayout(phoneRows, Boolean(sticky), Boolean(action));
+  const bar = useRef<HTMLDivElement>(null);
+  const { sentinel, stuck } = useStickyBar(bar, Boolean(sticky));
 
+  // Inert but for the action, which works while the list loads (New task).
   return (
-    <div inert className={cn("@container", className)}>
-      <div className={cn("flex items-center gap-2", phoneRows && "max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto]")}>
-        {search && (
-          <SearchInput
-            size="sm"
-            placeholder={search.placeholder}
-            value={params.get(search.param ?? "q") ?? ""}
-            className={cn("min-w-0 flex-1", classes.search)}
-          />
-        )}
-
-        {views && (
-          <>
-            <SegmentedControl
-              aria-label={views.label}
-              options={views.options}
-              value={view}
-              onChange={ignore}
-              fullWidth={phoneRows ? "below-sm" : false}
-              className={cn(phoneRows && "max-sm:order-last max-sm:col-span-2", views.menu && cn("hidden", classes.inline))}
+    <BarShell
+      barRef={bar}
+      sentinel={sentinel}
+      sticky={sticky}
+      stuck={stuck}
+      inert={!action}
+      className={className}
+      after={
+        layout.split && views ? (
+          <div inert className="mt-2 sm:hidden">
+            <SegmentedControl aria-label={views.label} options={views.options} value={view} onChange={ignore} fullWidth="below-sm" />
+          </div>
+        ) : null
+      }
+    >
+      <div className={layout.row}>
+        <div inert className="contents">
+          {search && (
+            <SearchInput
+              size="sm"
+              placeholder={search.placeholder}
+              value={params.get(search.param ?? "q") ?? ""}
+              className={cn("min-w-0 flex-1", classes.search)}
             />
-            {views.menu && current && (
-              <span className={cn(buttonClass({ variant: "secondary", size: "sm" }), "min-w-0 shrink-0", classes.hide)}>
-                <span className="truncate">{current.label}</span>
-                {/* The place the live button's count takes from sm up (ViewMenu), so the search field holds its width. */}
-                {current.mark && <span className="tabular-nums max-sm:hidden">{current.mark}</span>}
-                <ChevronDown aria-hidden="true" className="size-3.5 text-muted-foreground" />
-              </span>
-            )}
-          </>
-        )}
+          )}
 
-        <div className={cn("hidden min-w-0 shrink items-center gap-2", classes.show)}>
-          {facets.map((f) =>
-            f.kind === "multi" ? (
-              <span key={f.param} className={cn(chipEdge, "min-w-0 shrink border-line-strong")}>
-                <span className="flex h-full min-w-0 items-center gap-1.5 px-2.5">
-                  <Plus aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="shrink-0 text-fg-2">{f.label}</span>
+          {views && (
+            <>
+              <SegmentedControl
+                aria-label={views.label}
+                options={views.options}
+                value={view}
+                onChange={ignore}
+                fullWidth={layout.grid ? "below-sm" : false}
+                className={cn(layout.views, views.menu && cn("hidden", classes.inline))}
+              />
+              {views.menu && current && (
+                <span className={cn(buttonClass({ variant: "secondary", size: "sm" }), "min-w-0 shrink-0", classes.hide)}>
+                  <span className="truncate">{current.label}</span>
+                  {/* The place the live button's count takes from sm up (ViewMenu), so the search field holds its width. */}
+                  {current.mark && <span className="tabular-nums max-sm:hidden">{current.mark}</span>}
+                  <ChevronDown aria-hidden="true" className="size-3.5 text-muted-foreground" />
                 </span>
-              </span>
-            ) : (
-              <span key={f.param} className={cn(chipEdge, "gap-1.5 border-line-strong px-2.5 text-fg-2")}>
-                {f.label}
-              </span>
-            ),
+              )}
+            </>
+          )}
+
+          <div className={cn("hidden min-w-0 shrink items-center gap-2", classes.show)}>
+            {facets.map((f) =>
+              f.kind === "multi" ? (
+                <span key={f.param} className={cn(chipEdge, "min-w-0 shrink border-line-strong")}>
+                  <span className="flex h-full min-w-0 items-center gap-1.5 px-2.5">
+                    <Plus aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+                    <span className="shrink-0 text-fg-2">{f.label}</span>
+                  </span>
+                </span>
+              ) : (
+                <span key={f.param} className={cn(chipEdge, "gap-1.5 border-line-strong px-2.5 text-fg-2")}>
+                  {f.label}
+                </span>
+              ),
+            )}
+          </div>
+
+          {hasSheet && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              tabIndex={-1}
+              className={cn("shrink-0", views?.menu && "pointer-coarse:max-sm:min-w-11", classes.hide)}
+            >
+              <SlidersHorizontal aria-hidden="true" className={chromeIconClass} />
+              <span className={cn(views?.menu && "max-sm:sr-only")}>Filters</span>
+              {filterCount > 0 && <Badge className="num">{filterCount}</Badge>}
+            </Button>
           )}
         </div>
 
-        {hasSheet && (
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            tabIndex={-1}
-            className={cn("shrink-0", views?.menu && "pointer-coarse:max-sm:min-w-11", classes.hide)}
-          >
-            <SlidersHorizontal aria-hidden="true" className={chromeIconClass} />
-            <span className={cn(views?.menu && "max-sm:sr-only")}>Filters</span>
-            {filterCount > 0 && <Badge className="num">{filterCount}</Badge>}
-          </Button>
-        )}
+        {action && <div className="ml-auto flex shrink-0 items-center">{action}</div>}
       </div>
-    </div>
+    </BarShell>
   );
 }
 

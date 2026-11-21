@@ -152,7 +152,8 @@ export function TaskColumnHeads({
       <SortHeader cell="div" label={label} field={field} defaultSort={DEFAULT_TASK_SORT} numeric={numeric} className={className} />
     );
   return (
-    <div className="hidden items-center gap-3 border-b border-border pb-2 lg:@min-[60rem]:flex">
+    // Sticks under the Tasks filter bar (its height is --list-bar-h), on the page's background, its bottom line the divider.
+    <div className="sticky top-[calc(var(--app-bar-h)+var(--list-bar-h,0px))] z-10 hidden items-center gap-3 border-b border-border bg-background pb-2 lg:@min-[60rem]:flex">
       {/* The checkbox's 20px. */}
       <span aria-hidden="true" className="w-5 shrink-0" />
       <div className="flex min-w-0 flex-1 items-center gap-3">
