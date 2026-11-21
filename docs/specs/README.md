@@ -37,6 +37,8 @@ Each chunk ships its own small migration.
 
 [view-as.md](view-as.md) lets Connor open the contractor portal as any contractor sees it, view only, from the ⋯ menu on their page, with an ink "Viewing as" bar across the top. It was planned with Connor on Nov 14, 2026. The build was started and then paused before any code landed; re-check it against main first.
 
+[maintenance-requests.md](maintenance-requests.md) gives every current tenant their own link to report repairs from their phone: one screen with photos or video, permission to let ourselves in and pets. Each request becomes a task, both partners get an email, and the resident follows it on three steps (Received, Scheduled, Done) by email, never seeing comments. It was planned with Connor on Nov 21, 2026; he said "build it", then paused the build before any code was written.
+
 [update-notice.md](update-notice.md) tells a tab left open that a new version is live: a sticky toast, "A new version is ready" with Reload, on staff and portal pages, and the next in-app link loads the new version. It was planned with Connor on Nov 14, 2026, and waits for his "build it".
 
 [design-foundation.md](design-foundation.md) moves the app and the public site onto stock shadcn/ui components (React Aria base, aria-vega style), with Ink and Limestone's colors, gold and Geist as the theme. A zero-pixel color rename lands first, then landings A to M swap one component family at a time, each reviewed by Connor before it ships. It was planned with Connor on Nov 14, 2026, and waits for his "build it".

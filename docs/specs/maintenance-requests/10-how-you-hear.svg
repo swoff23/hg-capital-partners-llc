@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="560" viewBox="0 0 1000 560" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Question 9: how you and Pieter hear about a new request. A (recommended): an email to both of you, the same task email you get for contractor updates, plus Needs you. B: Needs you only. C: an email to one of you.</title>
+<rect width="1000" height="560" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Question 9: how do you and Pieter hear about a new request?</text>
+<text x="32" y="56" font-size="11" fill="#424e61">Every request already lands in Needs you, due the day it arrives and unread. The question is whether anything else reaches you.</text>
+
+<!-- A -->
+<g transform="translate(32 76)">
+<rect x="0" y="0" width="300" height="420" rx="10" fill="none" stroke="#c9a96a" stroke-width="1.5"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">A. An email to both of you</text>
+<rect x="20" y="40" width="92" height="20" rx="10" fill="#f6efe1"/>
+<text x="66" y="54" font-size="10" font-weight="500" fill="#8a6d2f" text-anchor="middle">Recommended</text>
+<rect x="20" y="72" width="260" height="214" rx="10" fill="#ffffff" stroke="#152133"/>
+<text x="36" y="94" font-size="9" fill="#8f99a8">To Connor and Pieter</text>
+<text x="36" y="116" font-size="12.5" font-weight="600" fill="#152133">New request: Kitchen sink leaks</text>
+<text x="36" y="132" font-size="10" fill="#424e61">Dana · 56 Tamarack St, Upper</text>
+<text x="36" y="154" font-size="10" fill="#152133">Water under the sink when the</text>
+<text x="36" y="168" font-size="10" fill="#152133">dishwasher runs.</text>
+<rect x="36" y="178" width="40" height="30" rx="4" fill="#e6e9ee"/>
+<rect x="82" y="178" width="40" height="30" rx="4" fill="#e6e9ee"/>
+<text x="36" y="228" font-size="10" fill="#424e61">Let yourselves in · Pets: a cat</text>
+<rect x="36" y="240" width="110" height="30" rx="8" fill="#152133"/>
+<text x="91" y="259" font-size="10.5" font-weight="500" fill="#ffffff" text-anchor="middle">Open the task</text>
+<text x="20" y="314" font-size="10.5" fill="#152133">• The same task email you get for</text>
+<text x="28" y="328" font-size="10.5" fill="#152133">contractor updates, so nothing new.</text>
+<text x="20" y="348" font-size="10.5" fill="#152133">• An addition sends one too ("Dana</text>
+<text x="28" y="362" font-size="10.5" fill="#152133">added 2 photos"), bundled as today.</text>
+<text x="20" y="382" font-size="10.5" fill="#152133">• You see it without opening the app.</text>
+</g>
+
+<!-- B -->
+<g transform="translate(350 76)">
+<rect x="0" y="0" width="300" height="420" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">B. Needs you only</text>
+<rect x="20" y="72" width="260" height="214" rx="10" fill="#ffffff" stroke="#152133"/>
+<text x="36" y="96" font-size="12.5" font-weight="600" fill="#152133">Today</text>
+<line x1="20" y1="108" x2="280" y2="108" stroke="#eceef1"/>
+<circle cx="40" cy="128" r="6" fill="#ffffff" stroke="#8f99a8"/>
+<text x="54" y="126" font-size="10.5" font-weight="500" fill="#152133">Kitchen sink leaks</text>
+<text x="54" y="140" font-size="9.5" fill="#424e61">56 Tamarack St · Upper · From Dana</text>
+<circle cx="266" cy="124" r="4" fill="#c9a96a"/>
+<line x1="20" y1="152" x2="280" y2="152" stroke="#eceef1"/>
+<circle cx="40" cy="172" r="6" fill="#ffffff" stroke="#8f99a8"/>
+<text x="54" y="170" font-size="10.5" font-weight="500" fill="#152133">Gutter cleaning</text>
+<text x="54" y="184" font-size="9.5" fill="#424e61">647 Prospect Ave</text>
+<line x1="20" y1="196" x2="280" y2="196" stroke="#eceef1"/>
+<text x="20" y="314" font-size="10.5" fill="#152133">• No email; it waits for you in Today</text>
+<text x="28" y="328" font-size="10.5" fill="#152133">with the unread dot.</text>
+<text x="20" y="348" font-size="10.5" fill="#152133">• Quietest inbox.</text>
+<text x="20" y="368" font-size="10.5" fill="#152133">• Only seen when one of you opens</text>
+<text x="28" y="382" font-size="10.5" fill="#152133">the app, which might be days.</text>
+</g>
+
+<!-- C -->
+<g transform="translate(668 76)">
+<rect x="0" y="0" width="300" height="420" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">C. An email to one of you</text>
+<rect x="20" y="72" width="260" height="214" rx="10" fill="#ffffff" stroke="#152133"/>
+<text x="36" y="96" font-size="12.5" font-weight="600" fill="#152133">Settings</text>
+<line x1="20" y1="108" x2="280" y2="108" stroke="#eceef1"/>
+<text x="36" y="132" font-size="10" font-weight="500" fill="#424e61">Resident requests go to</text>
+<rect x="36" y="140" width="228" height="30" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="48" y="159" font-size="10.5" fill="#152133">Connor</text>
+<text x="252" y="159" font-size="10" fill="#8f99a8" text-anchor="end">▾</text>
+<text x="150" y="214" font-size="9.5" fill="#8f99a8" text-anchor="middle">then the email in A, to that one person</text>
+<text x="20" y="314" font-size="10.5" fill="#152133">• One owner for maintenance, one inbox.</text>
+<text x="20" y="334" font-size="10.5" fill="#152133">• A new setting to build and keep right.</text>
+<text x="20" y="354" font-size="10.5" fill="#152133">• If that person's away, it waits.</text>
+</g>
+
+<text x="32" y="526" font-size="11" fill="#424e61">Sizes: emails are your own Mail app. The Today row is the one you have now, with "From Dana" in its second line on every screen.</text>
+</svg>

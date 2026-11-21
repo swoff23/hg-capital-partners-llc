@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="720" viewBox="0 0 1000 720" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Question 10: how residents get their link. A (recommended): Email link and Copy link in each tenant's sheet on the lease page, plus a one-time Email request links on the Tenants list for launch day. B: one at a time only. C: sent automatically.</title>
+<rect width="1000" height="720" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Question 10: how does each resident get their link?</text>
+<text x="32" y="56" font-size="11" fill="#424e61">Launch day, and every new tenant after. The Residents page's "Email me my link" (question 2) covers anyone who loses theirs.</text>
+
+<!-- A -->
+<g transform="translate(32 76)">
+<rect x="0" y="0" width="936" height="420" rx="10" fill="none" stroke="#c9a96a" stroke-width="1.5"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">A. Send from each tenant, plus one send for launch day</text>
+<rect x="378" y="16" width="92" height="20" rx="10" fill="#f6efe1"/>
+<text x="424" y="30" font-size="10" font-weight="500" fill="#8a6d2f" text-anchor="middle">Recommended</text>
+
+<!-- tenant sheet -->
+<text x="20" y="62" font-size="10" fill="#424e61">The lease page: tap Dana's row to open the sheet</text>
+<rect x="20" y="72" width="280" height="222" rx="10" fill="#ffffff" stroke="#152133"/>
+<text x="38" y="98" font-size="12.5" font-weight="600" fill="#152133">Dana Lee</text>
+<text x="38" y="114" font-size="10" fill="#424e61">716-555-0142 · dana@email.com</text>
+<line x1="20" y1="128" x2="300" y2="128" stroke="#eceef1"/>
+<text x="38" y="150" font-size="10" font-weight="500" fill="#424e61">Request link</text>
+<text x="282" y="150" font-size="9.5" fill="#424e61" text-anchor="end">Emailed Nov 21 · used Nov 22</text>
+<rect x="38" y="160" width="110" height="30" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="93" y="179" font-size="10.5" fill="#152133" text-anchor="middle">Email link</text>
+<rect x="156" y="160" width="100" height="30" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="206" y="179" font-size="10.5" fill="#152133" text-anchor="middle">Copy link</text>
+<text x="38" y="222" font-size="9.5" fill="#8f99a8">⋯ Turn off link · Send a new link</text>
+<text x="20" y="318" font-size="10.5" fill="#152133">• Email link for anyone with an email.</text>
+<text x="20" y="338" font-size="10.5" fill="#152133">• Copy link to paste into a text from your</text>
+<text x="28" y="352" font-size="10.5" fill="#152133">own phone (the app sends no texts).</text>
+<text x="20" y="372" font-size="10.5" fill="#152133">• Shows when it went and was last used.</text>
+
+<!-- launch -->
+<text x="332" y="62" font-size="10" fill="#424e61">The Tenants list, once, on launch day</text>
+<rect x="332" y="72" width="280" height="222" rx="10" fill="#ffffff" stroke="#152133"/>
+<text x="350" y="98" font-size="12.5" font-weight="600" fill="#152133">Email request links?</text>
+<text x="350" y="122" font-size="10" fill="#152133">51 tenants get their own link.</text>
+<text x="350" y="140" font-size="10" fill="#424e61">9 have no email. Copy theirs from</text>
+<text x="350" y="154" font-size="10" fill="#424e61">their lease page.</text>
+<rect x="430" y="246" width="70" height="30" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="465" y="265" font-size="10.5" fill="#152133" text-anchor="middle">Not now</text>
+<rect x="508" y="246" width="88" height="30" rx="6" fill="#152133"/>
+<text x="552" y="265" font-size="10.5" font-weight="500" fill="#ffffff" text-anchor="middle">Email 51</text>
+<text x="332" y="318" font-size="10.5" fill="#152133">• From a button on the Tenants list.</text>
+<text x="332" y="338" font-size="10.5" fill="#152133">• Current tenants only; skips anyone</text>
+<text x="340" y="352" font-size="10.5" fill="#152133">who already has one.</text>
+
+<!-- email -->
+<text x="644" y="62" font-size="10" fill="#424e61">What Dana gets</text>
+<rect x="644" y="72" width="272" height="222" rx="10" fill="#ffffff" stroke="#152133"/>
+<text x="662" y="98" font-size="12.5" font-weight="600" fill="#152133">Your repair requests link</text>
+<text x="662" y="120" font-size="10" fill="#152133">Hi Dana, from now on, send repairs for</text>
+<text x="662" y="134" font-size="10" fill="#152133">56 Tamarack St, Upper here. You'll see</text>
+<text x="662" y="148" font-size="10" fill="#152133">when each one is scheduled and done.</text>
+<rect x="662" y="162" width="130" height="30" rx="8" fill="#152133"/>
+<text x="727" y="181" font-size="10.5" font-weight="500" fill="#ffffff" text-anchor="middle">Report a problem</text>
+<text x="662" y="218" font-size="9.5" fill="#424e61">Save it to your home screen.</text>
+<text x="662" y="234" font-size="9.5" fill="#424e61">Emergency? Text us in our group chat.</text>
+<text x="644" y="318" font-size="10.5" fill="#152133">• "From now on" sets the new rule.</text>
+<text x="644" y="338" font-size="10.5" fill="#152133">• The button opens their home with</text>
+<text x="652" y="352" font-size="10.5" fill="#152133">Report a problem on top.</text>
+</g>
+
+<!-- B and C -->
+<g transform="translate(32 516)">
+<rect x="0" y="0" width="456" height="150" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">B. One tenant at a time only</text>
+<text x="20" y="58" font-size="10.5" fill="#152133">• The sheet in A, with no launch-day send.</text>
+<text x="20" y="78" font-size="10.5" fill="#152133">• Launch day is 51 taps across 31 lease pages.</text>
+<text x="20" y="98" font-size="10.5" fill="#152133">• Nothing to build for the Tenants list.</text>
+</g>
+<g transform="translate(512 516)">
+<rect x="0" y="0" width="456" height="150" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">C. Sent automatically</text>
+<text x="20" y="58" font-size="10.5" fill="#152133">• Every current tenant on launch, and each new tenant on</text>
+<text x="28" y="72" font-size="10.5" fill="#152133">their move-in day, with no button to press.</text>
+<text x="20" y="92" font-size="10.5" fill="#152133">• Nobody gets forgotten.</text>
+<text x="20" y="112" font-size="10.5" fill="#152133">• You don't choose the moment, and a wrong email on</text>
+<text x="28" y="126" font-size="10.5" fill="#152133">file sends it to the wrong person before you notice.</text>
+</g>
+
+<text x="32" y="696" font-size="11" fill="#424e61">Sizes: the sheet and dialog follow the app's pattern: side sheet and centered dialog on laptop and tablet, bottom sheet on phones.</text>
+</svg>
