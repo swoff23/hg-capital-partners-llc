@@ -8,7 +8,7 @@ import { shortAddress } from "@/lib/normalize";
  * a tab shows only its start. Pure; see record-title.test.ts.
  */
 
-export type RecordKind = "property" | "deal" | "task" | "contractor" | "template" | "lease";
+export type RecordKind = "property" | "deal" | "task" | "contractor" | "template" | "lease" | "rehab";
 
 /** Longest title a tab is given: past this a tab shows nothing more. */
 export const MAX_TAB_TITLE = 60;

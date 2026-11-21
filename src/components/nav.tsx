@@ -3,6 +3,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import {
   Building2,
   ChartColumn,
+  HandCoins,
   House,
   Settings2,
   SquareCheckBig,
@@ -22,6 +23,7 @@ const LINKS: { href: string; label: string; icon: LucideIcon; list?: ListKey }[]
   { href: "/", label: "Home", icon: House },
   { href: "/deals", label: "Deals", icon: TrendingUp, list: "deals" },
   { href: "/properties", label: "Portfolio", icon: Building2, list: "properties" },
+  { href: "/draws", label: "Draws", icon: HandCoins },
   { href: "/tenants", label: "Tenants", icon: Users, list: "tenants" },
   { href: "/financials", label: "Financials", icon: ChartColumn },
   { href: "/tasks", label: "Tasks", icon: SquareCheckBig, list: "tasks" },

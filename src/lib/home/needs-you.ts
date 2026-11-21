@@ -1,5 +1,7 @@
 import { dayLabel, daysUntil, fmtDay, toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
+import { STAGE_LABEL, atLender, daysInStage, isStuck, type DrawIn } from "@/lib/draws/figures";
 import { shortAddress } from "@/lib/normalize";
+import { fmtMoney } from "@/lib/utils";
 
 /**
  * Home's Needs you list (docs/home-as-today.md): the things that aren't tasks
@@ -22,7 +24,8 @@ export type NeedsYouKind =
   | "sync-stale"
   | "sync-lost"
   | "signup"
-  | "baselane";
+  | "baselane"
+  | "draw";
 
 /** The rows that carry buttons beside them (contractor onboarding, docs/specs/contractor-onboarding.md 4.5). */
 export type NeedsYouActions = "signup" | "baselane";
@@ -79,8 +82,12 @@ const KEY_DATES = [
   { field: "rentalRegistrationExpiry", kind: "registration", title: "Rental registration", withinDays: 60 },
 ] as const;
 
-/** Every key date within its window or already past, oldest past first, then soonest. */
-export function keyDateItems(properties: KeyDateProperty[], today: Ymd): NeedsYouItem[] {
+/**
+ * Every key date within its window or already past, oldest past first, then soonest. A loan maturing on a
+ * property whose open rehab still holds money back says how much (docs/specs/rehab-draws.md, R11):
+ * `undrawn` maps a property's id to that amount.
+ */
+export function keyDateItems(properties: KeyDateProperty[], today: Ymd, undrawn: ReadonlyMap<string, number> = new Map()): NeedsYouItem[] {
   const items: NeedsYouItem[] = [];
   for (const p of properties) {
     for (const k of KEY_DATES) {
@@ -88,13 +95,15 @@ export function keyDateItems(properties: KeyDateProperty[], today: Ymd): NeedsYo
       const days = daysUntil(date, today);
       if (date == null || days == null || days > k.withinDays) continue;
       const late = days < 0;
+      const place = shortAddress(p.address) || p.address;
+      const held = k.kind === "loan" ? (undrawn.get(p.id) ?? 0) : 0;
       items.push({
         key: `${k.kind}:${p.id}`,
         kind: k.kind,
         href: `/properties/${p.id}`,
         title: k.title,
         state: late ? "Late" : "Due",
-        detail: shortAddress(p.address) || p.address,
+        detail: held > 0 ? `${place} · ${fmtMoney(held)} not drawn` : place,
         amount: null,
         pastDue: null,
         dateLabel: dayLabel(date, today),
@@ -290,13 +299,47 @@ export function baselaneItems(people: BaselaneContact[], today: Ymd): NeedsYouIt
     });
 }
 
+// ---------------------------------------------------------------------------
+// Rehab draws
+// ---------------------------------------------------------------------------
+
+export interface DrawRehab {
+  id: string;
+  name: string;
+  draws: Pick<DrawIn, "number" | "stage" | "stageChangedAt" | "waitingOnUs" | "waitingNote">[];
+}
+
 /**
- * The list in order: key dates and lease ends (late first, then soonest), new sign-ups, Baselane links to send,
- * the Missing info row, this year's CapEx, then QuickBooks.
+ * Draws that need a partner (docs/specs/rehab-draws.md, R11): one the lender
+ * is waiting on us for, and one with the lender that hasn't moved in 10 days.
+ * A ready draft doesn't earn a row. Waiting first, then the longest stuck.
+ */
+export function drawItems(rehabs: readonly DrawRehab[], today: Ymd): NeedsYouItem[] {
+  const waiting: NeedsYouItem[] = [];
+  const stuck: { item: NeedsYouItem; days: number }[] = [];
+  for (const r of rehabs) {
+    for (const d of r.draws) {
+      if (!atLender(d.stage)) continue;
+      const base = { kind: "draw" as const, href: `/draws/${r.id}`, title: `${r.name} · draw ${d.number}`, amount: null, pastDue: null, dateLabel: null, late: false, date: null };
+      if (d.waitingOnUs) {
+        waiting.push({ ...base, key: `draw-waiting:${r.id}:${d.number}`, state: "Waiting", detail: d.waitingNote?.trim() || "Waiting on us" });
+      } else if (isStuck(d, today)) {
+        const days = daysInStage(d, today);
+        stuck.push({ days, item: { ...base, key: `draw-stuck:${r.id}:${d.number}`, state: "Stuck", detail: `No change in ${days} days · ${STAGE_LABEL[d.stage]}` } });
+      }
+    }
+  }
+  return [...waiting.sort((a, b) => a.title.localeCompare(b.title)), ...stuck.sort((a, b) => b.days - a.days || a.item.title.localeCompare(b.item.title)).map((s) => s.item)];
+}
+
+/**
+ * The list in order: key dates and lease ends (late first, then soonest), draws that need us, new sign-ups,
+ * Baselane links to send, the Missing info row, this year's CapEx, then QuickBooks.
  */
 export function needsYouList(parts: {
   keyDates: NeedsYouItem[];
   leaseEnds?: NeedsYouItem[];
+  draws?: NeedsYouItem[];
   signups?: NeedsYouItem[];
   baselane?: NeedsYouItem[];
   missing?: NeedsYouItem | null;
@@ -308,6 +351,7 @@ export function needsYouList(parts: {
   );
   return [
     ...dated,
+    ...(parts.draws ?? []),
     ...(parts.signups ?? []),
     ...(parts.baselane ?? []),
     ...(parts.missing ? [parts.missing] : []),

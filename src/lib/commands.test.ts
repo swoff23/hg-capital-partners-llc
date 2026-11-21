@@ -71,7 +71,7 @@ test("ids are unique in each list, and a tab names its section", () => {
   assert.equal(rentRoll?.parent, "Financials");
   assert.deepEqual(
     GO_TO.map((c) => c.label),
-    ["Home", "Deals", "Portfolio", "Tenants", "Financials", "Rent roll", "Settings", "Tasks", "Contractors", "Playbooks", "Settings", "Move-in form", "Storage"],
+    ["Home", "Deals", "Portfolio", "Draws", "Tenants", "Financials", "Rent roll", "Settings", "Tasks", "Contractors", "Playbooks", "Settings", "Move-in form", "Storage"],
   );
 });
 

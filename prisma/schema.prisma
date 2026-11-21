@@ -53,6 +53,7 @@ model User {
   uploadedPropertyAttachments PropertyAttachment[] @relation("PropertyAttachmentUploadedBy")
   createdLeases               Lease[]              @relation("LeaseCreatedBy")
   uploadedLeaseFiles          LeaseFile[]          @relation("LeaseFileUploadedBy")
+  createdRehabs               Rehab[]              @relation("RehabCreatedBy")
   // Who wrote a deal note, so the deal's Activity names its author instead of
   // initials pasted into the text (activity 2.9, DEALS-044).
   dealNotes                   DealNote[]           @relation("DealNoteAuthor")
@@ -232,6 +233,9 @@ model Property {
 
   // Who lives, or lived, in its units (docs/specs/tenants.md).
   leases Lease[]
+
+  // The rehab loans it's part of (docs/specs/rehab-draws.md); one loan can cover several properties.
+  rehabs RehabProperty[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -1414,4 +1418,114 @@ model MissingInfoSkip {
 
   @@unique([check, subject])
   @@index([subject])
+}
+
+// ---------------------------------------------------------------------------
+// Rehab draws (docs/specs/rehab-draws.md). A rehab is one loan's rehab
+// holdback: its budget line by line and the draws on it. It follows the loan,
+// so one rehab can cover more than one property (RehabProperty). Every write
+// goes through src/lib/draws/service.ts; the figures (funded, at the lender,
+// draft, left) are computed in src/lib/draws/figures.ts, never stored.
+// ---------------------------------------------------------------------------
+enum RehabSource {
+  APP // set up by hand
+  WORKSHEET // read from the lender's Renovation Draw Worksheet
+}
+
+// A draw's stages, in order (R4). Waiting on us is a flag beside them, not a stage.
+enum DrawStage {
+  DRAFT
+  SENT
+  INSPECTION
+  APPROVED
+  FUNDED
+}
+
+model Rehab {
+  id              String          @id @default(cuid())
+  // "765 and 767 Prospect": the properties' streets when it's set up, editable.
+  name            String
+  lender          String?
+  // The lender's rehab holdback. Null: the lines' original total stands in.
+  holdback        Decimal?        @db.Decimal(12, 2)
+  notes           String?         @db.Text
+  source          RehabSource     @default(APP)
+  // Marked done after the last draw or the refi; it leaves the property page and Draws' open list.
+  doneAt          DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  createdByUser   User?           @relation("RehabCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByUserId String?
+  properties      RehabProperty[]
+  lines           RehabLine[]
+  draws           Draw[]
+
+  @@index([doneAt])
+}
+
+model RehabProperty {
+  rehab      Rehab    @relation(fields: [rehabId], references: [id], onDelete: Cascade)
+  rehabId    String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId String
+
+  @@id([rehabId, propertyId])
+  @@index([propertyId])
+}
+
+// One budget line: the lender's Original Budget and Change Order columns. Revised is their sum.
+model RehabLine {
+  id          String     @id @default(cuid())
+  rehab       Rehab      @relation(fields: [rehabId], references: [id], onDelete: Cascade)
+  rehabId     String
+  position    Int
+  // The property unit the line is for (R8): its lasting id in Property.units, picked from the rehab's
+  // properties. Null on a plain list, or for a worksheet's own unit that wasn't matched to one.
+  unitId      String?
+  // The unit's label when it was set: the worksheet's "Unit 1", or the picked unit's label. Reads show
+  // the property unit's current label when unitId still finds it.
+  unitLabel   String?
+  name        String
+  original    Decimal    @db.Decimal(12, 2)
+  changeOrder Decimal    @default(0) @db.Decimal(12, 2)
+  amounts     DrawLine[]
+
+  @@index([rehabId, position])
+}
+
+model Draw {
+  id             String     @id @default(cuid())
+  rehab          Rehab      @relation(fields: [rehabId], references: [id], onDelete: Cascade)
+  rehabId        String
+  number         Int
+  stage          DrawStage  @default(DRAFT)
+  // When it last moved, for "6 days" and Needs you's no change in 10 days. Waiting on us doesn't move it.
+  stageChangedAt DateTime   @default(now())
+  // Calendar days (UTC midnight of a Buffalo day), and what each stage recorded.
+  sentOn         DateTime?
+  sentAmount     Decimal?   @db.Decimal(12, 2) // the draft's total when it was sent
+  approvedOn     DateTime?
+  approvedAmount Decimal?   @db.Decimal(12, 2)
+  fundedOn       DateTime?
+  fundedAmount   Decimal?   @db.Decimal(12, 2) // what landed, after the lender's fee
+  // The lender is waiting on HG Capital (a lien waiver, an invoice). Any stage after Draft.
+  waitingOnUs    Boolean    @default(false)
+  waitingNote    String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  lines          DrawLine[]
+
+  @@unique([rehabId, number])
+}
+
+// A draw's amount on one budget line. A line with amounts on a sent draw can't be deleted (Restrict).
+model DrawLine {
+  draw   Draw      @relation(fields: [drawId], references: [id], onDelete: Cascade)
+  drawId String
+  line   RehabLine @relation(fields: [lineId], references: [id], onDelete: Restrict)
+  lineId String
+  amount Decimal   @db.Decimal(12, 2)
+
+  @@id([drawId, lineId])
+  @@index([lineId])
 }

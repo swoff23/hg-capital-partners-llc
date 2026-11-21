@@ -5,6 +5,7 @@ import { generateStartingPassword, hashToken, newToken, signupLinkToken } from "
 import { addDaysYmd } from "../../src/lib/quick-dates";
 import { signSessionToken } from "../../src/lib/session-token";
 import * as core from "../../src/lib/tasks/core";
+import * as draws from "../../src/lib/draws/core";
 import { PORTAL_FIXTURE_EMAIL, ROUTE_SESSION_OVERRIDE, SAMPLE_PARAMS, listRoutes } from "./routes";
 
 /**
@@ -16,7 +17,8 @@ import { PORTAL_FIXTURE_EMAIL, ROUTE_SESSION_OVERRIDE, SAMPLE_PARAMS, listRoutes
  *
  * Staff data is only read. The portal fixtures are the one write: for each,
  * a Contact, its PortalAccount and a fresh PortalSession, reused across runs
- * by email, plus one job assigned to the "portal" contractor. Like
+ * by email, plus one job assigned to the "portal" contractor. A DB with no
+ * open rehab also gets one, so /draws/[id] has a page to load. Like
  * `npm run db:dev-passwords`, it refuses anything but a localhost
  * DATABASE_URL.
  *
@@ -178,6 +180,28 @@ async function seedPortalJob(db: PrismaClient, contactId: string): Promise<void>
   });
 }
 
+/**
+ * One open rehab when the local DB has none (docs/specs/rehab-draws.md), so /draws and /draws/[id] render
+ * with a budget, a draw at the lender and a draft. Written through src/lib/draws/core.ts like any rehab.
+ * A DB that already has an open rehab is left alone.
+ */
+async function seedRehabFixture(db: PrismaClient): Promise<void> {
+  if ((await db.rehab.count({ where: { doneAt: null } })) > 0) return;
+  assertLocalDb();
+  const property = await db.property.findFirst({ where: { archivedAt: null, rehabs: { none: {} } }, select: { id: true }, orderBy: { createdAt: "asc" } });
+  if (!property) return;
+  const { id } = await draws.createRehab(db, { propertyIds: [property.id], lender: "Vontive" }, null);
+  await draws.patchRehab(db, id, { notes: "Fixture for npm run test:devices. Safe to delete locally." });
+  const lines = [];
+  for (const [name, original] of [["Demo", 12000], ["Electrical (Rough)", 16000], ["Kitchen Cabinets", 9500]] as const) {
+    lines.push(await draws.addLine(db, id, { unit: null, name, original, changeOrder: 0 }));
+  }
+  await draws.setDraftAmount(db, lines[0].id, 12000);
+  const sent = await draws.sendDraft(db, id, todayYmdEastern());
+  await draws.updateDraw(db, sent.drawId, { stage: "INSPECTION" }, todayYmdEastern());
+  await draws.setDraftAmount(db, lines[1].id, 6000);
+}
+
 export default async function setup() {
   // A renamed page would otherwise leave its override behind, and the page
   // would quietly load with the default session.
@@ -214,6 +238,7 @@ export default async function setup() {
     });
     process.env.DEVICE_PORTAL_SETUP_TOKEN = setup.token;
     await seedSignupLink(db);
+    await seedRehabFixture(db);
 
     const samples: Record<string, string> = {};
     for (const [key, find] of Object.entries(SAMPLE_PARAMS)) {

@@ -70,7 +70,7 @@ Per line:
 - **At the lender** = its amounts on Sent, Inspection and Approved draws.
 - **Draft** = its amount on the open draft.
 - **Left** = revised − funded − at the lender − draft.
-- **Over**: when left would go below zero the line shows "Over by $X". It warns; it doesn't block. This is the MVP's over or under (R3).
+- **Over**: a draft or a sent draw's line can't take more than the line has left (Connor, Nov 20: "dont allow me to try and pull more than what I have remaining available"); the refusal reads "Only $4,000 is left on Framing." A line can still show "Over by $X" when its budget is cut below what's already drawn. This is the MVP's over or under (R3).
 
 Per draw: **sent** is the draft's total at the moment it's marked Sent. **Approved** is entered at Approved, and the line amounts are adjusted to add up to it (the lender's returned worksheet shows which lines were cut). **Funded** is what landed; the **fee** is approved − funded.
 
@@ -84,7 +84,7 @@ Planning-level sketch; the build settles names and indexes (Opus for the schema 
 
 - **Rehab**: name ("765 and 767 Prospect"), lender, holdback, status (open or done) with done date, notes, how it started (upload or typed), who changed it last.
 - **RehabProperty**: links a rehab to each property it covers.
-- **RehabLine**: rehab, position, unit label (null without a split), name, original, change order.
+- **RehabLine**: rehab, position, unit (the property unit's lasting id, picked from the rehab's properties' units, and its label when set; a worksheet's "Unit 1" that wasn't matched keeps its words), name, original, change order.
 - **Draw**: rehab, number, stage, stage changed at, sent at and amount, approved at and amount, funded at and amount, waiting on us with its note. One open Draft per rehab at most. Imported past draws arrive as Funded with no dates; Pieter can add them.
 - **DrawLine**: draw, line, amount.
 
@@ -97,7 +97,7 @@ Picked with Connor on Nov 20, one at a time, each drawn as low-fi options at lap
 | # | Decision |
 |---|---|
 | L1 | **The Draws page** is the totals strip (`FactStrip`: Ready to draw, At the lender, Funded, Left) over one table of open rehabs: Rehab, Current draw, Ready, Left and a Funded meter. The current draw cell reads "Draw 4 · Inspection · 6 days", or "Waiting on us" in the warning color. A row opens the rehab. It's built like the Portfolio page. A separate "In progress" list of draws above the table was turned down: every open draw would show twice |
-| L2 | **A rehab is its own page** (`/draws/[id]`), laid out like the lease page: a BackLink to Draws, the rehab's figures (Holdback, Funded, At the lender, Ready, Left), then Budget and Draws sections in the main column, and a sticky Details rail with the lender, the properties as links, the loan's maturity and notes. Not a sheet over the list as deals open: 20 to 40 lines and a typed draft don't fit 672px, and the property pages link to it |
+| L2 | **A rehab is its own page** (`/draws/[id]`), laid out like the lease page: a BackLink to Draws, the rehab's figures (Holdback, Funded, At the lender, Ready, Left), then Budget and Draws sections in the main column, and a sticky Details rail with the lender, the holdback and the properties as links (Connor, Nov 20, dropped the loan's maturity and notes from it). Not a sheet over the list as deals open: 20 to 40 lines and a typed draft don't fit 672px, and the property pages link to it |
 | L3 | **The property page shows a Rehab section right after Tasks** while a rehab is open: the current draw with its stage and days, a Meter for funded of the holdback, ready and left, and Open rehab. A Rehabbing property with no rehab shows Add rehab there. A done rehab leaves the property page and stays under Done on Draws. Not in the rail under Loan: below laptop width the rail stacks under the whole main column |
 | L4 | **New rehab is a short sheet** (properties, prefilled when it starts from a property, and the lender). The rehab page then opens with an empty Budget offering Upload Vontive's worksheet or Add a line. An upload shows what it found (units, lines, holdback, past draws, and that past draws arrive as Funded without dates) before Add to rehab saves it. Typed lines use the same table's Add a line. Not one stepped sheet: 40 typed lines cramp it, and it would be a second place that edits a budget |
 
@@ -124,7 +124,7 @@ Also the Snowflake cost table on Mobbin ([Mobbin](https://mobbin.com/screens/acf
 **Reused.**
 
 - The property's `lender`, `loanNumber` and `loanMaturityDate` (prisma/schema.prisma, Property), and the Rehabbing status (`PROPERTY_STATUSES` in src/lib/config.ts; the `^rehab` match in src/lib/missing/checks.ts).
-- `Section`, `FormSheet`, `useRun` with Undo, `NumberInput kind="money"`, `fmtMoney` and `MoneyCents` (cents are needed).
+- `Section`, `FormSheet`, `useRun` with Undo, `NumberInput kind="money"`, `Money` and `fmtMoney`. Amounts show in whole dollars (Connor, Nov 20: "we don't need" decimals); they're stored to the cent so an uploaded worksheet adds up exactly.
 - `FactStrip` and `Table`, `Th`, `Td`, `RowCell`, as the Portfolio page uses them (L1); `Meter` for funded of the holdback; `StatusMenu` to move a draw's stage; `EmptyState` and `AddRow` for the empty Budget and typed lines; the lease page's grid, sticky rail and `BackLink` (L2); the documents section's drop target for the worksheet upload (L4).
 - The tenants feature as the template for a money record on a property: `src/lib/tenants/{core,service}.ts`, actions with zod, delete with a snapshot and Undo (docs/specs/lease-term-edits.md).
 - `exceljs`, already a dependency (scripts/migrate/_lib.ts), to read the worksheet.
@@ -152,3 +152,18 @@ Also the Snowflake cost table on Mobbin ([Mobbin](https://mobbin.com/screens/acf
 ## 9. Conflict to settle when costs are planned
 
 The contractor invoices plan (docs/contractor-invoices-plan.md, Oct 23) keeps an invoice as "a total plus the jobs it covers", says "the app isn't for reconciling to properties" (I4), and covers contractor invoices only (I11). Costs on budget lines need invoices, and materials receipts, tied to a rehab and a line. It doesn't touch this MVP. Decide it when costs get their own planning pass; that plan carries a note pointing here.
+
+## 10. Build notes (Nov 20)
+
+Connor's calls during the build, all in the code:
+
+- **Whole dollars.** Every amount shows without cents; they're stored to the cent so a worksheet adds up exactly.
+- **Units come from the property.** A line's unit is picked from the rehab's properties' units (house-meter rows left out), never typed; on a rehab over two properties the pick reads "765 Prospect Avenue · Upper". A unit saved before ids existed gets its lasting id on that save, as a lease's does. A worksheet split by unit asks which of the property's units each worksheet unit is before it saves, defaulting by order; one left unmatched keeps its words.
+- **No more than what's left.** A draft amount, or a sent draw's amount on a line, can't go past what the line has left.
+- **"Submitted", not "At the lender".** The figure and the column for money on draws that are sent and not yet funded (Sent, Inspection, Approved) read "Submitted" (Connor: "submitted and waiting"); this spec's "at the lender" means the same. The Budget table shows its Submitted column only while a line has some.
+- **The Details rail** is Lender, Holdback and Properties.
+- **Rows** take the app's usual table hover on a laptop, and a whole budget row opens its line (the draft input aside).
+- **Table padding**: the first and last columns sit inset from the row edge, as the app's other tables do.
+
+The device check's setup seeds one small open rehab when a local DB has none, so /draws/[id] always has a page.
+

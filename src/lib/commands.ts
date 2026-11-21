@@ -10,6 +10,7 @@ export type CommandIcon =
   | "home"
   | "deals"
   | "portfolio"
+  | "draws"
   | "financials"
   | "tasks"
   | "tenants"
@@ -38,6 +39,7 @@ export const GO_TO: readonly Command[] = [
   { id: "go-home", kind: "go", label: "Home", href: "/", icon: "home" },
   { id: "go-deals", kind: "go", label: "Deals", href: "/deals", icon: "deals" },
   { id: "go-portfolio", kind: "go", label: "Portfolio", href: "/properties", icon: "portfolio" },
+  { id: "go-draws", kind: "go", label: "Draws", href: "/draws", icon: "draws" },
   { id: "go-tenants", kind: "go", label: "Tenants", href: "/tenants", icon: "tenants" },
   { id: "go-financials", kind: "go", label: "Financials", href: "/financials", icon: "financials" },
   { id: "go-rent-roll", kind: "go", label: "Rent roll", href: "/financials/rent-roll", icon: "financials", parent: "Financials" },

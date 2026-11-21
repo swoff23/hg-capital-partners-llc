@@ -8,16 +8,19 @@ import { liveRecord } from "@/lib/record-scope";
 import { TRADE_LINKS, tradeLine } from "@/lib/contractors/trades";
 import { leaseEndRows, loadMissingInfo } from "@/lib/missing/queries";
 import { ofPriority, placesLine } from "@/lib/missing/checks";
-import { baselaneItems, capexItem, keyDateItems, missingItem, needsYouList, quickbooksItem, signupItems, type NeedsYouItem } from "./needs-you";
+import { lineFigures, rehabFigures } from "@/lib/draws/figures";
+import { listRehabs } from "@/lib/draws/queries";
+import { baselaneItems, capexItem, drawItems, keyDateItems, missingItem, needsYouList, quickbooksItem, signupItems, type NeedsYouItem } from "./needs-you";
 
 /**
  * Everything Home's Needs you list reads, in one place: each property's key
  * dates and CapEx inputs, the CapEx rules, the QuickBooks connection, lease
- * ends and the Missing info count (docs/specs/missing-info.md).
- * The rules for what shows are in ./needs-you.
+ * ends, the Missing info count (docs/specs/missing-info.md) and the open
+ * rehabs' draws (docs/specs/rehab-draws.md). The rules for what shows are
+ * in ./needs-you.
  */
 export async function needsYou(today: Ymd, now: Date = new Date()): Promise<NeedsYouItem[]> {
-  const [properties, rules, conn, signups, setups, leaseEnds, missing] = await Promise.all([
+  const [properties, rules, conn, signups, setups, leaseEnds, missing, rehabs] = await Promise.all([
     // An archived property leaves Home (lib/archive.ts); its reminder tasks stay on Today.
     prisma.property.findMany({
       where: liveRecord,
@@ -50,8 +53,16 @@ export async function needsYou(today: Ymd, now: Date = new Date()): Promise<Need
     }),
     leaseEndRows(today),
     loadMissingInfo(today),
+    listRehabs("open"),
   ]);
   const required = ofPriority(missing.gaps, "required");
+
+  // What each open rehab still holds back, for the loan maturity row on each of its properties.
+  const undrawn = new Map<string, number>();
+  for (const r of rehabs) {
+    const held = rehabFigures(r.holdback, lineFigures(r.lines, r.draws), r.draws).undrawn;
+    for (const p of r.properties) undrawn.set(p.id, held);
+  }
 
   // Other contractors sharing a new sign-up's mobile or email, so the row can say so.
   const phones = signups.flatMap((s) => (s.phoneE164 ? [s.phoneE164] : []));
@@ -87,8 +98,9 @@ export async function needsYou(today: Ymd, now: Date = new Date()): Promise<Need
   );
 
   return needsYouList({
-    keyDates: keyDateItems(properties, today),
+    keyDates: keyDateItems(properties, today, undrawn),
     leaseEnds,
+    draws: drawItems(rehabs, today),
     missing: missingItem(required.length, placesLine(required)),
     signups: signupItems(
       signups.map((s) => ({ id: s.id, fullName: s.fullName, phoneE164: s.phoneE164, email: s.email, trades: tradeLine(s.tradeLinks), createdAt: s.createdAt })),

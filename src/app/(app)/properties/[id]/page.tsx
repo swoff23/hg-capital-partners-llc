@@ -35,6 +35,7 @@ import { PropertyFactStrip } from "./record-strip";
 import { PropertyMoreMenu } from "./property-more-menu";
 import { PropertyPhoto } from "./property-photo";
 import { PropertyTasksSection, type PropertyTask } from "./property-tasks";
+import { PropertyRehabSection } from "./property-rehab";
 import { FillOnArrival, PropertyMissingLine } from "./missing-line";
 import { FindOnArrival } from "./find-on-arrival";
 import { PropertyMissingProvider } from "./missing-context";
@@ -202,6 +203,9 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
           {/* The work: what's open here, how to get in, then the money and the plan. */}
           <div className="min-w-0 space-y-8 pointer-coarse:space-y-6">
             <PropertyTasksSection propertyId={property.id} tasks={tasks} today={today} />
+
+            {/* A rehab's draws (docs/specs/rehab-draws.md, L3): only while one is open, or the property is Rehabbing with none. */}
+            <PropertyRehabSection propertyId={property.id} status={property.status} />
 
             <UnitsSection
               propertyId={property.id}

@@ -30,6 +30,8 @@ async function nameOf(kind: RecordKind, id: string): Promise<string | null> {
       return (await prisma.contact.findUnique({ where: { id }, select: { fullName: true } }))?.fullName ?? null;
     case "template":
       return (await prisma.taskTemplate.findUnique({ where: { id }, select: { name: true } }))?.name ?? null;
+    case "rehab":
+      return (await prisma.rehab.findUnique({ where: { id }, select: { name: true } }))?.name ?? null;
     case "lease": {
       // "647 Prospect · Front": the lease page's title, the household's home.
       const lease = await prisma.lease.findUnique({ where: { id }, select: { unitLabel: true, property: { select: { address: true } } } });

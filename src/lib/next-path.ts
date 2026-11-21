@@ -73,7 +73,7 @@ export const STAFF_HOME = "/";
  * the folders, src/proxy.test.ts the matcher. A section missing here only
  * means its links land on Home.
  */
-export const STAFF_SECTIONS = ["contractors", "deals", "financials", "missing", "properties", "settings", "tasks", "templates", "tenants"] as const;
+export const STAFF_SECTIONS = ["contractors", "deals", "draws", "financials", "missing", "properties", "settings", "tasks", "templates", "tenants"] as const;
 
 /**
  * Request header src/proxy.ts sets on every staff section request: the path

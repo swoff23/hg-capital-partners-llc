@@ -58,6 +58,7 @@ export const config = {
     "/p/:path*",
     "/contractors/:path*",
     "/deals/:path*",
+    "/draws/:path*",
     "/financials/:path*",
     "/missing/:path*",
     "/properties/:path*",

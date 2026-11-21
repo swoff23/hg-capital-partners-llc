@@ -7,6 +7,7 @@ import {
   signupItems,
   STALE_SYNC_MS,
   capexItem,
+  drawItems,
   keyDateItems,
   missingItem,
   moreCount,
@@ -265,4 +266,52 @@ test("the list: key dates and lease ends by date, then sign-ups, Baselane, Missi
     list.map((i) => i.key),
     ["lease", "loan", "missing"],
   );
+});
+
+// ---------------------------------------------------------------------------
+// Rehab draws (docs/specs/rehab-draws.md, R11)
+// ---------------------------------------------------------------------------
+
+test("a maturing loan says how much its open rehab still holds back", () => {
+  const p = property({ loanMaturityDate: "2026-12-01" });
+  const [plain] = keyDateItems([p], TODAY);
+  assert.equal(plain.detail, "118 Congress St");
+  const [held] = keyDateItems([p], TODAY, new Map([["p1", 52100]]));
+  assert.equal(held.detail, "118 Congress St · $52,100 not drawn");
+  const [none] = keyDateItems([p], TODAY, new Map([["p1", 0]]));
+  assert.equal(none.detail, "118 Congress St");
+});
+
+test("draws: waiting on us first, then the longest stuck; drafts and moving draws stay off", () => {
+  const draw = (number: number, stage: "DRAFT" | "SENT" | "INSPECTION" | "APPROVED" | "FUNDED", changed: string, waitingOnUs = false, waitingNote: string | null = null) => ({
+    number,
+    stage,
+    stageChangedAt: changed,
+    waitingOnUs,
+    waitingNote,
+  });
+  const items = drawItems(
+    [
+      { id: "r1", name: "58 Mariner Street", draws: [draw(1, "SENT", "2026-10-08T15:00:00Z")] },
+      { id: "r2", name: "415 Crescent Ave.", draws: [draw(2, "INSPECTION", "2026-10-24T15:00:00Z", true, "Lien waiver from the electrician"), draw(1, "FUNDED", "2026-09-01T15:00:00Z")] },
+      { id: "r3", name: "23 Sherwood St", draws: [draw(4, "INSPECTION", "2026-10-20T15:00:00Z"), draw(5, "DRAFT", "2026-09-01T15:00:00Z"), draw(3, "APPROVED", "2026-10-12T15:00:00Z")] },
+    ],
+    TODAY,
+  );
+  assert.deepEqual(
+    items.map((i) => [i.key, i.state, i.title, i.detail, i.href]),
+    [
+      ["draw-waiting:r2:2", "Waiting", "415 Crescent Ave. · draw 2", "Lien waiver from the electrician", "/draws/r2"],
+      ["draw-stuck:r1:1", "Stuck", "58 Mariner Street · draw 1", "No change in 17 days · Sent", "/draws/r1"],
+      ["draw-stuck:r3:3", "Stuck", "23 Sherwood St · draw 3", "No change in 13 days · Approved", "/draws/r3"],
+    ],
+  );
+});
+
+test("draw rows sit after the dated rows and before sign-ups", () => {
+  const dated = keyDateItems([property({ loanMaturityDate: "2026-11-01" })], TODAY);
+  const draws = drawItems([{ id: "r", name: "1 A St", draws: [{ number: 1, stage: "SENT", stageChangedAt: "2026-10-01T15:00:00Z", waitingOnUs: true, waitingNote: null }] }], TODAY);
+  const list = needsYouList({ keyDates: dated, draws, capex: null, quickbooks: null });
+  assert.deepEqual(list.map((i) => i.kind), ["loan", "draw"]);
+  assert.equal(list[1].detail, "Waiting on us");
 });
