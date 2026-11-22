@@ -12,6 +12,7 @@ import { asEditorConflict } from "./conflicts";
 import * as core from "./core";
 import { contactsWhoSaw, deleteEmailNote, emailStatesIn } from "./delivery";
 import type { DraftContractor } from "./drafts";
+import { attachForm } from "./new-task-files";
 
 /**
  * Task domain for the app: every staff, system and public-form task write
@@ -47,8 +48,16 @@ function revalidateTask(t: { id: string; propertyId?: string | null; dealId?: st
   if (t.dealId) revalidatePath(`/deals/${t.dealId}`);
 }
 
-export async function createTask(input: core.NewTaskInput, p: core.Principal): Promise<Task> {
-  const task = await prisma.$transaction((tx) => core.createTask(tx, input, p));
+/**
+ * `formId` is New task's form (docs/specs/new-task-checklist-photos.md): its files, held since they were picked,
+ * become the task's in the same transaction, and any still going join it as they land (new-task-files.ts attachForm).
+ */
+export async function createTask(input: core.NewTaskInput, p: core.Principal, opts: { formId?: string | null } = {}): Promise<Task> {
+  const task = await prisma.$transaction(async (tx) => {
+    const made = await core.createTask(tx, input, p);
+    if (opts.formId && p.kind === "staff") await attachForm(tx, opts.formId, p.userId, made.id);
+    return made;
+  });
   revalidateTask(task);
   return task;
 }
@@ -341,6 +350,19 @@ export async function undoTaskApproval(taskId: string, approvedEventId: string, 
 export async function setChecklistItem(itemId: string, done: boolean, p: core.Principal): Promise<void> {
   const item = await prisma.$transaction((tx) => core.setChecklistItem(tx, itemId, done, p));
   revalidatePath(`/tasks/${item.taskId}`);
+}
+
+/** A pasted list on the task page's Add item: one item per line, in order, in one save. */
+export async function addChecklistItems(taskId: string, titles: readonly string[], p: core.Principal): Promise<void> {
+  try {
+    await prisma.$transaction(async (tx) => {
+      for (const title of titles) await core.addChecklistItem(tx, taskId, title, p);
+    });
+  } catch (err) {
+    if (err instanceof core.TaskRuleError) revalidatePath(`/tasks/${taskId}`);
+    throw err;
+  }
+  revalidatePath(`/tasks/${taskId}`);
 }
 
 export async function addChecklistItem(taskId: string, title: string, p: core.Principal): Promise<void> {

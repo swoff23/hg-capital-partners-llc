@@ -1,5 +1,5 @@
 import { FILE_KINDS, PREVIEW_RULE, UPLOAD_RULES, contentTypeForName, nameExtension, type FileKind, type UploadRule } from "./content-types";
-import { requestedResidentUploadRole, requestedUploadRole } from "./paths";
+import { requestedNewTaskUploadRole, requestedResidentUploadRole, requestedUploadRole } from "./paths";
 
 /**
  * What one task upload may be: the token limits the token route mints before
@@ -24,7 +24,18 @@ const isFileKind = (k: unknown): k is FileKind => typeof k === "string" && (FILE
  * kind's own list of file kinds, when it has one.
  */
 export function uploadLimits(taskId: string, pathname: string, fileKind: unknown, allowed?: readonly FileKind[]): TokenLimits | string {
-  const role = requestedUploadRole(pathname, taskId);
+  return limitsFor(requestedUploadRole(pathname, taskId), pathname, fileKind, allowed);
+}
+
+/**
+ * New task's files (docs/specs/new-task-checklist-photos.md): the form's own folder, and what a staff task upload takes
+ * (photos, videos and documents), at the same caps.
+ */
+export function newTaskUploadLimits(formId: string, pathname: string, fileKind: unknown): TokenLimits | string {
+  return limitsFor(requestedNewTaskUploadRole(pathname, formId), pathname, fileKind);
+}
+
+function limitsFor(role: ReturnType<typeof requestedUploadRole>, pathname: string, fileKind: unknown, allowed?: readonly FileKind[]): TokenLimits | string {
   if (!role) return "That upload path isn't allowed.";
   if (!isFileKind(fileKind)) return "fileKind must be image, video or file.";
   // The kind's own table (upload-kinds.ts UPLOAD_KIND_ALLOWED): a contractor's photos and videos can't be a document.

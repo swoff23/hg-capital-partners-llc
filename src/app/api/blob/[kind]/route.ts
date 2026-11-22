@@ -1,7 +1,7 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { isFinalRefusal } from "@/lib/attachments/access";
-import { contactUploadLimits, leaseUploadLimits, propertyUploadLimits, residentUploadLimits, uploadLimits } from "@/lib/attachments/limits";
+import { contactUploadLimits, leaseUploadLimits, newTaskUploadLimits, propertyUploadLimits, residentUploadLimits, uploadLimits } from "@/lib/attachments/limits";
 import { appScope, ownerRefusal, portalScope, residentTokenOf } from "@/lib/attachments/queue-owner";
 import { UploadRefusal, tokenFailure } from "@/lib/attachments/token-failure";
 import { blobToken, noStoreMessage } from "@/lib/attachments/blob-stores";
@@ -12,6 +12,7 @@ import { logError } from "@/lib/log";
 import { getPortalPrincipal } from "@/lib/portal/session";
 import { resolveResidentLink } from "@/lib/residents/links";
 import { UPLOADS_FULL, residentUploadsFull } from "@/lib/residents/requests";
+import { newTaskTokenRefusal } from "@/lib/tasks/new-task-uploads";
 import { contractorUploadRefusal } from "@/lib/tasks/service";
 
 /**
@@ -33,6 +34,7 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  *   /api/blob/lease-upload           { leaseId, termId, fileKind }      staff, a lease's signed term
  *   /api/blob/resident-upload        { linkId, fileKind, owner }        a resident, from their request link (no sign-in:
  *                                                                       the link in `owner` is who they are)
+ *   /api/blob/new-task-upload        { formId, fileKind }               staff, New task's files before the task exists
  *
  * The keys are lib/attachments/upload-kinds.ts UPLOAD_KINDS, which the
  * uploaders send; the table below is typed against that list, so a kind
@@ -74,7 +76,7 @@ interface UploadKind {
   /** Who may mint a token for this kind. */
   principal: Uploader["kind"];
   /** clientPayload key naming the parent row. */
-  idKey: "taskId" | "propertyId" | "contactId" | "leaseId" | "linkId";
+  idKey: "taskId" | "propertyId" | "contactId" | "leaseId" | "linkId" | "formId";
   /** Throws with a message the uploader can act on, or returns the token's limits. */
   authorize: (id: string, pathname: string, payload: Record<string, unknown>, who: Uploader) => Promise<Limits>;
 }
@@ -200,6 +202,20 @@ const KINDS: Record<string, UploadKind> = {
       }
       // A day's worth per link, so a leaked link can't fill the store (requests.ts UPLOADS_PER_DAY).
       if (await residentUploadsFull(linkId)) throw new UploadRefusal(UPLOADS_FULL, true);
+      return limits;
+    },
+  },
+  "new-task-upload": {
+    principal: "staff",
+    idKey: "formId",
+    // New task's files before the task exists (docs/specs/new-task-checklist-photos.md): the form's own folder, a form
+    // nobody else's files or task use, and room left under its cap.
+    authorize: async (formId, pathname, payload, who) => {
+      const limits = newTaskUploadLimits(formId, pathname, payload.fileKind);
+      if (typeof limits === "string") throw new UploadRefusal(limits);
+      if (who.kind !== "staff") throw new UploadRefusal("Not found");
+      const refusal = await newTaskTokenRefusal(formId, who.userId);
+      if (refusal) throw new UploadRefusal(refusal.message, refusal.final);
       return limits;
     },
   },

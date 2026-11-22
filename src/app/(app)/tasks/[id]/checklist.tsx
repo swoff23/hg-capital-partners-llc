@@ -1,16 +1,15 @@
 "use client";
-import { useOptimistic, useRef, useState, useTransition } from "react";
-import { Check, MoreHorizontal, Plus, Trash2 } from "lucide-react";
-import { Button as AriaButton } from "react-aria-components";
+import { useOptimistic, useTransition } from "react";
+import { Check } from "lucide-react";
 import { InlineField } from "@/components/inline-field";
-import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
 import { Meter } from "@/components/meter";
 import { useToast } from "@/components/toast";
-import { Section, buttonClass } from "@/components/ui";
+import { Section } from "@/components/ui";
 import { useRun } from "@/components/use-run";
 import { callAction } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
-import { addChecklistItem, setChecklistItem } from "./actions";
+import { AddChecklistItem, ChecklistItemRow, checkBoxClass } from "../checklist-rows";
+import { addChecklistItem, addChecklistItems, setChecklistItem } from "./actions";
 import { removeChecklistItem, renameChecklistItem, restoreChecklistItem } from "./checklist-actions";
 
 export type ChecklistRow = { id: string; title: string; done: boolean };
@@ -29,6 +28,8 @@ type Change = { id: string; done: boolean } | { id: string; removed: true };
  * and "All done". An item's words are its own InlineField: a click renames it
  * in place, Enter saves, Esc puts the old words back. Each item's ⋯ menu
  * holds Delete, which takes it off at once and toasts with Undo (BTASKS-024).
+ * The rows and Add item are New task's too (../checklist-rows.tsx); a pasted
+ * list adds one item per line.
  */
 export function Checklist({ taskId, items }: { taskId: string; items: ChecklistRow[] }) {
   const { run } = useRun();
@@ -115,122 +116,49 @@ function ChecklistItem({ row: r, onTick, onRemoved }: { row: ChecklistRow; onTic
   }
 
   return (
-    <li className="group/item flex min-h-9 items-center gap-2.5 pointer-coarse:min-h-11">
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked={r.done}
-        aria-label={r.title}
-        onClick={onTick}
-        className={cn(
-          "relative flex size-4.5 shrink-0 items-center justify-center rounded-full border transition-colors",
-          "after:absolute after:-inset-2.5 pointer-coarse:after:-inset-3.5",
-          r.done ? "border-primary bg-primary text-primary-foreground" : "border-input text-transparent hover:border-foreground",
-        )}
-      >
-        <Check className="size-3" strokeWidth={3} aria-hidden="true" />
-      </button>
-      <div className="flex min-w-0 flex-1 items-center">
-        <InlineField
-          kind="text"
-          label="Checklist item"
-          value={r.title}
-          minLength={1}
-          tooShort="Enter a name for the item."
-          wrap
-          inRail={false}
-          message={() => "Item renamed"}
-          // Removing the item replaces this toast, so an Undo for a row that is gone never shows.
-          toastKey={toastKeyFor(r.id)}
-          className={cn(r.done && "text-muted-foreground line-through")}
-          onSave={(next) => renameChecklistItem(r.id, next)}
-        />
-      </div>
-      <MenuTrigger>
-        <AriaButton
-          aria-label={`${r.title} actions`}
-          className={cn(
-            buttonClass({ variant: "ghost", size: "sm", icon: true }),
-            "-mr-2 shrink-0 text-muted-foreground data-pressed:bg-muted",
-            // With a mouse the menu shows on the row; touch has no hover, so it stays.
-            "pointer-fine:opacity-0 pointer-fine:focus-visible:opacity-100 pointer-fine:group-hover/item:opacity-100 pointer-fine:data-pressed:opacity-100",
-          )}
+    <ChecklistItemRow
+      title={r.title}
+      onDelete={remove}
+      box={
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={r.done}
+          aria-label={r.title}
+          onClick={onTick}
+          className={cn(checkBoxClass(r.done), "after:absolute after:-inset-2.5 pointer-coarse:after:-inset-3.5", !r.done && "hover:border-foreground")}
         >
-          <MoreHorizontal aria-hidden="true" strokeWidth={1.5} className="size-4" />
-        </AriaButton>
-        <Menu sheetTitle="Checklist item">
-          <MenuItem variant="destructive" icon={<Trash2 />} onAction={remove}>
-            Delete item
-          </MenuItem>
-        </Menu>
-      </MenuTrigger>
-    </li>
+          <Check className="size-3" strokeWidth={3} aria-hidden="true" />
+        </button>
+      }
+    >
+      <InlineField
+        kind="text"
+        label="Checklist item"
+        value={r.title}
+        minLength={1}
+        tooShort="Enter a name for the item."
+        wrap
+        inRail={false}
+        message={() => "Item renamed"}
+        // Removing the item replaces this toast, so an Undo for a row that is gone never shows.
+        toastKey={toastKeyFor(r.id)}
+        className={cn(r.done && "text-muted-foreground line-through")}
+        onSave={(next) => renameChecklistItem(r.id, next)}
+      />
+    </ChecklistItemRow>
   );
 }
 
 function AddItem({ taskId }: { taskId: string }) {
   const { run } = useRun();
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const input = useRef<HTMLInputElement>(null);
-  // Esc closes the row, and a browser may fire blur as the input goes away,
-  // with the typed text still in that render's handler. This keeps that blur from adding it.
-  const cancelled = useRef(false);
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          // A fresh row: the blur after Esc never reaches onBlur in React 19 (the input is already gone), so this flag can be left set.
-          cancelled.current = false;
-          setOpen(true);
-        }}
-        className="-ml-1 mt-0.5 inline-flex h-8 items-center gap-1.5 rounded-md px-1 text-label text-fg-2 transition-colors hover:text-foreground pointer-coarse:h-11"
-      >
-        <Plus className="size-4" aria-hidden="true" />
-        Add item
-      </button>
-    );
-  }
-
-  function add() {
-    const t = title.trim();
-    if (!t) return;
-    setTitle("");
-    // Put the text back if it didn't save, unless something newer was typed since.
-    run(() => addChecklistItem(taskId, t), { failed: () => setTitle((cur) => cur || t) });
-    input.current?.focus();
-  }
-
   return (
-    <div className="mt-0.5 flex min-h-9 items-center gap-2.5 pointer-coarse:min-h-11">
-      <span className="size-4.5 shrink-0 rounded-full border border-dashed border-input" aria-hidden="true" />
-      <input
-        ref={input}
-        autoFocus
-        aria-label="New checklist item"
-        placeholder="Add item"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            add();
-          }
-          if (e.key === "Escape") {
-            cancelled.current = true;
-            setTitle("");
-            setOpen(false);
-          }
-        }}
-        onBlur={() => {
-          if (!cancelled.current && title.trim()) add();
-          cancelled.current = false;
-          setOpen(false);
-        }}
-        className="min-w-0 flex-1 bg-transparent text-body text-foreground outline-none placeholder:text-muted-foreground"
-      />
-    </div>
+    <AddChecklistItem
+      onAdd={(titles, putBack) =>
+        titles.length === 1
+          ? run(() => addChecklistItem(taskId, titles[0]), { failed: () => putBack(titles[0]) })
+          : run(() => addChecklistItems(taskId, titles))
+      }
+    />
   );
 }

@@ -94,6 +94,26 @@ export function residentUploadPath(linkId: string, filename: string, role: Uploa
   return `residents/${linkId}/${role}/${safeUploadName(contentType ? filenameForType(filename, contentType) : filename)}`;
 }
 
+/**
+ * New task's files (docs/specs/new-task-checklist-photos.md), uploaded from the form before the task exists, so under
+ * the form's own folder; the task's file rows point at them as they are, as a resident's do.
+ *
+ *   new-tasks/<formId>/(orig|thumb|poster)/<name>
+ */
+export function requestedNewTaskUploadRole(pathname: string, formId: string): UploadRole | null {
+  return roleIn(pathname, formId, REQUESTED_NAME, "new-tasks");
+}
+
+/** The role of a stored blob's path in a form's folder, or null when it isn't that form's. */
+export function storedNewTaskUploadRole(pathname: string, formId: string): UploadRole | null {
+  return roleIn(pathname, formId, STORED_NAME, "new-tasks");
+}
+
+/** The path New task's uploader asks for. */
+export function newTaskUploadPath(formId: string, filename: string, role: UploadRole = "orig", contentType?: string): string {
+  return `new-tasks/${formId}/${role}/${safeUploadName(contentType ? filenameForType(filename, contentType) : filename)}`;
+}
+
 /** The store id inside a read-write token, "vercel_blob_rw_<storeId>_<secret>". */
 export function storeIdFromToken(token: string | null | undefined): string | null {
   const parts = (token ?? "").split("_");

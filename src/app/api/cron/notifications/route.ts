@@ -8,6 +8,7 @@ import { queueDueReminders } from "@/lib/notifications/reminders";
 import { sendResidentUpdates } from "@/lib/residents/updates";
 import { cronAuthorized, cronRefusal } from "@/lib/secrets";
 import { sweepDiscardedDrafts } from "@/lib/tasks/service";
+import { sweepNewTaskUploads } from "@/lib/tasks/new-task-uploads";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -63,6 +64,11 @@ export async function GET(request: NextRequest) {
     logError("cron:discarded-drafts", err);
     return 0;
   });
+  // New task's files on drafts that expired (docs/specs/new-task-checklist-photos.md, section 3.3).
+  const heldFiles = await sweepNewTaskUploads(now).catch((err: unknown) => {
+    logError("cron:new-task-uploads", err);
+    return 0;
+  });
   after(() => checkInBackgroundJobs(new Date()));
-  return NextResponse.json({ ...result, reminders: reminders.queued, settled, residentEmails: residents.sent, discarded });
+  return NextResponse.json({ ...result, reminders: reminders.queued, settled, residentEmails: residents.sent, discarded, heldFiles });
 }

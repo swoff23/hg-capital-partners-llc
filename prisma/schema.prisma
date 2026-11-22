@@ -77,6 +77,9 @@ model User {
   missingInfoSkips            MissingInfoSkip[]    @relation("MissingInfoSkipBy")
 
   qboConnections      QuickbooksConnection[]
+  // New task's files before Create, and which task each form made (docs/specs/new-task-checklist-photos.md).
+  newTaskUploads      NewTaskUpload[]
+  newTaskForms        NewTaskForm[]
   // "Forgot password" links for this partner (docs/specs/staff-password-reset.md).
   passwordResetTokens PasswordResetToken[]
   // This partner's Claude, connected through the connector (docs/specs/tasks-from-claude.md).
@@ -512,6 +515,8 @@ model Task {
   notifications NotificationOutbox[]
   // Set when a resident sent this from their link (docs/specs/maintenance-requests.md).
   resident      ResidentRequest?
+  // Set when New task made this with files picked on the form (docs/specs/new-task-checklist-photos.md).
+  newTaskForm   NewTaskForm?
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -1678,6 +1683,48 @@ model ResidentRequest {
 // A photo or video a resident uploaded from their link, checked with head()
 // and waiting to be attached to the request it goes with. usedAt is set when
 // it is.
+// New task's files (docs/specs/new-task-checklist-photos.md): uploaded the moment they're picked, under the person and
+// the form's id (made by the browser, one per new task), and held here until Create attaches them to the task. A file
+// that finishes after Create attaches as it lands, through the form's NewTaskForm. `attachmentId` is the task file
+// it became; one never attached is deleted, blobs and all, once its draft has expired (sweepNewTaskUploads).
+model NewTaskUpload {
+  id             String         @id @default(cuid())
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  formId         String
+  pathname       String         @unique
+  url            String
+  filename       String
+  size           Int
+  contentType    String
+  kind           AttachmentKind
+  thumbPathname  String?
+  posterPathname String?
+  width          Int?
+  height         Int?
+  durationSec    Float?
+  attachmentId   String?
+  createdAt      DateTime       @default(now())
+
+  @@index([formId])
+  @@index([userId, formId])
+  @@index([createdAt])
+}
+
+// The task a New task form made, and its "created" line, which the form's files hang from (so the task page, its zip,
+// the contractor and the job email all see them as posted). Written by Create when the form had files.
+model NewTaskForm {
+  id        String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    String   @unique
+  eventId   String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
 model ResidentUpload {
   id             String         @id @default(cuid())
   link           ResidentLink   @relation(fields: [linkId], references: [id], onDelete: Cascade)

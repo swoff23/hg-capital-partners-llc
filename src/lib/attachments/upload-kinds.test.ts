@@ -21,7 +21,7 @@ import { propertyUploadLimits, uploadLimits } from "./limits";
 const T = "cm1abc2def3ghi";
 const P = "cm9prop8erty7";
 
-test("UPLOAD_KINDS: the five token routes the uploads spec names, the lockbox photo, the contractor's documents, signed leases and a resident's request photos, each with a parent and an access", () => {
+test("UPLOAD_KINDS: the five token routes the uploads spec names, the lockbox photo, the contractor's documents, signed leases, a resident's request photos and New task's files, each with a parent and an access", () => {
   assert.deepEqual(
     [...UPLOAD_KINDS],
     [
@@ -35,6 +35,7 @@ test("UPLOAD_KINDS: the five token routes the uploads spec names, the lockbox ph
       "contact-upload",
       "lease-upload",
       "resident-upload",
+      "new-task-upload",
     ],
   );
   for (const k of UPLOAD_KINDS) {
@@ -74,10 +75,12 @@ test("UPLOAD_KIND_ALLOWED: what each target takes, and previews only where the r
   assert.deepEqual(UPLOAD_KIND_ALLOWED["lockbox-photo-upload"], ["image"]);
   // A resident's request (docs/specs/maintenance-requests.md): photos and videos, kept with their previews like a task's.
   assert.deepEqual(UPLOAD_KIND_ALLOWED["resident-upload"], ["image", "video"]);
+  // New task's files (docs/specs/new-task-checklist-photos.md) become the task's own, so they take what a task takes.
+  assert.deepEqual(UPLOAD_KIND_ALLOWED["new-task-upload"], ["image", "video", "file"]);
   // The lockbox photo keeps its thumbnail (properties/photo.ts recordLockboxPhoto) for the tile and the job page.
   assert.deepEqual(
     UPLOAD_KINDS.filter((k) => UPLOAD_KIND_PREVIEWS[k]),
-    ["task-upload", "portal-task-upload", "lockbox-photo-upload", "resident-upload"],
+    ["task-upload", "portal-task-upload", "lockbox-photo-upload", "resident-upload", "new-task-upload"],
   );
 });
 
@@ -91,6 +94,16 @@ test("uploadTargetKey and uploadTargetHref: the queue key and the page for each 
   assert.equal(uploadTargetHref("portal-task-upload", "t1"), "/p/jobs/t1");
   assert.equal(uploadTargetHref("property-upload", "p1"), "/properties/p1");
   assert.equal(uploadTargetHref("listing-photo-upload", "p1"), "/properties/p1");
+  assert.equal(uploadTargetKey("new-task-upload", "f1"), "new-task:f1");
+  assert.equal(uploadTargetHref("new-task-upload", "f1"), "/tasks/new");
+});
+
+test("uploadRequest: New task's files go to new-tasks/<formId>/<role> with their fileKind", () => {
+  const r = uploadRequest("new-task-upload", "f-1", { name: "Quote (final).PDF", contentType: "application/pdf", fileKind: "file" }, { owner: "app:u1" });
+  assert.equal(r.pathname, "new-tasks/f-1/orig/Quote-final.pdf");
+  assert.deepEqual(JSON.parse(r.clientPayload), { formId: "f-1", fileKind: "file", owner: "app:u1" });
+  const thumb = uploadRequest("new-task-upload", "f-1", { name: "Porch.jpg", contentType: "image/jpeg", fileKind: "image" }, { role: "thumb" });
+  assert.equal(thumb.pathname, "new-tasks/f-1/thumb/Porch.jpg");
 });
 
 test("uploadRequest: task files go to tasks/<id>/orig with their fileKind, a path the token route accepts", () => {

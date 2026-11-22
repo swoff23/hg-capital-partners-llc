@@ -49,6 +49,7 @@ export const maxDuration = 300;
  *   link (`?r=`): `resident`, a file on one of their lease's requests that a tenant uploaded, and
  *   `resident-upload`, a photo or video their link uploaded that waits for Send. Never staff's or a
  *   contractor's files.
+ * - New task's files before Create (`new-task-upload`): staff, the person whose form holds them.
  *
  * `?v=thumb` / `?v=poster` serve the row's thumbnail or video poster,
  * authorized by the row itself. A LINK row has no bytes here (the UI links
@@ -65,7 +66,7 @@ export const maxDuration = 300;
 
 // onlyTaskId: a viewer let in by a job email's link (`?l=`) sees that job's files only.
 type Viewer =
-  | { kind: "staff"; onlyTaskId?: string | null }
+  | { kind: "staff"; onlyTaskId?: string | null; userId?: string }
   | { kind: "contractor"; contactId: string; onlyTaskId: string | null }
   | { kind: "resident"; linkId: string; leaseId: string; onlyTaskId?: null };
 
@@ -85,6 +86,8 @@ const KIND_VIEWERS: Record<string, readonly Viewer["kind"][]> = {
   // A resident's own files, by their request link (`?r=`), never by a session.
   resident: ["resident"],
   "resident-upload": ["resident"],
+  // New task's files before Create (docs/specs/new-task-checklist-photos.md): the person whose form holds them.
+  "new-task-upload": ["staff"],
 };
 
 interface Served {
@@ -114,7 +117,10 @@ async function linkViewer(kind: string, token: string, variant: string | null): 
 }
 
 async function currentViewer(allowed: readonly Viewer["kind"][]): Promise<Viewer | null> {
-  if (allowed.includes("staff") && (await getCurrentUser())) return { kind: "staff" };
+  if (allowed.includes("staff")) {
+    const user = await getCurrentUser();
+    if (user) return { kind: "staff", userId: user.id };
+  }
   if (allowed.includes("contractor")) {
     const portal = await getPortalPrincipal();
     if (portal) return { kind: "contractor", contactId: portal.contactId, onlyTaskId: portal.onlyTaskId };
@@ -138,6 +144,7 @@ async function lookup(
   }
   if (kind === "resident" || kind === "resident-upload") return viewer.kind === "resident" ? residentFile(kind, id, variant, viewer, storeId) : null;
   if (viewer.kind === "resident") return null;
+  if (kind === "new-task-upload") return viewer.kind === "staff" && viewer.userId && !viewer.onlyTaskId ? heldFile(id, variant, viewer.userId, storeId) : null;
   if (kind === "task") {
     const a = await prisma.taskAttachment.findUnique({
       where: { id },
@@ -255,6 +262,20 @@ async function residentFile(
           .findUnique({ where: { id }, select: { url: true, pathname: true, filename: true, contentType: true, thumbPathname: true, posterPathname: true, linkId: true } })
           .then((u) => (u && u.linkId === viewer.linkId ? u : null));
   if (!f?.url || !f.pathname || !isPrivateStoreUrl(f.url, storeId, f.pathname)) return null;
+  if (variant) {
+    const p = variant === "thumb" ? f.thumbPathname : f.posterPathname;
+    return p ? { source: p, privatePathname: p, filename: previewName(f.filename, variant, p), contentType: null, publicFallback: false } : null;
+  }
+  return { source: f.url, privatePathname: f.pathname, filename: f.filename, contentType: f.contentType, publicFallback: false };
+}
+
+/** A file New task holds for Create: the viewer's own form only, from our private store. */
+async function heldFile(id: string, variant: Variant | null, userId: string, storeId: string | null): Promise<Served | null> {
+  const f = await prisma.newTaskUpload.findUnique({
+    where: { id },
+    select: { userId: true, url: true, pathname: true, filename: true, contentType: true, thumbPathname: true, posterPathname: true },
+  });
+  if (!f || f.userId !== userId || !isPrivateStoreUrl(f.url, storeId, f.pathname)) return null;
   if (variant) {
     const p = variant === "thumb" ? f.thumbPathname : f.posterPathname;
     return p ? { source: p, privatePathname: p, filename: previewName(f.filename, variant, p), contentType: null, publicFallback: false } : null;

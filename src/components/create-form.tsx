@@ -61,6 +61,8 @@ export type CreateFormProps<V, R> = {
   onRestore: (draft: V) => void;
   /** Starts the fields over, keeping the caller's context: Clear on the draft line, and a success with Create more on. */
   onReset: () => void;
+  /** The form is closed and its draft thrown away (Discard changes, or Cancel with nothing changed): let go of what it holds elsewhere, such as New task's files. */
+  onDiscard?: () => void;
   /** The draft's key: the editor and its context ("new-task:p_1"). The draft clears on a success and on Discard. */
   draftKey: string;
   /** The names of the fields that show their own line. Any other failure line goes above the primary. */
@@ -123,6 +125,7 @@ export function CreateForm<V, R>({
   values,
   onRestore,
   onReset,
+  onDiscard,
   draftKey,
   fields,
   check,
@@ -189,6 +192,7 @@ export function CreateForm<V, R>({
 
   function leave() {
     clearDraft();
+    onDiscard?.();
     setOpen(false);
     if (variant === "sheet") router.back();
     // In place of the form, so Back doesn't return to the form just discarded.

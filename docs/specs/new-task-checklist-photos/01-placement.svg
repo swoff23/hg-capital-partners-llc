@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="720" viewBox="0 0 1200 720" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Where Checklist and Photos go</title>
+<defs>
+  <symbol id="ic-check" viewBox="0 0 12 12">
+    <rect x="0.75" y="0.75" width="10.5" height="10.5" rx="2.5" fill="none" stroke="#424e61" stroke-width="1.3"/>
+    <path d="M3.4 6.2 L5.2 8 L8.6 4.2" fill="none" stroke="#424e61" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="ic-photo" viewBox="0 0 12 12">
+    <rect x="0.75" y="1.5" width="10.5" height="9" rx="2" fill="none" stroke="#424e61" stroke-width="1.3"/>
+    <path d="M2 9.2 L4.8 6.2 L6.8 8 L8.2 6.8 L10.2 9.2" fill="none" stroke="#424e61" stroke-width="1.2" stroke-linejoin="round"/>
+    <circle cx="8.3" cy="4.2" r="0.9" fill="#424e61"/>
+  </symbol>
+  <symbol id="ic-cal" viewBox="0 0 12 12">
+    <rect x="1" y="2" width="10" height="9" rx="2" fill="none" stroke="#424e61" stroke-width="1.2"/>
+    <line x1="1" y1="5" x2="11" y2="5" stroke="#424e61" stroke-width="1.2"/>
+  </symbol>
+  <symbol id="ic-house" viewBox="0 0 12 12">
+    <path d="M1.5 6 L6 2 L10.5 6 V10.5 H1.5 Z" fill="none" stroke="#424e61" stroke-width="1.2" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="tile" viewBox="0 0 44 44">
+    <rect x="0" y="0" width="44" height="44" rx="6" fill="#f2f0ec"/>
+    <path d="M8 34 L18 22 L25 29 L30 24 L37 34 Z" fill="#e2ded7"/>
+    <circle cx="30" cy="13" r="3.5" fill="#e2ded7"/>
+    <circle cx="38" cy="6" r="5.5" fill="#152133"/>
+    <path d="M35.8 3.8 L40.2 8.2 M40.2 3.8 L35.8 8.2" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="add-tile" viewBox="0 0 44 44">
+    <rect x="0.75" y="0.75" width="42.5" height="42.5" rx="6" fill="#ffffff" stroke="#c9c4bb" stroke-dasharray="3 2.5"/>
+    <path d="M22 15 V29 M15 22 H29" stroke="#5d6778" stroke-width="1.5" stroke-linecap="round"/>
+  </symbol>
+  <!-- Today's chip row, scrolling past the right edge. -->
+  <symbol id="chips" viewBox="0 0 232 26">
+    <rect x="14.5" y="0.5" width="70" height="25" rx="6" fill="#ffffff" stroke="#c9c4bb"/>
+    <circle cx="27" cy="13" r="6" fill="#e7e5e0"/>
+    <text x="38" y="17" font-size="10.5" font-weight="500" fill="#152133">Connor</text>
+    <rect x="90.5" y="0.5" width="52" height="25" rx="6" fill="#ffffff" stroke="#c9c4bb"/>
+    <use href="#ic-cal" x="98" y="7" width="12" height="12"/>
+    <text x="114" y="17" font-size="10.5" font-weight="500" fill="#152133">Due</text>
+    <rect x="148.5" y="0.5" width="58" height="25" rx="6" fill="#ffffff" stroke="#c9c4bb"/>
+    <circle cx="160" cy="13" r="4.5" fill="none" stroke="#424e61" stroke-width="1.2"/>
+    <text x="170" y="17" font-size="10.5" font-weight="500" fill="#152133">To do</text>
+    <rect x="212.5" y="0.5" width="80" height="25" rx="6" fill="#ffffff" stroke="#c9c4bb"/>
+    <use href="#ic-house" x="220" y="7" width="12" height="12"/>
+  </symbol>
+  <!-- The phone sheet as it is today: header, Title, Notes. -->
+  <symbol id="phone" viewBox="0 0 232 440">
+    <rect x="0.75" y="0.75" width="230.5" height="438.5" rx="22" fill="#ffffff" stroke="#d5d1ca" stroke-width="1.5"/>
+    <path d="M15 33 L24 42 M24 33 L15 42" stroke="#424e61" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="116" y="41" font-size="12" font-weight="600" fill="#152133" text-anchor="middle">New task</text>
+    <line x1="1" y1="56" x2="231" y2="56" stroke="#e7e5e0"/>
+    <text x="14" y="78" font-size="10.5" font-weight="500" fill="#424e61">Title</text>
+    <rect x="14.5" y="84.5" width="203" height="30" rx="6" fill="#ffffff" stroke="#d5d1ca"/>
+    <text x="14" y="132" font-size="10.5" font-weight="500" fill="#424e61">Notes</text>
+    <text x="47" y="132" font-size="10" fill="#5d6778">Optional</text>
+    <rect x="14.5" y="138.5" width="203" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca"/>
+  </symbol>
+  <symbol id="create" viewBox="0 0 204 34">
+    <rect x="0" y="0" width="204" height="34" rx="8" fill="#152133"/>
+    <text x="102" y="21" font-size="11.5" font-weight="600" fill="#ffffff" text-anchor="middle">Create task</text>
+  </symbol>
+</defs>
+
+<rect width="1200" height="720" fill="#ffffff"/>
+<text x="32" y="40" font-size="17" font-weight="600" fill="#152133">Q1. Where do Checklist and Photos go on New task?</text>
+<text x="32" y="62" font-size="12" fill="#5d6778">New task on a phone (375). Title, Notes and the chip row are today's. The new parts are the checklist and the photos.</text>
+
+<!-- ===== A ===== -->
+<rect x="24" y="84" width="279" height="616" rx="12" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<text x="44" y="112" font-size="13.5" font-weight="600" fill="#152133">A. Two buttons under Notes</text>
+<text x="44" y="130" font-size="11.5" font-weight="500" fill="#152133">Recommended</text>
+<text x="44" y="148" font-size="11" fill="#5d6778">Nothing extra until you use it. Linear,</text>
+<text x="44" y="163" font-size="11" fill="#5d6778">Asana and Aboard work this way.</text>
+<g transform="translate(47.5 176)">
+  <use href="#phone" width="232" height="440"/>
+  <rect x="14.5" y="194.5" width="84" height="28" rx="6" fill="#ffffff" stroke="#d5d1ca"/>
+  <use href="#ic-check" x="24" y="202.5" width="12" height="12"/>
+  <text x="42" y="212.5" font-size="10.5" font-weight="500" fill="#152133">Checklist</text>
+  <rect x="104.5" y="194.5" width="74" height="28" rx="6" fill="#ffffff" stroke="#d5d1ca"/>
+  <use href="#ic-photo" x="114" y="202.5" width="12" height="12"/>
+  <text x="132" y="212.5" font-size="10.5" font-weight="500" fill="#152133">Photos</text>
+  <use href="#chips" y="236" width="232" height="26"/>
+  <use href="#create" x="14" y="392" width="204" height="34"/>
+</g>
+<text x="44" y="640" font-size="10.5" fill="#424e61"><tspan font-weight="600">Laptop:</tspan> the same two buttons. Drop or paste</text>
+<text x="44" y="655" font-size="10.5" fill="#424e61">a photo anywhere on the sheet.</text>
+<text x="44" y="672" font-size="10.5" fill="#424e61"><tspan font-weight="600">Tablet:</tspan> same row, 44px tall for touch.</text>
+<text x="44" y="689" font-size="10.5" fill="#424e61"><tspan font-weight="600">Phone:</tspan> Photos opens the camera or library.</text>
+
+<!-- ===== B ===== -->
+<rect x="315" y="84" width="279" height="616" rx="12" fill="#ffffff" stroke="#d5d1ca" stroke-width="1.5"/>
+<text x="335" y="112" font-size="13.5" font-weight="600" fill="#152133">B. Both sections always show</text>
+<text x="335" y="148" font-size="11" fill="#5d6778">Easy to spot, but every new task starts</text>
+<text x="335" y="163" font-size="11" fill="#5d6778">with two empty boxes. Jira, Bonsai.</text>
+<g transform="translate(338.5 176)">
+  <use href="#phone" width="232" height="440"/>
+  <text x="14" y="206" font-size="10.5" font-weight="500" fill="#424e61">Checklist</text>
+  <circle cx="21" cy="223" r="5.5" fill="none" stroke="#c9c4bb" stroke-dasharray="2 2"/>
+  <text x="34" y="227" font-size="10.5" fill="#5d6778">Add item</text>
+  <text x="14" y="256" font-size="10.5" font-weight="500" fill="#424e61">Photos and files</text>
+  <use href="#add-tile" x="14" y="264" width="44" height="44"/>
+  <use href="#chips" y="322" width="232" height="26"/>
+  <use href="#create" x="14" y="392" width="204" height="34"/>
+</g>
+<text x="335" y="640" font-size="10.5" fill="#424e61"><tspan font-weight="600">Laptop:</tspan> both boxes on every new task.</text>
+<text x="335" y="657" font-size="10.5" fill="#424e61"><tspan font-weight="600">Tablet:</tspan> same.</text>
+<text x="335" y="674" font-size="10.5" fill="#424e61"><tspan font-weight="600">Phone:</tspan> the chips drop under the keyboard</text>
+<text x="335" y="689" font-size="10.5" fill="#424e61">on an iPhone SE.</text>
+
+<!-- ===== C ===== -->
+<rect x="606" y="84" width="279" height="616" rx="12" fill="#ffffff" stroke="#d5d1ca" stroke-width="1.5"/>
+<text x="626" y="112" font-size="13.5" font-weight="600" fill="#152133">C. Two icons by Create task</text>
+<text x="626" y="148" font-size="11" fill="#5d6778">The smallest, but icons with no words</text>
+<text x="626" y="163" font-size="11" fill="#5d6778">are easy to miss.</text>
+<g transform="translate(629.5 176)">
+  <use href="#phone" width="232" height="440"/>
+  <use href="#chips" y="196" width="232" height="26"/>
+  <rect x="14.5" y="392.5" width="34" height="33" rx="8" fill="#ffffff" stroke="#d5d1ca"/>
+  <use href="#ic-check" x="25.5" y="403" width="12" height="12"/>
+  <rect x="54.5" y="392.5" width="34" height="33" rx="8" fill="#ffffff" stroke="#d5d1ca"/>
+  <use href="#ic-photo" x="65.5" y="403" width="12" height="12"/>
+  <rect x="94" y="392" width="124" height="34" rx="8" fill="#152133"/>
+  <text x="156" y="413" font-size="11.5" font-weight="600" fill="#ffffff" text-anchor="middle">Create task</text>
+</g>
+<text x="626" y="640" font-size="10.5" fill="#424e61"><tspan font-weight="600">Laptop:</tspan> icons left of Create more, with</text>
+<text x="626" y="655" font-size="10.5" fill="#424e61">a tooltip on hover.</text>
+<text x="626" y="672" font-size="10.5" fill="#424e61"><tspan font-weight="600">Tablet, phone:</tspan> beside Create task, and</text>
+<text x="626" y="689" font-size="10.5" fill="#424e61">touch has no tooltip to name them.</text>
+
+<!-- ===== After adding ===== -->
+<rect x="897" y="84" width="279" height="616" rx="12" fill="#faf9f7" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="917" y="112" font-size="13.5" font-weight="600" fill="#152133">Once you add them</text>
+<text x="917" y="148" font-size="11" fill="#5d6778">A and B end up like this. Enter adds the</text>
+<text x="917" y="163" font-size="11" fill="#5d6778">next item. A pasted list is one per line.</text>
+<g transform="translate(920.5 176)">
+  <use href="#phone" width="232" height="440"/>
+  <text x="22" y="104" font-size="11" fill="#152133">Fix porch light</text>
+  <text x="22" y="157" font-size="10.5" fill="#152133">Light by the back door flickers.</text>
+  <text x="14" y="203" font-size="10.5" font-weight="500" fill="#424e61">Checklist</text>
+  <circle cx="21" cy="219" r="5.5" fill="none" stroke="#c9c4bb"/>
+  <text x="34" y="223" font-size="10.5" fill="#152133">Replace the bulb</text>
+  <circle cx="21" cy="239" r="5.5" fill="none" stroke="#c9c4bb"/>
+  <text x="34" y="243" font-size="10.5" fill="#152133">Check the switch</text>
+  <circle cx="21" cy="259" r="5.5" fill="none" stroke="#c9c4bb"/>
+  <text x="34" y="263" font-size="10.5" fill="#152133">Photo when it's done</text>
+  <circle cx="21" cy="279" r="5.5" fill="none" stroke="#c9c4bb" stroke-dasharray="2 2"/>
+  <text x="34" y="283" font-size="10.5" fill="#5d6778">Add item</text>
+  <use href="#tile" x="14" y="294" width="44" height="44"/>
+  <use href="#tile" x="64" y="294" width="44" height="44"/>
+  <use href="#tile" x="114" y="294" width="44" height="44"/>
+  <rect x="118" y="331" width="36" height="3" rx="1.5" fill="#d5d1ca"/>
+  <rect x="118" y="331" width="20" height="3" rx="1.5" fill="#152133"/>
+  <use href="#add-tile" x="164" y="294" width="44" height="44"/>
+  <use href="#chips" y="350" width="232" height="26"/>
+  <use href="#create" x="14" y="392" width="204" height="34"/>
+</g>
+<text x="917" y="640" font-size="10.5" fill="#424e61"><tspan font-weight="600">Laptop:</tspan> the sheet grows, then scrolls.</text>
+<text x="917" y="655" font-size="10.5" fill="#424e61">Create task stays put at the bottom.</text>
+<text x="917" y="672" font-size="10.5" fill="#424e61"><tspan font-weight="600">Phone:</tspan> photos go up while you type,</text>
+<text x="917" y="689" font-size="10.5" fill="#424e61">so Create task never waits on them.</text>
+</svg>
