@@ -246,7 +246,7 @@ export function renderJobEmail(input: JobEmailInput): RenderedEmail {
     const value = job.scheduled ? `${job.scheduled}${job.scheduledAfterDue ? " (after the due date)" : ""}` : "Not set";
     dateFact("Scheduled", value, [
       job.scheduled && calendar ? { label: "Add to calendar", url: calendar } : null,
-      change ? { label: job.scheduled ? "Change day" : "Set a day", url: change } : null,
+      change ? { label: job.scheduled ? "Change day" : "Schedule", url: change } : null,
     ]);
   }
   if (job.accessUrl) {

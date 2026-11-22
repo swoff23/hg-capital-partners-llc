@@ -12,8 +12,9 @@ import { cn } from "@/lib/utils";
 import { crewTextAction } from "../actions";
 
 /**
- * "Text to my crew" (docs/specs/contractor-job-emails.md, section 4): the
- * header's message button, and the sheet it opens with the text ready to
+ * "Share with crew" (docs/specs/contractor-job-emails.md, section 4): the
+ * share button in the job page's header (Connor, Nov 22: it was the job
+ * card's last row, and before that a header icon), and the sheet it opens with the text ready to
  * send from their own phone. The sheet follows the login-details payoff on
  * the contractor page (Text login details), with Grab's share sheet as the
  * reference for the preview over its buttons: on a phone Send text opens
@@ -21,7 +22,7 @@ import { crewTextAction } from "../actions";
  * rest) and Copy beside it; with a mouse Copy leads. The text is made when
  * the sheet opens (jobs.ts crewTextFor), each time with a link of its own.
  *
- * `openOnLoad` is an email's Text to my crew button (`?do=share`): the sheet
+ * `openOnLoad` is an email's Share with crew button (`?do=share`): the sheet
  * opens once as the page loads, and the ?do= comes off the address.
  */
 export function CrewText({ taskId, openOnLoad = false }: { taskId: string; openOnLoad?: boolean }) {
@@ -80,11 +81,12 @@ export function CrewText({ taskId, openOnLoad = false }: { taskId: string; openO
 
   return (
     <>
-      <Button variant="ghost" icon aria-label="Text to my crew" className="h-11 w-11" onClick={show}>
-        <MessageSquareText className="h-5 w-5" aria-hidden="true" />
+      {/* The header's share button, beside Call HG (Connor, Nov 22). */}
+      <Button variant="ghost" icon aria-label="Share with crew" className="h-11 w-11" onClick={show}>
+        <Share className="h-5 w-5" aria-hidden="true" />
       </Button>
       <Sheet
-        title="Text to my crew"
+        title="Share with crew"
         isOpen={open}
         onOpenChange={setOpen}
         footer={

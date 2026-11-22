@@ -10,7 +10,7 @@ import { hashToken, isWellFormedToken, newToken } from "./tokens";
  * Each email gets its own token; the database keeps only its SHA-256, as for
  * sessions and reset links (tokens.ts). A contractor's EMAIL link opens that
  * one job as them, lockbox included, until the job closes or they lose it; a
- * CREW link is the same, minted for "Text to my crew" so the log tells them
+ * CREW link is the same, minted for "Share with crew" so the log tells them
  * apart; a partner's STAFF link only shows the email's photos. Remove access
  * and Sign out everywhere revoke a contractor's links (revokeJobLinksFor).
  * The pure half (paths, what a link session may open) is job-link-paths.ts.

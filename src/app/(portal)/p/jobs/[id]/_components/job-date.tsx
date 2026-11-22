@@ -1,32 +1,30 @@
 "use client";
-import { useEffect, useState, useTransition } from "react";
-import { ChevronRight } from "lucide-react";
+import { useEffect, useTransition } from "react";
 import { Button as AriaButton } from "react-aria-components";
 import { AfterDueMark } from "@/components/after-due-mark";
 import { DatePanel, warmDatePanel } from "@/components/due-date-picker";
 import { PickerLayer } from "@/components/picker-layer";
 import { useToast } from "@/components/toast";
+import { textLinkClass } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import { fmtDay, type Ymd } from "@/lib/dates";
 import { dateParts } from "@/lib/portal/job-view";
 import { isAfterDue } from "@/lib/tasks/rules";
 import { cn } from "@/lib/utils";
 import { setJobDateAction } from "../actions";
+import { useScheduleOpen } from "./schedule-open";
 
 /**
- * The job's two days under the address, as a field list (docs/specs/
- * contractor-scheduled-date.md, section 3.2, Q3 A): "Scheduled", the
- * contractor's own day, and "Due", HG Capital's, which they never change.
- * Hairlines between rows, a fixed label column, and the rows held to the text
- * column so the label and day don't drift apart across a wide laptop.
- *
- * The Scheduled row shows only while the contractor may set a day (`editable`,
- * contractorMaySetDate) and is one tap target, 44px on touch, that opens the
- * date panel the task page's date chips use (DatePanel in a PickerLayer: a
- * popover with a mouse, a sheet on a phone), with no "No date". The button
- * covers the row and the words sit over it, so the warning mark can be its own
- * button without nesting one in another. The day keeps the dotted underline of
- * tap-to-edit.
+ * The job's days, one row of the job card under the address (docs/specs/
+ * contractor-scheduled-date.md; Connor, Nov 22, card B): "Scheduled", the
+ * contractor's own day, on the left and "Due", HG Capital's, on the right,
+ * each a small label over the value, so each has half the phone's width and
+ * the full day always fits at 320. While they may set it (`editable`,
+ * contractorMaySetDate) a link under their day reads Schedule, or Reschedule
+ * once set; it opens the date panel the task page's date chips use (DatePanel
+ * in a PickerLayer: a popover with a mouse, a sheet on a phone), whose last
+ * pick is Remove day once there's a day to take off. The after-due mark sits
+ * beside the day.
  *
  * `openOnLoad` is an email's Change date (`?do=date`): the panel opens once
  * the page is up, and the ?do= comes off the address.
@@ -49,7 +47,8 @@ export function JobDates({
   openOnLoad?: boolean;
 }) {
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
+  // Shared with the bar's Schedule, which opens this same picker (schedule-open.tsx).
+  const [open, setOpen] = useScheduleOpen();
   const [saving, startSaving] = useTransition();
 
   useEffect(() => {
@@ -69,11 +68,19 @@ export function JobDates({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openOnLoad]);
 
-  if (!editable && !due) return null;
+  if (!editable && !due && !scheduled) return null;
 
   function pick(next: Ymd | null) {
     // While a pick saves the trigger is pending (React Aria keeps it focused and won't open it), so there's no second pick.
-    if (!next || next === scheduled) return;
+    if (next === scheduled) return;
+    // Remove day: the job asks for a day again.
+    if (!next) {
+      startSaving(async () => {
+        const res = await callAction(() => setJobDateAction(taskId, null));
+        toast({ message: res.ok ? "Scheduled day removed" : res.error });
+      });
+      return;
+    }
     const day = fmtDay(next, { weekday: true, year: "auto", now: today });
     // A tenant at home needs 24 hours' notice (Q7), so the toast says it when the day is today or tomorrow.
     const when = dateParts(next, "scheduled", today).day;
@@ -91,63 +98,68 @@ export function JobDates({
     });
   }
 
-  const label = "w-24 shrink-0 text-meta font-medium text-fg-2";
+  const dueDay = due ? dateParts(due, "due", today).day : null;
+  const day = scheduled ? dateParts(scheduled, "scheduled", today).day : null;
+  const panel = (
+    <PickerLayer
+      isOpen={open}
+      onOpenChange={setOpen}
+      title="Scheduled day"
+      motion="pop"
+      // As the task page's date chips: beside the row on a short laptop screen where it fits neither above nor below.
+      besideWhenShort
+      trigger={
+        // A text link under the day (Connor, Nov 22, B), 44px tall on touch so it's still a full tap.
+        <AriaButton
+          isPending={saving}
+          onHoverStart={warmDatePanel}
+          onFocus={warmDatePanel}
+          onPressStart={warmDatePanel}
+          aria-label={day ? `Reschedule, now ${day}` : undefined}
+          className={cn(textLinkClass, "mt-0.5 inline-flex min-h-8 items-center text-label font-medium pointer-coarse:min-h-11")}
+        >
+          {day ? "Reschedule" : "Schedule"}
+        </AriaButton>
+      }
+    >
+      {({ container, close }) => (
+        <DatePanel
+          value={scheduled}
+          today={today}
+          label="Scheduled day"
+          layout={container === "sheet" ? "steps" : "together"}
+          // Remove day, once there's a day to take off (Connor, Nov 22).
+          allowNone={!!scheduled}
+          noneLabel="Remove day"
+          onPick={(next) => {
+            close();
+            pick(next);
+          }}
+        />
+      )}
+    </PickerLayer>
+  );
+  // One row of the job card: their day on the left and Due on the right, each a small label over the value
+  // (Connor, Nov 22, B; Airbnb's check-in | checkout pair). Reschedule (or Schedule) is a link under their day, while
+  // it's theirs to set. Started or in review with no day, Due alone.
+  const showDay = editable || !!day;
+  const afterDue = !!(due && day && isAfterDue(scheduled, due));
   return (
-    <div className="mt-3 max-w-sm divide-y divide-border border-y border-border">
-      {editable && (
-        <div className="relative flex min-h-11 items-center">
-          <PickerLayer
-            isOpen={open}
-            onOpenChange={setOpen}
-            title="Scheduled day"
-            motion="pop"
-            // As the task page's date chips: beside the row on a short laptop screen where it fits neither above nor below.
-            besideWhenShort
-            trigger={
-              <AriaButton
-                isPending={saving}
-                onHoverStart={warmDatePanel}
-                onFocus={warmDatePanel}
-                onPressStart={warmDatePanel}
-                className="absolute inset-0 rounded-sm hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid"
-              >
-                <span className="sr-only">
-                  Scheduled day, {scheduled ? dateParts(scheduled, "scheduled", today).day : "none set"}, change
-                </span>
-              </AriaButton>
-            }
-          >
-            {({ container, close }) => (
-              <DatePanel
-                value={scheduled}
-                today={today}
-                label="Scheduled day"
-                layout={container === "sheet" ? "steps" : "together"}
-                allowNone={false}
-                onPick={(next) => {
-                  close();
-                  pick(next);
-                }}
-              />
-            )}
-          </PickerLayer>
-          {/* The words sit over the button and let a tap through; only the warning mark takes its own. */}
-          <span aria-hidden="true" className={cn(label, "pointer-events-none relative")}>
-            Scheduled
-          </span>
-          <span className="pointer-events-none relative flex min-w-0 flex-1 items-center gap-1.5 text-meta text-foreground">
-            <span className="truncate underline decoration-dotted decoration-1 underline-offset-4" aria-hidden="true">
-              {scheduled ? dateParts(scheduled, "scheduled", today).day : "Set a day"}
-            </span>
-            {due && isAfterDue(scheduled, due) && <AfterDueMark due={due} today={today} />}
-          </span>
-          <ChevronRight aria-hidden="true" className="pointer-events-none relative size-4 shrink-0 text-muted-foreground" />
+    <div className={cn("grid divide-x divide-border", showDay && dueDay ? "grid-cols-2" : "grid-cols-1")}>
+      {showDay && (
+        <div id="schedule" className="min-w-0 scroll-mt-[calc(var(--app-bar-h)+1rem)] px-4 py-3">
+          <p className="text-meta text-muted-foreground">Scheduled</p>
+          <p className={cn("mt-0.5 flex min-w-0 items-center gap-1.5 text-body", day ? "text-foreground" : "text-muted-foreground")}>
+            <span className="min-w-0 break-words text-pretty">{day ?? "Not set"}</span>
+            {afterDue && due && <AfterDueMark due={due} today={today} />}
+          </p>
+          {editable && panel}
         </div>
       )}
-      {due && (
-        <div className="flex min-h-11 items-center">
-          <span className={label}>Due</span>
-          <span className="truncate text-meta text-muted-foreground">{dateParts(due, "due", today).day}</span>
+      {dueDay && (
+        <div className="min-w-0 px-4 py-3">
+          <p className="text-meta text-muted-foreground">Due</p>
+          <p className="mt-0.5 break-words text-pretty text-body text-foreground">{dueDay}</p>
         </div>
       )}
     </div>

@@ -63,9 +63,18 @@ export async function revokePortalSessions(db: Db, accountId: string, opts: { ex
   return count;
 }
 
-/** Outstanding reset links die whenever the password changes or access is removed. */
+/**
+ * Outstanding emailed links die whenever the password or the email changes or access is removed: reset links, and
+ * Welcome back's sign-in links (sign-in-link-core.ts), which start a session just as a password would.
+ */
 export async function expireResetTokens(db: Db, accountId: string, at: Date = new Date()): Promise<void> {
   await db.passwordResetToken.updateMany({ where: { accountId, usedAt: null }, data: { usedAt: at } });
+  await expireSignInLinks(db, accountId, at);
+}
+
+/** Unused sign-in links die: with the reset links above, and on Sign out everywhere, which keeps those. */
+export async function expireSignInLinks(db: Db, accountId: string, at: Date = new Date()): Promise<void> {
+  await db.portalSignInLink.updateMany({ where: { accountId, usedAt: null }, data: { usedAt: at } });
 }
 
 /**

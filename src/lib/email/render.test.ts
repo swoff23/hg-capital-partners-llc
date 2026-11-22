@@ -207,10 +207,10 @@ test("job email: an email with nothing to do has no buttons, and the Scheduled r
   assert.equal([...off.html.matchAll(/<a href="/g)].length, 1, "only Directions");
   assert.ok(!off.text.includes("Start job"));
   const url = "https://hg.example.com/j/tok?do=date";
-  // No scheduled day yet: the row reads "Not set" and offers Set a day.
+  // No scheduled day yet: the row reads "Not set" and offers Schedule.
   const open = renderJobEmail({ ...job, job: { ...job.job, dateUrl: url } });
-  assert.ok(open.html.includes(">Set a day</a>"));
-  assert.ok(open.text.includes(`Set a day: ${url}`));
+  assert.ok(open.html.includes(">Schedule</a>"));
+  assert.ok(open.text.includes(`Schedule: ${url}`));
   assert.ok(open.text.includes("Not set"));
   // With a day, the same link reads Change day and sits in the Scheduled row, not the Due row.
   const dated = renderJobEmail({ ...job, job: { ...job.job, scheduled: "Thu, Oct 29", dateUrl: url } });

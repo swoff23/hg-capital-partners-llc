@@ -7,8 +7,11 @@ const APP_DIR = path.join(__dirname, "../../src/app");
 
 type FindRow = (db: PrismaClient) => Promise<{ id: string } | null>;
 
-/** The "portal" fixture contractor's login (setup.ts), who also gets one job of their own. */
+/** The "portal" fixture contractor's login (setup.ts), who also gets two jobs of their own: one In progress, one To do. */
 export const PORTAL_FIXTURE_EMAIL = "device-check@hg.localhost";
+
+/** The end of the To do fixture job's notes, which is how setup.ts and its sample find it again. */
+export const TODO_FIXTURE_MARK = "To do fixture for npm run test:devices.";
 
 // One real row per dynamic segment, keyed "parent/[param]". IDs are cuids from
 // each machine's own import, so tests/devices/setup.ts looks them up in the
@@ -27,10 +30,23 @@ export const SAMPLE_PARAMS: Record<string, FindRow> = {
     const pick = leases.reduce<(typeof leases)[number] | null>((best, l) => (!best || l._count.tenants > best._count.tenants ? l : best), null);
     return pick ? { id: pick.id } : null;
   },
-  // The contractor portal's job page: the job setup.ts gives the fixture contractor.
+  // The contractor portal's job page: the In progress job setup.ts gives the fixture contractor (its first).
   "jobs/[id]": (db) =>
     db.task.findFirst({
-      where: { access: { some: { revokedAt: null, contact: { portalAccount: { email: PORTAL_FIXTURE_EMAIL } } } } },
+      where: {
+        access: { some: { revokedAt: null, contact: { portalAccount: { email: PORTAL_FIXTURE_EMAIL } } } },
+        OR: [{ description: null }, { description: { not: { endsWith: TODO_FIXTURE_MARK } } }],
+      },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    }),
+  // The same page in its first state: the fixture contractor's To do job with no day (setup.ts seedPortalTodoJob).
+  "jobs/[id]#todo": (db) =>
+    db.task.findFirst({
+      where: {
+        description: { endsWith: TODO_FIXTURE_MARK },
+        access: { some: { revokedAt: null, contact: { portalAccount: { email: PORTAL_FIXTURE_EMAIL } } } },
+      },
       select: { id: true },
       orderBy: { createdAt: "asc" },
     }),
@@ -86,9 +102,11 @@ export const SAMPLE_PARAMS: Record<string, FindRow> = {
  * Which session a route loads with: "staff" for (app) pages, "portal" (the
  * fixture contractor from setup.ts) for (portal) pages. Public pages and
  * /login load signed out. "portal-welcome" is the second fixture, still on
- * its starting password, for the one page only it can see.
+ * its starting password, for the one page only it can see. "portal-email-link"
+ * and "portal-crew-link" are the "portal" fixture through a job email's link
+ * and a Share with crew link (setup.ts seedLinkSessions).
  */
-export type RouteSession = "none" | "staff" | "portal" | "portal-welcome" | "portal-setup";
+export type RouteSession = "none" | "staff" | "portal" | "portal-welcome" | "portal-setup" | "portal-email-link" | "portal-crew-link";
 
 export interface Route {
   /** The URL pattern, e.g. /deals/[id] */
@@ -142,9 +160,18 @@ function findPages(dir: string, segments: string[] = []): string[][] {
 /**
  * A page in a state its route's one sample doesn't reach, loaded as well as the route itself. The pattern ends in
  * `#name`, which is the page's own name in the report and the fragment of the URL it loads (no page reads it), and
- * the SAMPLE_PARAMS key is the pattern's. A draft's page is the one: the task page's sample is never a draft.
+ * the SAMPLE_PARAMS key is the pattern's. A draft's page is one: the task page's sample is never a draft. The
+ * contractor's job page at To do is the other: its sample is In progress.
  */
-const EXTRA_PAGES: Route[] = [{ pattern: "/tasks/[id]#draft", params: ["tasks/[id]#draft"], session: "staff" }];
+const EXTRA_PAGES: Route[] = [
+  { pattern: "/tasks/[id]#draft", params: ["tasks/[id]#draft"], session: "staff" },
+  // The contractor's job page at To do with no day: the Schedule step, "Not set" and the three-control bar.
+  { pattern: "/p/jobs/[id]#todo", params: ["jobs/[id]#todo"], session: "portal" },
+  // The same job through a Share with crew link: no back arrow, only the job (Connor, Nov 22).
+  { pattern: "/p/jobs/[id]#crew", params: ["jobs/[id]#todo"], session: "portal-crew-link" },
+  // Sign in from a job email's link: Welcome back, the email known, and Email me a sign-in link.
+  { pattern: "/login#welcome-back", params: [], session: "portal-email-link" },
+];
 
 export function listRoutes(): Route[] {
   const own = listOwnRoutes();

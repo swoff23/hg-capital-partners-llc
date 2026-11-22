@@ -2,12 +2,12 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ActivityDivider, ActivityFold, ActivityItem, ActivityTimeline } from "@/components/activity-timeline";
 import { ActivityTime } from "@/components/activity-time";
-import { CommentBody, CommentCard, DeliveryLine } from "@/components/comment-card";
+import { CommentBody, CommentCard } from "@/components/comment-card";
 import { FilesList, type FileLink } from "@/components/files-list";
 import { MediaGrid } from "@/components/media-grid";
 import { taskFileUrl } from "@/lib/attachments/media";
 import type { BodyPart } from "@/lib/portal/access-code";
-import type { JobDelivery, JobFile, JobUpdate } from "@/lib/portal/queries";
+import type { JobFile, JobUpdate } from "@/lib/portal/queries";
 import { collapseStretches, linkedUpdateId, stretchSummary } from "@/lib/tasks/activity";
 import { bodySegments } from "@/lib/tasks/body-links";
 import { cn } from "@/lib/utils";
@@ -16,13 +16,12 @@ import { cn } from "@/lib/utils";
  * The contractor's Updates on the shared timeline (docs/specs/activity-
  * comments.md 3.4 A): the rail with each person's avatar (the contractor's
  * square), comment cards, a quiet line with the new status's mark for a
- * status change or a file post, the New divider and the delivery line under
- * their own newest update. No day headings: each time slot carries its day.
+ * status change or a file post, and the New divider. No line on who got an
+ * email (Connor, Nov 22: it added nothing). No day headings: each time slot carries its day.
  * Between two comments, a stretch of 4 or more status lines and file posts
  * keeps its newest 2 in view and collapses the rest into "Show 4 updates:
  * status and files" (docs/specs/activity-collapse.md); a decision, Mark
- * done, Approve, their own Start and the line the delivery sits under never
- * collapse, and neither does anything from the New divider on. The same pieces as the staff
+ * done, Approve and their own Start never collapse, and neither does anything from the New divider on. The same pieces as the staff
  * task page, so a fix lands for partners and contractors at once.
  *
  * A status change and the note written with it (a send back's reason, a Mark
@@ -43,7 +42,6 @@ export function JobUpdates({
   updates,
   now,
   newSince,
-  delivery,
   viewerName,
 }: {
   updates: JobUpdate[];
@@ -51,7 +49,6 @@ export function JobUpdates({
   now: string;
   /** Where they last looked (ISO). */
   newSince: string;
-  delivery: JobDelivery | null;
   /** The contractor's own name, for their avatar. */
   viewerName: string;
 }) {
@@ -67,11 +64,12 @@ export function JobUpdates({
   }, []);
 
   const entries = useMemo(() => pairDecisions(updates), [updates]);
-  const firstNewIndex = entries.findIndex(({ update: u }) => !u.you && u.kind !== "removed" && u.createdAt.getTime() > since);
+  // The job's story never counts as new, as in the "2 new" counts (docs/specs/contractor-timeline.md, call 3).
+  const firstNewIndex = entries.findIndex(({ update: u }) => !u.you && u.kind !== "removed" && u.kind !== "event" && u.createdAt.getTime() > since);
   const firstNew = firstNewIndex >= 0 ? entries[firstNewIndex].update.id : null;
   const items = useMemo(
-    () => collapseStretches(entries, { isAnchor: (e) => staysInView(e, delivery), idOf: (e) => e.update.id, keepFrom: firstNewIndex }),
-    [entries, delivery, firstNewIndex],
+    () => collapseStretches(entries, { isAnchor: staysInView, idOf: (e) => e.update.id, keepFrom: firstNewIndex }),
+    [entries, firstNewIndex],
   );
   const holds = (e: Entry, id: string) => e.update.id === id || e.note?.id === id;
   useEffect(() => {
@@ -80,7 +78,8 @@ export function JobUpdates({
     }
   }, [anchor, items]);
 
-  if (updates.length === 0) return <p className="text-body text-muted-foreground">No updates yet.</p>;
+  // No empty line: the composer under it is the next step (Connor, Nov 21).
+  if (updates.length === 0) return null;
 
   return (
     <ActivityTimeline now={now}>
@@ -89,7 +88,7 @@ export function JobUpdates({
           return (
             <Fragment key={x.row.update.id}>
               {x.row.update.id === firstNew && <ActivityDivider unread>New</ActivityDivider>}
-              <EntryView entry={x.row} delivery={delivery} viewerName={viewerName} />
+              <EntryView entry={x.row} viewerName={viewerName} />
             </Fragment>
           );
         }
@@ -108,7 +107,7 @@ export function JobUpdates({
             openSummary={words.hide}
           >
             {x.rows.map((e) => (
-              <EntryView key={e.update.id} entry={e} delivery={delivery} viewerName={viewerName} />
+              <EntryView key={e.update.id} entry={e} viewerName={viewerName} />
             ))}
           </ActivityFold>
         );
@@ -118,19 +117,18 @@ export function JobUpdates({
 }
 
 /**
- * Whether an entry stays in view and ends a stretch (activity-collapse 3.1): a comment or its trace, a decision with
- * its note, Mark done and Approve (into Review or Done), a contractor's own status change (Start), and the update the
- * delivery line sits under.
+ * Whether an entry stays in view and ends a stretch, by the task page's rule (activity-collapse 3.1, activity.ts
+ * anchorsStretch; Connor, Nov 22): a comment or its trace, a decision with its note, Sent for review, Approve and
+ * Sent back, the contractor's Start, and the job being added (`stays`, set by queries.ts). Their scheduling, a
+ * status shuffle, a checklist tick or a date move folds in a run of 4 or more.
  */
-function staysInView({ update: u, note }: Entry, delivery: JobDelivery | null): boolean {
+function staysInView({ update: u, note }: Entry): boolean {
   if (u.kind === "comment" || u.kind === "removed" || note) return true;
-  if (delivery && delivery.eventId === u.id) return true;
-  if (u.kind === "status") return u.contractor || u.statusTo === "REVIEW" || u.statusTo === "DONE";
-  return false;
+  return u.stays;
 }
 
 /** A collapsed line's word for an entry. */
-const kindOf = ({ update: u }: Entry) => (u.kind === "attachment" ? "files" : "status");
+const kindOf = ({ update: u }: Entry) => (u.kind === "attachment" ? "files" : u.kind === "event" ? (u.change ?? "updates") : "status");
 
 /** One row of Updates: an update, or a status change with the note written with it. */
 type Entry = { update: JobUpdate; note: JobUpdate | null };
@@ -159,7 +157,7 @@ function filesOf(u: JobUpdate): ReactNode {
   return u.attachments.files.length > 0 ? <FilesList files={u.attachments.files.map(toFileLink)} /> : null;
 }
 
-function EntryView({ entry, delivery, viewerName }: { entry: Entry; delivery: JobDelivery | null; viewerName: string }) {
+function EntryView({ entry, viewerName }: { entry: Entry; viewerName: string }) {
   const { update: u, note } = entry;
   const media = (inCard: boolean) => mediaOf(u, inCard);
   const files = filesOf(u);
@@ -174,18 +172,17 @@ function EntryView({ entry, delivery, viewerName }: { entry: Entry; delivery: Jo
         body={u.parts ? bodyOf(u.parts) : null}
         media={media(true)}
         files={files}
-        footer={delivery?.eventId === u.id ? <DeliveryLine state={delivery.state} to={delivery.to} /> : undefined}
       />
     );
   }
 
-  // A status change, a file post or the trace of a removed comment: one quiet line, then any files. A decision's
+  // A status change, a file post, a line of the job's story or the trace of a removed comment: one quiet line, then any files. A decision's
   // note sits under its line in a card with no header of its own, since the line names who and when.
-  const delivered = delivery && (delivery.eventId === u.id || delivery.eventId === note?.id);
   return (
     <ActivityItem id={`update-${u.id}`} marker={u.statusTo ? { status: u.statusTo } : "dot"}>
       <p className="text-meta text-muted-foreground">
-        {u.actorLabel} {u.body}
+        {/* A line of the job's story is a whole sentence ("A resident sent this request"); the rest lead with who. */}
+        {u.kind === "event" ? u.body : `${u.actorLabel} ${u.body}`}
         <span aria-hidden="true">{" · "}</span>
         <ActivityTime at={u.createdAt} />
       </p>
@@ -199,7 +196,6 @@ function EntryView({ entry, delivery, viewerName }: { entry: Entry; delivery: Jo
           {note.attachments.files.length > 0 && <div className="mt-2">{filesOf(note)}</div>}
         </div>
       )}
-      {delivered && <DeliveryLine state={delivery.state} to={delivery.to} className="mt-1" />}
     </ActivityItem>
   );
 }

@@ -679,7 +679,7 @@ test("with a job link, a contractor's buttons open the job as them, each ready f
     [
       { label: "Send for review", url: `https://hg.example.com/j/${T}?do=done` },
       { label: "Add photos", url: `https://hg.example.com/j/${T}?do=photos` },
-      { label: "Text to my crew", url: `https://hg.example.com/j/${T}?do=share` },
+      { label: "Share with crew", url: `https://hg.example.com/j/${T}?do=share` },
     ],
   );
   assert.equal(taskEmail({ ...base, status: "OPEN" }).primary?.url, `https://hg.example.com/j/${T}`);
@@ -748,13 +748,13 @@ test("the 8 am emails: Due today or Due yesterday leads, with no name in front",
   assert.equal(whatsNew([overdue], TITLE).headline, "Due yesterday.");
 });
 
-test("the morning after the due date: Add photos and Text to my crew on an In progress job; Change day only while the job takes one", () => {
+test("the morning after the due date: Add photos and Share with crew on an In progress job; Change day only while the job takes one", () => {
   const T = "d".repeat(43);
   const base = { ...staffInput(), audience: "contractor" as const, linkToken: T };
   const overdueItems = [{ ...item("OVERDUE", "due yesterday", "HG"), due: "2026-10-29" }];
   // In progress, the contractor no longer sets their day: no Change day, no Scheduled row link.
   const overdue = taskEmail({ ...base, status: "IN_PROGRESS", items: overdueItems });
-  assert.deepEqual([overdue.primary?.label, ...overdue.secondary.map((b) => b.label)], ["Send for review", "Add photos", "Text to my crew"]);
+  assert.deepEqual([overdue.primary?.label, ...overdue.secondary.map((b) => b.label)], ["Send for review", "Add photos", "Share with crew"]);
   assert.equal(overdue.job.dateUrl, null);
   // While the job takes a day (To do, Scheduled, Waiting), the Scheduled row carries Change day.
   const todo = taskEmail({ ...base, status: "OPEN", items: overdueItems });
@@ -968,4 +968,21 @@ test("the second decision closes a claimed row whose task became a draft since t
   assert.deepEqual(claimed({ job: draft }), { send: false, reason: "draft" });
   assert.deepEqual(claimed({ job: draft, audience: "staff", items: [item("COMMENT", "commented", "Zack Reading")] }), { send: false, reason: "draft" });
   assert.deepEqual(claimed({ job: draft, hasAccess: false, items: [item("OFF", `took you off "${TITLE}"`)] }), { send: false, reason: "draft" });
+});
+
+test("Remove day and a new day in one bundle still tells the partners; Remove day after a new day says nothing (Nov 22)", () => {
+  const now = { due: "2026-11-17", scheduled: "2026-11-18" as const, notes: null, status: "SCHEDULED" as const };
+  const removed: OutboxItem = { ...item("STATUS", `unscheduled "${TITLE}"`), eventId: "s1", from: "SCHEDULED", fromDay: "2026-11-17" };
+  const repicked: OutboxItem = { ...item("STATUS", `scheduled "${TITLE}" for Wed, Nov 18`), eventId: "s2", from: "OPEN" };
+  // Tue taken off, then Wed picked: a real move, so both lines go out.
+  assert.deepEqual(undoneDropped([removed, repicked], now), [removed, repicked]);
+  // Tue taken off and Tue picked again: nothing changed.
+  assert.deepEqual(undoneDropped([removed, { ...repicked, summary: `scheduled "${TITLE}" for Tue, Nov 17` }], { ...now, scheduled: "2026-11-17" }), []);
+  // A To do job scheduled Tue, moved to Wed, then the day removed: back to To do with no day, so the day line goes too.
+  const scheduled: OutboxItem = { ...item("STATUS", `scheduled "${TITLE}" for Tue, Nov 17`), eventId: "s3", from: "OPEN" };
+  const moved: OutboxItem = { ...item("DAY", `moved "${TITLE}" to Wed, Nov 18 (was Tue, Nov 17)`), eventId: "d1", from: "2026-11-17" };
+  const gone: OutboxItem = { ...item("STATUS", `unscheduled "${TITLE}"`), eventId: "s4", from: "SCHEDULED", fromDay: "2026-11-18" };
+  assert.deepEqual(undoneDropped([scheduled, moved, gone], { ...now, scheduled: null, status: "OPEN" }), []);
+  // The partners' words for it, whatever the title holds.
+  assert.deepEqual(itemLines([{ ...item("STATUS", 'unscheduled "Hang 36" mirror"') }], 'Hang 36" mirror'), ["Connor removed the scheduled day"]);
 });

@@ -60,6 +60,7 @@ const ALLOWLIST = new Set([
   "src/app/(marketing)/r/[token]/actions.ts#cancelRequest", // only the household's own, while it shows Received
   "src/app/(marketing)/residents/maintenance/actions.ts#emailMyLink", // emails only an address already on file, same answer either way; honeypot, IP and daily caps
   "/login/reset/submit", // the reset link's form; does nothing without a live single-use token
+  "/login/link/submit", // a sign-in link's form; does nothing without a live single-use 15-minute token
   "/api/health", // detail behind HEALTH_TOKEN
   "/api/version", // only the live commit, which /api/health already shows anyone; no database (update-notice.tsx asks it)
   "/api/quickbooks/sync", // CRON_SECRET

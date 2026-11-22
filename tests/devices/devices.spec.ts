@@ -18,6 +18,8 @@ const PORTAL_TOKEN_ENV = {
   portal: "DEVICE_PORTAL_TOKEN",
   "portal-welcome": "DEVICE_PORTAL_WELCOME_TOKEN",
   "portal-setup": "DEVICE_PORTAL_SETUP_TOKEN",
+  "portal-email-link": "DEVICE_PORTAL_EMAIL_LINK_TOKEN",
+  "portal-crew-link": "DEVICE_PORTAL_CREW_LINK_TOKEN",
 } as const;
 
 // Every width from the responsiveness rule, including both sides of each
@@ -71,7 +73,7 @@ for (const route of listRoutes()) {
 
     if (route.session === "staff") {
       await page.context().addCookies([{ name: SESSION_COOKIE, value: process.env.DEVICE_SESSION_TOKEN!, url: origin }]);
-    } else if (route.session === "portal" || route.session === "portal-welcome" || route.session === "portal-setup") {
+    } else if (route.session !== "none") {
       const value = process.env[PORTAL_TOKEN_ENV[route.session]]!;
       await page.context().addCookies([{ name: PORTAL_COOKIE_HTTP, value, url: origin }]);
     }
@@ -104,9 +106,9 @@ for (const route of listRoutes()) {
     if (!res || res.status() >= 400) {
       findings.add("page-error", target.url, `HTTP ${res?.status() ?? "no response"}`, width);
     }
-    // A signed-in page that lands on /login means the session didn't take.
+    // A signed-in page that lands on /login means the session didn't take (unless /login is the page: Welcome back).
     const landed = new URL(page.url()).pathname;
-    if (route.session !== "none" && landed === "/login") {
+    if (route.session !== "none" && landed === "/login" && new URL(target.url, origin).pathname !== "/login") {
       const which = route.session === "staff" ? "the device session" : `the ${route.session} fixture's session`;
       findings.add("page-error", target.url, `Redirected to /login: ${which} wasn't accepted`, width);
     } else if (route.session.startsWith("portal") && landed !== new URL(target.url, origin).pathname) {

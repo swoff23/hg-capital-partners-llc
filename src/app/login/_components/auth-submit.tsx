@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui";
-import { authButtonClass } from "./auth-frame";
+import { authButtonClass, authSecondaryButtonClass } from "./auth-frame";
 
 /**
  * The sign-in screens' submit button: the app's `Button` with its `pending`
@@ -15,7 +15,16 @@ import { authButtonClass } from "./auth-frame";
  * React doesn't follow: the button holds from the submit event until the page
  * is replaced, and lets go if the browser brings the page back from its cache.
  */
-export function AuthSubmit({ children, native = false }: { children: React.ReactNode; native?: boolean }) {
+export function AuthSubmit({
+  children,
+  native = false,
+  secondary = false,
+}: {
+  children: React.ReactNode;
+  native?: boolean;
+  /** The view's second action, as the public secondary Button ("Email me a sign-in link"). */
+  secondary?: boolean;
+}) {
   const { pending } = useFormStatus();
   const [posted, setPosted] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
@@ -42,7 +51,13 @@ export function AuthSubmit({ children, native = false }: { children: React.React
   }, [native]);
 
   return (
-    <Button ref={ref} type="submit" className={authButtonClass} pending={pending || posted}>
+    <Button
+      ref={ref}
+      type="submit"
+      variant={secondary ? "secondary" : "primary"}
+      className={secondary ? authSecondaryButtonClass : authButtonClass}
+      pending={pending || posted}
+    >
       {children}
     </Button>
   );

@@ -6,6 +6,9 @@ import { clientIdToReuse } from "@/lib/composer-draft";
 import { STATUS_ORDER } from "@/lib/task-scope";
 import { statusEventVisibility } from "@/lib/tasks/rules";
 import {
+  jobSteps,
+  storyLine,
+  type StoryRow,
   MAX_FILES_PER_POST,
   MAX_FILES_REASON,
   PORTAL_STATUS_UPDATES,
@@ -57,7 +60,6 @@ const job = (id: string, over: Partial<JobCard> = {}): JobCard => ({
   title: id,
   status: "OPEN",
   address: null,
-  photoUrl: null,
   unitLabel: null,
   due: null,
   scheduled: null,
@@ -519,9 +521,74 @@ test("the leave sheet names what's still uploading (decision 24)", () => {
   assert.equal(stillUploading(["file"]), "1 file is still uploading");
 });
 
-// docs/specs/contractor-email-switch.md: the payoff promises an email only to a contractor who gets them.
-test("the Mark done payoff says what happens next: an email, or a look back here when their job emails are off", () => {
-  assert.equal(payoffLine("Connor and Pieter", true), "Sent to Connor and Pieter. You'll get an email if anything else is needed.");
-  assert.equal(payoffLine("Connor and Pieter", false), "Sent to Connor and Pieter. Check back here if anything else is needed.");
-  assert.equal(payoffLine("HG", false), "Sent to HG. Check back here if anything else is needed.");
+// The payoff's line is one sentence, who it went to and that it's for review (Connor, Nov 22).
+test("the Send for review payoff says who it went to, for review", () => {
+  assert.equal(payoffLine("Connor and Pieter"), "Sent to Connor and Pieter for review.");
+  assert.equal(payoffLine("HG Capital"), "Sent to HG Capital for review.");
+});
+
+test("jobSteps: each step names what's next and turns past tense once done (Connor, Nov 22)", () => {
+  const says = (status: TaskStatus, day: string | null) => jobSteps(status, day)?.map((st) => `${st.label}:${st.state}`);
+  assert.deepEqual(says("OPEN", null), ["Schedule:current", "Start:next", "Approval:next"]);
+  assert.deepEqual(says("SCHEDULED", null), ["Schedule:current", "Start:next", "Approval:next"]);
+  assert.deepEqual(says("OPEN", "2026-11-24"), ["Scheduled:done", "Start:current", "Approval:next"]);
+  assert.deepEqual(says("IN_PROGRESS", "2026-11-24"), ["Scheduled:done", "In progress:current", "Approval:next"]);
+  // Started without a day: Schedule was passed by, not done.
+  assert.deepEqual(says("IN_PROGRESS", null), ["Schedule:skipped", "In progress:current", "Approval:next"]);
+  assert.deepEqual(says("REVIEW", "2026-11-24"), ["Scheduled:done", "Completed:done", "Awaiting approval:current"]);
+  assert.deepEqual(says("DONE", null), ["Schedule:skipped", "Completed:done", "Approved:done"]);
+  assert.equal(jobSteps("WAITING", "2026-11-24"), null);
+  assert.equal(jobSteps("CANCELED", null), null);
+});
+
+const story = (r: Partial<StoryRow> & { kind: string }): StoryRow => ({
+  actor: "Connor",
+  from: null,
+  to: null,
+  itemTitle: null,
+  itemAction: null,
+  itemDone: null,
+  request: false,
+  ...r,
+});
+const today = "2026-11-21" as const;
+
+test("storyLine: the job's story in the contractor's words (docs/specs/contractor-timeline.md, section 2)", () => {
+  assert.equal(storyLine(story({ kind: "CREATED" }), today), "Connor added this job");
+  assert.equal(storyLine(story({ kind: "CREATED", actor: null }), today), "HG Capital added this job");
+  assert.equal(storyLine(story({ kind: "ASSIGNED" }), today), "Connor gave you this job");
+  assert.equal(storyLine(story({ kind: "ASSIGNED", actor: null }), today), "This job was given to you");
+  assert.equal(storyLine(story({ kind: "DUE", from: "2026-11-14", to: "2026-11-17" }), today), "Connor moved the due date to Tue, Nov 17");
+  assert.equal(storyLine(story({ kind: "DUE", to: "2026-11-17" }), today), "Connor set the due date to Tue, Nov 17");
+  assert.equal(storyLine(story({ kind: "SCHEDULED", actor: "You", to: "2026-11-23" }), today), "You set the scheduled day to Mon, Nov 23");
+  assert.equal(storyLine(story({ kind: "NOTES" }), today), "Connor edited the notes");
+  assert.equal(storyLine(story({ kind: "CHECKLIST", actor: "You", itemTitle: "Uppers", itemDone: "true" }), today), "You checked “Uppers”");
+  assert.equal(storyLine(story({ kind: "CHECKLIST", itemTitle: "Uppers", itemDone: "false" }), today), "Connor unchecked “Uppers”");
+  assert.equal(
+    storyLine(story({ kind: "CHECKLIST", itemTitle: "Uppers", itemAction: "renamed", from: "Uppers", to: "Upper cabinets" }), today),
+    "Connor renamed “Uppers” to “Upper cabinets”",
+  );
+  assert.equal(storyLine(story({ kind: "STATUS", from: "IN_PROGRESS", to: "WAITING" }), today), "Connor set status to Waiting");
+  assert.equal(storyLine(story({ kind: "STATUS", from: "WAITING", to: "OPEN" }), today), "Connor set status to To do");
+  assert.equal(storyLine(story({ kind: "STATUS", from: "OPEN", to: "CANCELED" }), today), "Connor canceled this job");
+  assert.equal(storyLine(story({ kind: "STATUS", actor: "You", from: "SCHEDULED", to: "OPEN" }), today), "You removed the scheduled day");
+  assert.equal(storyLine(story({ kind: "STATUS", from: "SCHEDULED", to: "OPEN" }), today), "Connor set status to To do");
+  assert.equal(storyLine(story({ kind: "SCHEDULED", actor: "You", from: "2026-11-23", to: null }), today), "You removed the scheduled day");
+  assert.equal(storyLine(story({ kind: "STATUS", actor: null, from: "OPEN", to: "CANCELED", resident: true }), today), "A resident canceled this request");
+});
+
+test("storyLine: a resident is never named, a draft's Add and anything off the list draw nothing", () => {
+  assert.equal(storyLine(story({ kind: "CREATED", actor: null, request: true }), today), "A resident sent this request");
+  assert.equal(storyLine(story({ kind: "STATUS", from: "DRAFT", to: "OPEN" }), today), null);
+  // The four the portal already draws as status updates aren't story lines.
+  for (const to of ["SCHEDULED", "IN_PROGRESS", "REVIEW", "DONE"]) assert.equal(storyLine(story({ kind: "STATUS", to }), today), null, to);
+  for (const kind of ["TITLE", "PROPERTY", "ACCESS", "REPEAT", "REPEAT_CREATED", "CONFLICT", "COMMENT", "ATTACHMENT"]) {
+    assert.equal(storyLine(story({ kind }), today), null, kind);
+  }
+});
+
+test("statusUpdateText: a move to Scheduled names its day when the event has one", () => {
+  assert.equal(statusUpdateText("OPEN", "SCHEDULED", { contractor: true }, { day: "2026-11-27", today: "2026-11-22" }), "scheduled the job for Fri, Nov 27");
+  assert.equal(statusUpdateText("OPEN", "SCHEDULED", { contractor: true }, { day: null, today: "2026-11-22" }), "scheduled the job");
+  assert.equal(statusUpdateText("OPEN", "SCHEDULED"), "scheduled the job");
 });

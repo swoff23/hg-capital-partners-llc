@@ -38,6 +38,12 @@ export type PortalPrincipal = {
    * (core.ts assertContractorAccess) refuses any other job. Null for a session from signing in.
    */
   onlyTaskId: string | null;
+  /**
+   * Opened from the link a contractor shared with their crew (Share with crew, a CREW job link): someone holding
+   * this one job, who may not be the contractor at all. The job page draws no way to My jobs for them (Connor,
+   * Nov 22). A UI hint only: `onlyTaskId` is what keeps them on the job.
+   */
+  shared: boolean;
 };
 
 interface PortalSessionState {
@@ -109,6 +115,7 @@ const readSession = cache(async (): Promise<PortalSessionState | null> => {
       email: row.account.email,
       label: row.account.contact.fullName,
       onlyTaskId: row.onlyTaskId,
+      shared: !!row.onlyTaskId && row.jobLink?.kind === "CREW",
     },
     // A link session never meets the first-password page: the link, not a password, is how it got in, and it opens one
     // job only. Signing in in full still asks for a new password while the starting one is in use.
@@ -228,6 +235,22 @@ export async function portalHomePath(next: string | null = null): Promise<string
   if (!state || state.principal.onlyTaskId) return null;
   if (state.inSetup && !state.mustChangePassword) return SETUP_PATH;
   return afterPortalSignIn(state.mustChangePassword, next);
+}
+
+/**
+ * The contractor behind a session an email's job link started, for /login's
+ * Welcome back (docs/specs/contractor-scheduled-date.md section 12): their
+ * name and email, and the job the link opened (`inSetup`: still finishing
+ * setup, so the job won't open until they sign in and finish it). Null for a
+ * full session, for signed out, and for a crew link, whose holder may not be
+ * the contractor.
+ */
+export async function portalLinkSessionOwner(): Promise<{ name: string; email: string; taskId: string; inSetup: boolean } | null> {
+  const state = await readSession();
+  if (!state) return null;
+  const p = state.principal;
+  if (!p.onlyTaskId || p.shared) return null;
+  return { name: p.label, email: p.email, taskId: p.onlyTaskId, inSetup: state.inSetup };
 }
 
 /** The contractor as the actor on a task write (src/lib/tasks/core.ts). */

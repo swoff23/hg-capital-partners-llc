@@ -1,12 +1,11 @@
 "use client";
 import { useOptimistic, useState, useTransition } from "react";
-import { Check, Copy, MapPin, MessageSquareText, Navigation, Phone } from "lucide-react";
+import { Check, Copy, MessageSquareText, Navigation, Phone } from "lucide-react";
 import { Code } from "@/components/code";
 import type { MediaItem } from "@/components/lightbox";
 import { LazyLightbox } from "@/components/lightbox-lazy";
-import { Meter } from "@/components/meter";
 import { useToast } from "@/components/toast";
-import { Button, Checkbox, LinkButton, Section, buttonClass } from "@/components/ui";
+import { Button, Checkbox, Section, buttonClass } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import { telHref, textHref } from "@/lib/contacts";
 import type { JobLockbox, JobTenants } from "@/lib/portal/queries";
@@ -28,58 +27,42 @@ function useCopy() {
 }
 
 /**
- * Directions (Apple Maps; other phones get the web map) and Copy address.
- * On a phone the two share the row, so at 320 neither runs into the gutter;
- * below 360 Copy address shortens to Copy, its name staying whole.
+ * The job card's first row (Connor, Nov 22, card B): "Address" over the street
+ * and unit (`line`, the short address: every job is in Buffalo), and
+ * Directions (Apple Maps; other phones get the web map) and Copy address as
+ * square icon buttons, the tenant rows' own. Copy and Directions take the
+ * full address. It's one line where it fits; on a narrow phone it wraps to a
+ * second line rather than cut off (Connor, Nov 22: the whole address has to
+ * show). With no address on file (a unit alone), just the words.
  */
-export function AddressActions({ address }: { address: string }) {
+export function AddressRow({ address, line }: { address: string | null; line: string }) {
   const copy = useCopy();
+  const iconLink = buttonClass({ variant: "secondary", icon: true });
   return (
-    <div className="mt-3 flex items-center gap-2">
-      <LinkButton
-        href={`https://maps.apple.com/?daddr=${encodeURIComponent(address)}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="min-w-0 flex-1 whitespace-nowrap sm:flex-none"
-      >
-        <Navigation className="h-4 w-4" aria-hidden="true" />
-        Directions
-      </LinkButton>
-      <Button
-        variant="secondary"
-        aria-label="Copy address"
-        className="min-w-0 flex-1 whitespace-nowrap sm:flex-none"
-        onClick={() => copy(address, "Address copied")}
-      >
-        <Copy className="h-4 w-4" aria-hidden="true" />
-        {/* Tailwind's max-[360px] is width < 360, so the pair meets at 360 without both showing. */}
-        <span className="max-[360px]:hidden">Copy address</span>
-        <span className="min-[360px]:hidden">Copy</span>
-      </Button>
+    <div className="flex items-center gap-2 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-meta text-muted-foreground">Address</p>
+        <p className="mt-0.5 break-words text-body text-foreground">{line}</p>
+      </div>
+      {address && (
+        <>
+          <a href={`https://maps.apple.com/?daddr=${encodeURIComponent(address)}`} target="_blank" rel="noopener noreferrer" aria-label="Directions" className={iconLink}>
+            <Navigation aria-hidden="true" className="size-4" />
+          </a>
+          <Button variant="secondary" icon aria-label="Copy address" onClick={() => copy(address, "Address copied")}>
+            <Copy aria-hidden="true" className="size-4" />
+          </Button>
+        </>
+      )}
     </div>
   );
 }
 
 /**
- * D21: the lockbox code, large, through Code. It's typed into the box by
- * hand, so there's no Copy button (Connor, Oct 26) and no hover copy icon;
- * a tap on the code still copies it, as every Code does. Code's button names
- * the code for screen readers. A long code wraps inside its column, so every
- * character shows.
- *
- * Where the box is sits under the code, and its photo beside it, 96x72; a tap
- * opens the photo full screen in the viewer, zoom included
- * (docs/specs/lockbox-location.md, decision 1). The same block at every
- * width. The photo comes from /api/files/lockbox/<job>, which shows it under
- * the code's own rule. No photo, or one whose file won't load, shows no tile
- * at all (Connor, Nov 15): the contractor never meets an empty box.
- */
-/**
  * Who lives there (docs/specs/tenant-contact.md section 3, Q26): one row per
- * person, the name over the number, with Call and Text on the right. Text is
- * touch only, where a tap opens Messages (Q13); with a mouse the number reads
- * in full beside Call. A tenant with no number on file shows by name alone
- * (tenants.md call 2). Above Lockbox; `#access` from an email lands here.
+ * person, the name over the number, with Call and Text on the right at every
+ * size (Connor, Nov 21, replacing Q13's touch only). A tenant with no number on file shows by name alone
+ * (tenants.md call 2). Under Getting in (Connor, Nov 22); `#access` lands here only when Getting in shows nothing.
  */
 export function TenantsSection({ tenants }: { tenants: JobTenants }) {
   const iconLink = buttonClass({ variant: "secondary", icon: true });
@@ -102,7 +85,7 @@ export function TenantsSection({ tenants }: { tenants: JobTenants }) {
                 </a>
               )}
               {sms && (
-                <a href={sms} aria-label={`Text ${first}`} className={cn(iconLink, "pointer-fine:hidden")}>
+                <a href={sms} aria-label={`Text ${first}`} className={iconLink}>
                   <MessageSquareText aria-hidden="true" className="size-4" />
                 </a>
               )}
@@ -114,62 +97,96 @@ export function TenantsSection({ tenants }: { tenants: JobTenants }) {
   );
 }
 
-export function LockboxSection({
+/**
+ * "Getting in" (Connor, Nov 22, B, no icons): how they get in, first, then the
+ * lockbox. With Permission to enter, "Let yourself in" in --ok (the tone this
+ * line had on the Lockbox, Nov 17) over who said so; at a home someone lives
+ * in without it, someone must be home, after 24 hours' notice (Q7), and the
+ * code stays hidden; nobody living there with a code, "Let yourself in" over
+ * "No one lives here". Then the code through Code, large: it's typed into the
+ * box by hand, so there's no Copy button (Connor, Oct 26) and no hover copy
+ * icon; a tap on the code still copies it, as every Code does. Where the box
+ * is sits under the code, and its photo beside it, 96x72; a tap opens the
+ * photo full screen in the viewer, zoom included (docs/specs/lockbox-location.md,
+ * decision 1). The photo comes from /api/files/lockbox/<job>, which shows it
+ * under the code's own rule. No photo, or one whose file won't load, shows no
+ * tile at all (Connor, Nov 15). Keeps the `lockbox` anchor, so an email's
+ * Show access lands here. `rule` is false once the job is closed.
+ */
+export function GettingInSection({
   taskId,
   lockbox,
-  permittedBy = 0,
+  tenants,
+  needsNotice,
+  vacant,
+  rule = true,
   pets = null,
 }: {
   taskId: string;
-  lockbox: JobLockbox;
-  permittedBy?: number;
+  lockbox: JobLockbox | null;
+  tenants: JobTenants;
+  needsNotice: boolean;
+  /** The job's unit is known and nobody lives there. A code with no known household (a building-wide job) gets no entry line. */
+  vacant: boolean;
+  rule?: boolean;
   /** "Pets inside. Keep doors shut.": the resident's answer on their request (docs/specs/maintenance-requests.md, 4.6). */
   pets?: string | null;
 }) {
   const [viewing, setViewing] = useState(false);
   const [broken, setBroken] = useState(false);
+  const one = tenants.people.length === 1;
+  const entry = !rule
+    ? null
+    : // Permission with no code on file is no way in yet, so nothing is said (as the Lockbox's line was, before).
+      tenants.permitted && lockbox
+      ? { value: "Let yourself in", note: one ? "The tenant said it's OK" : "The tenants said it's OK", ok: true }
+      : needsNotice
+        ? { value: one ? "The tenant must be home" : "A tenant must be home", note: "Call/text them 24 hours in advance", ok: false }
+        : lockbox && vacant
+          ? { value: "Let yourself in", note: "No one lives here", ok: true }
+          : null;
+  if (!entry && !lockbox) return null;
   const url = `/api/files/lockbox/${encodeURIComponent(taskId)}`;
-  const photo = broken ? null : lockbox.photo;
+  const photo = broken || !lockbox ? null : lockbox.photo;
   const item: MediaItem = { id: "lockbox", kind: "IMAGE", filename: "Lockbox photo.jpg", hasThumb: !!photo?.hasThumb, createdAt: "" };
   return (
-    <Section id="lockbox" title="Lockbox">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <Code value={lockbox.code} label="Lockbox code" size="lg" copyIcon={false} wrap className="min-w-0" />
-          {/* At an occupied home the code shows only with their Permission to enter, and this says so (Connor, Nov 17). */}
-          {permittedBy > 0 && (
-            <p className="mt-2 text-body text-ok">{permittedBy === 1 ? "The tenant said you can let yourself in" : "The tenants said you can let yourself in"}</p>
-          )}
-          {pets && <p className="mt-2 text-body text-foreground">{pets}</p>}
-          {lockbox.location && (
-            <p className="mt-2 flex items-start gap-1.5 text-body text-foreground">
-              <MapPin className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span className="min-w-0 break-words">{lockbox.location}</span>
-            </p>
+    <Section id="lockbox" title="Getting in">
+      {entry && (
+        <div>
+          <p className={cn("text-body", entry.ok ? "text-ok" : "text-foreground")}>{entry.value}</p>
+          <p className="text-meta text-fg-2">{entry.note}</p>
+        </div>
+      )}
+      {lockbox && (
+        <div className={cn("flex items-start justify-between gap-3", entry && "mt-3")}>
+          <div className="min-w-0 flex-1">
+            <Code value={lockbox.code} label="Lockbox code" size="lg" copyIcon={false} wrap className="min-w-0" />
+            {lockbox.location && <p className="mt-1 break-words text-meta text-fg-2">{lockbox.location}</p>}
+            {pets && <p className="mt-2 text-body text-foreground">{pets}</p>}
+          </div>
+          {photo && (
+            <button
+              type="button"
+              onClick={() => setViewing(true)}
+              aria-label="Open lockbox photo"
+              className="relative block aspect-[4/3] w-24 shrink-0 overflow-hidden rounded-md bg-muted"
+            >
+              {/* Gated, session-checked route; next/image would cache it publicly. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photo.hasThumb ? `${url}?v=thumb` : url}
+                alt=""
+                decoding="async"
+                draggable={false}
+                onError={() => setBroken(true)}
+                className="h-full w-full object-cover"
+              />
+              <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-md inset-shadow-photo-edge" />
+            </button>
           )}
         </div>
-        {photo && (
-          <button
-            type="button"
-            onClick={() => setViewing(true)}
-            aria-label="Open lockbox photo"
-            className="relative block aspect-[4/3] w-24 shrink-0 overflow-hidden rounded-md bg-muted"
-          >
-            {/* Gated, session-checked route; next/image would cache it publicly. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photo.hasThumb ? `${url}?v=thumb` : url}
-              alt=""
-              decoding="async"
-              draggable={false}
-              onError={() => setBroken(true)}
-              className="h-full w-full object-cover"
-            />
-            <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-md inset-shadow-photo-edge" />
-          </button>
-        )}
-      </div>
-      {photo && (
+      )}
+      {lockbox && photo && (
         <LazyLightbox
           items={[item]}
           index={0}
@@ -189,9 +206,9 @@ type Item = { id: string; title: string; done: boolean };
 
 /**
  * Tickable while the job is active; read-only once it's closed, when the
- * boxes dim to 50% (the one dim level). Progress is the shared Meter under
- * the heading (charts 2.3), springing with each tick; at the last tick the
- * count becomes a check and "All done" in --ok, at the count's weight.
+ * boxes dim to 50% (the one dim level). Progress is the count beside the
+ * heading, with no bar (Connor, Nov 22: the bar distracted); at the last tick
+ * the count becomes a check and "All done" in --ok, at the count's weight.
  */
 export function JobChecklist({ items, editable }: { items: Item[]; editable: boolean }) {
   const { toast } = useToast();
@@ -226,16 +243,6 @@ export function JobChecklist({ items, editable }: { items: Item[]; editable: boo
         </>
       }
     >
-      {shown.length > 0 && (
-        <Meter
-          value={doneCount}
-          max={shown.length}
-          label="Checklist progress"
-          valueText={`${doneCount} of ${shown.length} done`}
-          spring
-          className="mb-1"
-        />
-      )}
       <ul>
         {shown.map((item) => (
           <li key={item.id}>

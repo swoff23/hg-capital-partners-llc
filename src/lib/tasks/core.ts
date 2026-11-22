@@ -395,6 +395,8 @@ export interface OutboxItem {
    * none), NOTES notesFingerprint, STATUS the status.
    */
   from?: string;
+  /** STATUS out of Scheduled: the day it had ("" for none), for undoneDropped (notifications/content.ts). */
+  fromDay?: string;
   /**
    * OFF ("took you off"): the job as the contractor knew it when they were taken off (notifications/content.ts
    * jobKey), so giving it straight back says nothing unless the job changed meanwhile (offItems).
@@ -403,7 +405,7 @@ export interface OutboxItem {
 }
 
 /** What a line carries beside its summary (OutboxItem's optional fields). */
-type ItemRefs = Pick<OutboxItem, "eventId" | "noteEventId" | "visit" | "from">;
+type ItemRefs = Pick<OutboxItem, "eventId" | "noteEventId" | "visit" | "from" | "fromDay">;
 
 /** What a notification reads from the task. Its status says whether it is still a draft, which emails nobody. */
 type NotifyTask = Pick<Task, "id" | "assigneeContactId" | "status">;
@@ -1468,6 +1470,7 @@ export function statusSummary(
   if (c.from === "REVIEW" && c.to === "DONE") return `approved ${t}`;
   if (c.to === "IN_PROGRESS" && c.actor === "contractor") return `started ${t}`;
   if (c.to === "SCHEDULED" && c.scheduledFor) return `scheduled ${t} for ${emailDay(c.scheduledFor, now)}`;
+  if (c.from === "SCHEDULED" && c.to === "OPEN" && c.actor === "contractor") return `unscheduled ${t}`;
   return `set ${t} to ${c.to.replace("_", " ").toLowerCase()}`;
 }
 
@@ -1637,6 +1640,7 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   const audience = await notify(tx, task, p, { kind: "STATUS", visibility, to }, summary, now, {
     eventId: statusEvent.id,
     from: before.status,
+    ...(before.status === "SCHEDULED" ? { fromDay: toYmd(before.scheduledFor) ?? "" } : {}),
     ...(noteEvent && p.kind !== "contractor" && note ? { noteEventId: noteEvent.event.id } : {}),
   });
   // A canceled open job tells its contractor there's no need to go (the Canceled line itself stays Internal).
@@ -2215,6 +2219,28 @@ export async function scheduleByContractor(tx: Tx, taskId: string, date: Ymd, p:
   return after;
 }
 
+
+/**
+ * A contractor takes their scheduled day off (Connor, Nov 22: Reschedule offers Remove day), so the job asks for a day
+ * again. On a Scheduled job it is a move back to To do through setStatus with the day cleared, and both partners get
+ * "unscheduled "Fix the sink""; on a To do or Waiting job that still carries a day, the day alone clears and they get
+ * "unscheduled "Fix the sink" (was Tue, Nov 17)". Never on an In progress, Review or closed job, and never touches
+ * Due. Marks the task edited in the app, as scheduleByContractor does.
+ */
+export async function unscheduleByContractor(tx: Tx, taskId: string, p: Extract<Principal, { kind: "contractor" }>, now = new Date()): Promise<Task> {
+  await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${taskId} FOR NO KEY UPDATE`;
+  await assertContractorAccess(tx, taskId, p);
+  const before = await tx.task.findUnique({ where: { id: taskId } });
+  if (!before) throw new TaskRuleError("That job no longer exists.");
+  if (!contractorMaySetDate(before.status)) throw new TaskRuleError("This job's day can't change now.");
+  if (before.status === "SCHEDULED") return (await setStatus(tx, taskId, "OPEN", p, { scheduledFor: null }, now)).task;
+  const from = toYmd(before.scheduledFor);
+  if (!from) return before;
+  const after = await tx.task.update({ where: { id: taskId }, data: { scheduledFor: null, ...editStamp(p, now) } });
+  await addEvent(tx, taskId, p, { kind: "SCHEDULED", data: { from, to: null } });
+  await notify(tx, after, p, { kind: "DAY", visibility: "SHARED" }, `unscheduled "${after.title}" (was ${emailDay(from, now)})`, now, { from });
+  return after;
+}
 
 /**
  * A unit renamed on its property (properties/service.ts replaceUnits): every

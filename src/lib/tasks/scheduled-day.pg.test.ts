@@ -112,3 +112,39 @@ test("8 am lines: one per job per morning, and a line the send run dropped doesn
   await prisma.notificationOutbox.updateMany({ where: { taskId: id }, data: { sentAt: at, lastError: "nothing to send", openKey: null } });
   assert.equal(await prisma.$transaction((tx) => core.queueDueReminder(tx, who, "SCHEDULED_TOMORROW", "2026-11-22", at)), true);
 });
+
+test("Remove day puts a Scheduled job back to To do with no day, never touches Due, and is refused once started", { skip, timeout }, async () => {
+  const id = await job("Patch the ceiling", "2026-11-19");
+  await prisma.$transaction((tx) => core.scheduleByContractor(tx, id, "2026-11-17", zack));
+  await prisma.$transaction((tx) => core.unscheduleByContractor(tx, id, zack));
+  let t = await read(id);
+  assert.deepEqual([t.status, toYmd(t.scheduledFor), toYmd(t.dueDate)], ["OPEN", null, "2026-11-19"]);
+  const line = await prisma.taskEvent.findFirst({ where: { taskId: id, kind: "STATUS" }, orderBy: { createdAt: "desc" } });
+  const data = line?.data as { from?: string; to?: string } | undefined;
+  assert.deepEqual([data?.from, data?.to], ["SCHEDULED", "OPEN"]);
+
+  // A second Remove day finds nothing to take off.
+  await prisma.$transaction((tx) => core.unscheduleByContractor(tx, id, zack));
+  t = await read(id);
+  assert.deepEqual([t.status, toYmd(t.scheduledFor)], ["OPEN", null]);
+
+  // Once started, the day is no longer theirs to take off.
+  await prisma.$transaction((tx) => core.scheduleByContractor(tx, id, "2026-11-18", zack));
+  await prisma.$transaction((tx) => core.setStatus(tx, id, "IN_PROGRESS", zack));
+  await assert.rejects(
+    prisma.$transaction((tx) => core.unscheduleByContractor(tx, id, zack)),
+    /can't change now/,
+  );
+});
+
+test("Remove day on a Waiting job that kept its day clears the day alone and keeps it Waiting", { skip, timeout }, async () => {
+  const id = await job("Fix the attic fan", "2026-11-19");
+  await prisma.$transaction((tx) => core.scheduleByContractor(tx, id, "2026-11-17", zack));
+  // Staff put it on hold; the column keeps the day (rules.ts scheduledDay).
+  await prisma.$transaction((tx) => core.setStatus(tx, id, "WAITING", staff, { waitingOn: "parts" }));
+  await prisma.$transaction((tx) => core.unscheduleByContractor(tx, id, zack));
+  const t = await read(id);
+  assert.deepEqual([t.status, toYmd(t.scheduledFor), toYmd(t.dueDate)], ["WAITING", null, "2026-11-19"]);
+  const line = await prisma.taskEvent.findFirst({ where: { taskId: id, kind: "SCHEDULED" }, orderBy: { createdAt: "desc" } });
+  assert.deepEqual(line?.data, { from: "2026-11-17", to: null });
+});

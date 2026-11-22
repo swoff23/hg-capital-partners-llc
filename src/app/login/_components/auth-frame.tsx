@@ -1,7 +1,7 @@
 import { PublicHeader } from "@/components/public/header";
 import { PublicFooter } from "@/components/public/footer";
 import { PublicSurface } from "@/components/public/surface";
-import { Eyebrow, publicContainer, publicCtaClass, publicLinkHover, publicType } from "@/components/public/ui";
+import { Eyebrow, publicContainer, publicCtaClass, publicLinkHover, publicSecondaryClass, publicType } from "@/components/public/ui";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,12 +14,15 @@ import { cn } from "@/lib/utils";
 export function AuthFrame({
   title,
   subtitle,
+  back,
   children,
 }: {
   /** One short heading. /login itself has none, so its "Login" eyebrow is its h1. */
   title?: string;
   /** One line under the heading. */
   subtitle?: React.ReactNode;
+  /** A way back above the heading, at its left ("Back to the job" on Welcome back). */
+  back?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -28,6 +31,7 @@ export function AuthFrame({
 
       <main className={cn(publicContainer, "flex flex-1 flex-col items-center justify-center py-16")}>
         <div className="w-full max-w-sm text-center">
+          {back && <div className="-mt-2 mb-4 flex justify-start">{back}</div>}
           {/* The eyebrow is /login's own heading; a page with a title of its own goes without it (Connor, Nov 14). */}
           {title ? <h1 className={cn(publicType.heading, "text-foreground")}>{title}</h1> : <Eyebrow as="h1">Login</Eyebrow>}
           {subtitle && <p className="mt-1.5 text-meta text-muted-foreground">{subtitle}</p>}
@@ -52,6 +56,9 @@ export const authInputClass = "h-10 placeholder:text-pub-faint";
 
 /** The public CTA, full width. */
 export const authButtonClass = cn(publicCtaClass, "mt-1 w-full");
+
+/** The second action, full width: the public secondary Button ("Email me a sign-in link" on Welcome back). */
+export const authSecondaryButtonClass = cn(publicSecondaryClass, "w-full");
 
 /** Quiet text link under a form ("Forgot password?", "Back to sign in"), with a 44px tap height. */
 export const authLinkClass = cn("inline-flex min-h-11 items-center text-meta text-muted-foreground", publicLinkHover);

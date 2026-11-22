@@ -152,8 +152,12 @@ function Toast({ item, dismiss }: { item: ToastItem; dismiss: (id: number) => vo
       )}
     />
   );
+  // The whole pill is the action: icon, message and label in one button, the × beside it.
+  const wholePill = sticky && action;
+  // The whole message shows, wrapping to a second line on a narrow phone rather than cut off (Connor, Nov 22). The
+  // whole-pill button pads its own lines, so the message adds none there.
   const message = (
-    <span className="min-w-0 flex-1 truncate">
+    <span className={cn("min-w-0 flex-1 break-words text-pretty", !wholePill && "py-1")}>
       {item.phoneMessage ? (
         <>
           <span className="max-[374px]:hidden">{item.message}</span>
@@ -166,8 +170,6 @@ function Toast({ item, dismiss }: { item: ToastItem; dismiss: (id: number) => vo
     </span>
   );
   const actionLabelClass = "shrink-0 font-medium text-toast-fg underline decoration-1 underline-offset-3";
-  // The whole pill is the action: icon, message and label in one button, the × beside it.
-  const wholePill = sticky && action;
 
   return (
     <div

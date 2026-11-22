@@ -2,8 +2,10 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { login } from "../actions";
 import { LOGIN_MESSAGES, LOGIN_START } from "../login-state";
+import { Avatar } from "@/components/avatar";
 import { FormField, Input, SaveError } from "@/components/ui";
-import { AuthNotice, authInputClass } from "./auth-frame";
+import { cn } from "@/lib/utils";
+import { AuthNotice, authInputClass, authLinkClass } from "./auth-frame";
 import { AuthSubmit } from "./auth-submit";
 import { PasswordField } from "./password-field";
 
@@ -16,6 +18,11 @@ import { PasswordField } from "./password-field";
  * of the form after the action) and focus moves to the password; the reason
  * is one `--destructive` line above Sign in. `next` is the page to go back to,
  * already checked by the page.
+ *
+ * `known` is Welcome back's login (docs/specs/contractor-scheduled-date.md
+ * section 12): the email is already known, so it's shown beside their mark,
+ * not typed (Etsy's and Viator's Welcome back on Mobbin), and goes with the
+ * form as the username a password manager matches.
  */
 /**
  * The email from the last submit. A dropped connection shows the crash screen,
@@ -24,9 +31,18 @@ import { PasswordField } from "./password-field";
  */
 const lastTyped = { email: "" };
 
-export function LoginForm({ next, passwordChanged }: { next: string | null; passwordChanged: boolean }) {
+export function LoginForm({
+  next,
+  passwordChanged,
+  known = null,
+}: {
+  next: string | null;
+  passwordChanged: boolean;
+  /** Welcome back's login; `switchForm` is the id of the form "Use a different email" submits. */
+  known?: { name: string; email: string; switchForm: string } | null;
+}) {
   const [state, formAction] = useActionState(login, LOGIN_START);
-  const email = state.email || lastTyped.email;
+  const email = known?.email ?? (state.email || lastTyped.email);
   const passwordRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   // What's missing, shown once Sign in was pressed with it missing.
@@ -60,21 +76,36 @@ export function LoginForm({ next, passwordChanged }: { next: string | null; pass
         className="mt-8 space-y-4 text-left"
       >
         {next && <input type="hidden" name="next" value={next} />}
-        <FormField label="Email" required error={missing.email}>
-          {(p) => (
-            <Input
-              {...p}
-              ref={emailRef}
-              name="email"
-              type="email"
-              autoComplete="username"
-              autoFocus={!email}
-              defaultValue={email}
-              onChange={() => missing.email && setMissing((m) => ({ ...m, email: undefined }))}
-              className={authInputClass}
-            />
-          )}
-        </FormField>
+        {known ? (
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Avatar name={known.name} email={known.email} size={28} outline />
+            <div className="min-w-0">
+              <p className="truncate text-meta text-foreground">{known.email}</p>
+              {/* Its own form (forms can't nest): ends the job email's session so someone else can sign in. */}
+              <button type="submit" form={known.switchForm} className={cn(authLinkClass, "-my-2 underline underline-offset-3")}>
+                Use a different email
+              </button>
+            </div>
+            {/* The username a password manager fills the password for; read-only, never typed. */}
+            <input type="email" name="email" autoComplete="username" value={known.email} readOnly hidden />
+          </div>
+        ) : (
+          <FormField label="Email" required error={missing.email}>
+            {(p) => (
+              <Input
+                {...p}
+                ref={emailRef}
+                name="email"
+                type="email"
+                autoComplete="username"
+                autoFocus={!email}
+                defaultValue={email}
+                onChange={() => missing.email && setMissing((m) => ({ ...m, email: undefined }))}
+                className={authInputClass}
+              />
+            )}
+          </FormField>
+        )}
         <FormField label="Password" required error={missing.password}>
           {(p) => (
             <PasswordField

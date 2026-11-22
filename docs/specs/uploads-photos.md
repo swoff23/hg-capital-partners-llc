@@ -318,7 +318,7 @@ The Needs review rows on Today (BTASKS-016) can reuse the strip variant; the tas
 
 **Contractor batches.** A batch picked while the composer is empty posts once every file in it has recorded, as one update. Files that failed stay on the tray with Retry and post as their own small update when they land, so one bad photo never holds up the rest. The toast reads "3 photos posted · Undo" for 5 seconds; Undo removes that update and its files (contractors only ever soft-delete; question 5).
 
-**The payoff** (Mark done sent): `SpotArt` job-done (the property photo once phase 5 lands), "Thanks, Zack!", then the strip of what HG received, then "Sent to Connor and Pieter. You'll get an email if anything else is needed." and "Back to my jobs", as today. The strip opens nothing here, so the payoff stays one layer and one Esc closes it.
+**The payoff** (Mark done sent): `SpotArt` job-done (the property photo once phase 5 lands), "Thanks, Zack!", then the strip of what HG received, then "Sent to Connor and Pieter. You'll get an email if anything else is needed." and "Back to my jobs", as today. The strip opens nothing here, so the payoff stays one layer and one Esc closes it. Since Nov 22 (Connor) it is one sentence: "Sent to Connor and Pieter for review."
 
 - **Sizes.** The strip shows four thumbs and the count at every size in the payoff (its content is 288px at 320, the sheet's 16px padding in from each edge) and in Activity lines; three inside a comment card at 320 (2.5). Nothing else drops.
 - **Tokens.** As 2.5, plus `--toast-*` for the toast and `text-title` for the payoff heading.

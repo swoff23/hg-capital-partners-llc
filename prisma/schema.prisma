@@ -779,6 +779,7 @@ model PortalAccount {
 
   sessions    PortalSession[]
   resetTokens PasswordResetToken[]
+  signInLinks PortalSignInLink[]
 }
 
 // Database-backed so "Sign out everywhere" and "Remove access" take effect on
@@ -852,6 +853,21 @@ model PasswordResetToken {
   @@index([userId])
 }
 
+// "Email me a sign-in link" (docs/specs/contractor-scheduled-date.md section 12): a contractor on an email's job link
+// asks for one from the Welcome back page, and it opens My jobs on any phone. Sent only to the login's own email,
+// works once, for 15 minutes. The link is only in the email; this keeps its hash.
+model PortalSignInLink {
+  id        String        @id @default(cuid())
+  account   PortalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId String
+  tokenHash String        @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([accountId])
+}
+
 // One partner's Claude account, allowed to read the directory and save draft
 // tasks as that partner (docs/specs/tasks-from-claude.md, sections 7 and 8).
 // Made when the partner taps Allow; connectedAt is set when Claude swaps the
@@ -915,6 +931,7 @@ enum SecurityEventKind {
   TENANT_VIEWED
   CLAUDE_CONNECTED
   CLAUDE_DISCONNECTED
+  SIGN_IN_LINK_REQUESTED
 }
 
 // Audit log for the portal. No foreign keys on purpose: it outlives the rows

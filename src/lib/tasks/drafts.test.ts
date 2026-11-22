@@ -176,8 +176,8 @@ test("each line follows the copy rules: no em dash, no exclamation, one line", (
   for (const line of lines) assert.doesNotMatch(line, /[—!\n]/, line);
 });
 
-// A toast is one line that truncates (components/toast.tsx): a refusal that carries its next step keeps to what a
-// 320px phone shows whole (lib/toast-line.ts), for a six-letter name, as the house's other refusals do.
+// A toast wraps rather than cut off (components/toast.tsx), but one line reads best: a refusal that carries its next
+// step keeps to what a 320px phone shows on one line (lib/toast-line.ts), for a six-letter name, as the house's other refusals do.
 test("every refusal core.ts words for a draft fits a phone's toast, with its next step", () => {
   const core = readFileSync(join(import.meta.dirname, "core.ts"), "utf8");
   const SIX = "Pieter";

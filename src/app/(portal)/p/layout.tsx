@@ -7,6 +7,7 @@ import { portalScope } from "@/lib/attachments/queue-owner";
 import { BRAND } from "@/lib/brand";
 import { requirePortalSession } from "@/lib/portal/session";
 import { PortalUploadQueue } from "./_components/portal-upload-queue";
+import { SharedLinkProvider } from "./_components/shared-link";
 
 export const metadata: Metadata = {
   // absolute, so the app's "%s · HG" template (src/app/layout.tsx) leaves the portal's titles as they are.
@@ -43,6 +44,9 @@ export const metadata: Metadata = {
  * owner with every token, record, post and Undo, and a mismatch is refused
  * (attachments/queue-owner.ts), so its files wait in the outbox for their own
  * person.
+ *
+ * A visit from a link the contractor shared with their crew draws no way to
+ * My jobs anywhere on the job page (SharedLinkProvider, session.ts `shared`).
  */
 export default async function PortalLayout({ children }: LayoutProps<"/p">) {
   const principal = await requirePortalSession();
@@ -54,7 +58,7 @@ export default async function PortalLayout({ children }: LayoutProps<"/p">) {
           <PortalUploadQueue key={scope} scope={scope}>
             {/* A job page left open hears about a new version (docs/specs/update-notice.md). */}
             <UpdateNotice version={getEnv().VERCEL_GIT_COMMIT_SHA ?? null} />
-            {children}
+            <SharedLinkProvider shared={principal.shared}>{children}</SharedLinkProvider>
           </PortalUploadQueue>
         </LeaveGuard>
       </ToastProvider>
