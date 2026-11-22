@@ -2,7 +2,6 @@
 import { useOptimistic, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PhotoThumb } from "@/components/photo-thumb";
 import { SearchInput } from "@/components/search-field";
 import { SegmentedControl } from "@/components/segmented-control";
 import { StatusBadge } from "@/components/status-badge";
@@ -11,6 +10,7 @@ import { LinkPending } from "@/components/link-pending";
 import { Button, EmptyState, Section, pendingRowFill } from "@/components/ui";
 import { useUploadQueue } from "@/components/upload-queue";
 import type { Ymd } from "@/lib/dates";
+import { contractorMaySetDate } from "@/lib/portal/job-link-paths";
 import {
   JOBS_GROUP_COOKIE,
   addressLine,
@@ -154,8 +154,7 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
 
 /**
  * One job, 72px (docs/brand-guidelines.md, section 5 Density), the whole row
- * opening it (§6): the property's front photo (the fallback tile until it has
- * one), the title, then the address and unit and the day ("Due date Today", or "Scheduled Mon, Nov 23" once they set one),
+ * opening it (§6): the title, then the address and unit and the day ("Due date Today", or "Scheduled Mon, Nov 23" once they set one),
  * with the status as its mark and word in one fixed column. Below 480 the
  * column drops and the status leads the subline instead, in its tone. The
  * subline is status, date and place (section 5 Density): the date before the
@@ -165,8 +164,8 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
  * rows leave it out, as the job page does.
  *
  * New updates are one dot hung in the row's leading gutter, centered 8px
- * before the photo, so the photo and title line up whether or not a row has
- * them (activity 3.5 A; 4px clear of the screen edge inside the 16px gutter).
+ * before the title, so titles line up whether or not a row has one (no photo
+ * tile: Connor, Nov 22) (activity 3.5 A; 4px clear of the screen edge inside the 16px gutter).
  * The row opens at #new, and screen readers hear the count. While the job has
  * files going up, the subline leads with it: "Uploading 3 photos", or "2
  * photos didn't upload" in danger (uploads 2.1).
@@ -177,7 +176,8 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
   const day = isActiveStatus(job.status) ? shownDay(job) : null;
   const kind = job.scheduled ? "scheduled" : "due";
   const afterDue = isAfterDue(job.scheduled, job.due);
-  const street = job.address ? addressLine(job.address, null, { short: true }) : null;
+  // A job they can still set a day on and haven't: said on the row, so what needs scheduling shows at a glance (Connor, Nov 22).
+  const unscheduled = contractorMaySetDate(job.status) && !job.scheduled;
   const uploading = rowUploadLine(useUploadQueue(`portal-task:${job.id}`));
 
   return (
@@ -189,10 +189,6 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
       {job.newCount > 0 && (
         <span aria-hidden="true" className="absolute -left-2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
       )}
-      {/* The row's text names the place, so the photo is decoration here. */}
-      <span aria-hidden="true" className="shrink-0">
-        <PhotoThumb size={48} src={job.photoUrl} alt={street ? `Front of ${street}` : "No property"} />
-      </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-body font-medium text-foreground">
           {job.newCount > 0 && <span className="sr-only">{job.newCount} new, </span>}
@@ -213,8 +209,19 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
           {/* Below 480 the status leads the subline, except while the job has files in flight: the upload line has the room then. */}
           <span className={cn("shrink-0 items-center gap-1 min-[480px]:hidden", uploading ? "hidden" : "flex")}>
             <StatusBadge status={job.status} />
-            {(day || where) && <span aria-hidden="true">·</span>}
+            {(unscheduled || day || where) && <span aria-hidden="true">·</span>}
           </span>
+          {/* Gives way to an upload line, as the status does: both can't fit at 320 beside the date. */}
+          {unscheduled && !uploading && (
+            <span className="flex shrink-0 items-center gap-1 text-foreground">
+              Not scheduled
+              {(day || where) && (
+                <span aria-hidden="true" className="text-muted-foreground">
+                  ·
+                </span>
+              )}
+            </span>
+          )}
           {day && (
             <span className="flex min-w-0 items-center gap-1">
               {/* The mark follows the day and never shrinks; the address drops before either. */}

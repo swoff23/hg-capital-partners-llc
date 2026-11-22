@@ -17,8 +17,8 @@ export function jobLinkStep(value: string | null | undefined): JobLinkStep | nul
  *  - done, share and date: `?do=` asks the page to open the Mark done sheet,
  *    the crew text or the date (it opens nothing the job can't take, and asks
  *    before acting);
- *  - access: `#access`, which the page takes to Tenants, or to Lockbox when
- *    nobody lives there (hash-scroll.tsx);
+ *  - access: `#access`, which the page takes to Getting in, or to Tenants
+ *    when there is none (hash-scroll.tsx);
  *  - photos: `#updates`, the Updates section with the composer;
  *  - no step: `#update-<id>` for the update the email opens at.
  * Ids are checked so nothing from the link's query reaches the path unescaped.

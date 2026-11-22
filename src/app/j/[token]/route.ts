@@ -30,7 +30,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
   if (!link.opensJob) return seeOther(withNext("/login", destination));
 
   const current = await getPortalPrincipal();
-  const alreadyIn = current?.contactId === link.contactId && (!current.onlyTaskId || current.onlyTaskId === link.taskId);
+  // Their own email link replaces a crew link's session on the same job, so the contractor gets the way back to My
+  // jobs that a crew member doesn't (Connor, Nov 22); a crew link never replaces anything of theirs.
+  const sameJob = !!current?.onlyTaskId && current.onlyTaskId === link.taskId && (link.kind === "CREW" || !current.shared);
+  const alreadyIn = current?.contactId === link.contactId && (!current.onlyTaskId || sameJob);
   if (!alreadyIn) await startJobLinkSession(link.accountId, link.taskId, link.id);
   await touchJobLink(link.id);
   return seeOther(destination);

@@ -15,6 +15,16 @@ export const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 /** "Forgot password" requests per rolling hour, counted from SecurityEvent rows. */
 export const RESET_LIMITS = { perEmail: 3, perIp: 10, windowMs: 60 * 60 * 1000 } as const;
 
+/** A sign-in link ("Email me a sign-in link", Welcome back) works for 15 minutes, once. */
+export const SIGN_IN_LINK_TTL_MS = 15 * 60 * 1000;
+
+/** Sign-in link emails per login per rolling hour, counted from SecurityEvent rows, as resets are. */
+export const SIGN_IN_LINK_LIMITS = { perAccount: 3, windowMs: 60 * 60 * 1000 } as const;
+
+export function signInLinkExpiresAt(now: Date): Date {
+  return new Date(now.getTime() + SIGN_IN_LINK_TTL_MS);
+}
+
 export function sessionExpiresAt(now: Date): Date {
   return new Date(now.getTime() + PORTAL_SESSION_TTL_MS);
 }

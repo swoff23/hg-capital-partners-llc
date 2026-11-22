@@ -68,7 +68,7 @@ export function LateUploads({ taskId, label }: { taskId: string; label: string }
 
   if (uploader.uploads.length === 0) return null;
   return (
-    <div className="mt-4">
+    <div className="mt-4 first:mt-0">
       <MediaUploadTray uploader={uploader} layout="grid" />
     </div>
   );

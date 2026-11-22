@@ -12,7 +12,7 @@ Planned with Connor on Nov 15, 2026, in two questions (Q1 and Q2 below). He took
 - Only staff move a job out of Review: Approve (to Done) or Send back (to In progress). Both live on the task page's Review card (`src/app/(app)/tasks/[id]/review-banner.tsx`) and in the task list's tick (`src/app/(app)/tasks/list-actions.ts`).
 - Send back is the "there's an issue" email. It asks "What still needs doing?", refuses an empty note (`src/app/(app)/tasks/send-back-sheet.tsx`), and emails the contractor the note with Send for review as the next step.
 - The 8 am emails skip a job in Review, Done or Canceled. The 8 am run only picks To do, Scheduled, Waiting and In progress jobs (`src/lib/notifications/reminders.ts`), and the send run drops a queued 8 am line if the job has moved to Review since (`src/lib/notifications/content.ts` `liveReminders`, tested in `content.test.ts`). A job sent back goes back to getting them.
-- After the contractor sends it, their payoff screen already says "Sent to Connor and Pieter. You'll get an email if anything else is needed." (`src/lib/portal/job-view.ts` `payoffLine`). That is the rule Connor described; the approval email below is what broke it.
+- After the contractor sends it, their payoff screen already says "Sent to Connor and Pieter. You'll get an email if anything else is needed." (`src/lib/portal/job-view.ts` `payoffLine`). That is the rule Connor described; the approval email below is what broke it. Since Nov 22 (Connor) it is one sentence: "Sent to Connor and Pieter for review."
 
 **What changes.**
 

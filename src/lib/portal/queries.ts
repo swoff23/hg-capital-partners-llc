@@ -3,13 +3,13 @@ import { Prisma, type AttachmentKind, type TaskStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todayYmdEastern, toYmd, type Ymd } from "@/lib/dates";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, contractorCanOpen, isActiveStatus } from "@/lib/task-scope";
-import { partnersEmailState } from "@/lib/tasks/delivery";
 import { MARK_DONE_WINDOW_MS, finishPhotoIds, orderMedia } from "@/lib/tasks/media";
+import { changeKind } from "@/lib/tasks/activity";
 import { scheduledDay } from "@/lib/tasks/rules";
 import { lockboxMasker, NO_ACCESS, readJobAccess, type BodyPart, type JobTenant, type LockboxAccess } from "./access-code";
-import { JOB_EMAIL_SELECT, jobEmailState } from "./job-emails";
+import { storyEvents } from "./story-events";
 import { NO_NOTICE, dateChange, dateChangeText, noticeCount, sendBackStands, type DateChange, type DateEvent, type JobNotice } from "./job-notice";
-import { PORTAL_STATUS_UPDATES, addedText, firstName, portalActorLabel, statusUpdateText, type JobCard, type JobsTab } from "./job-view";
+import { PORTAL_STATUS_UPDATES, addedText, firstName, portalActorLabel, statusUpdateText, storyLine, type JobCard, type JobsTab } from "./job-view";
 import type { PortalPrincipal } from "./session";
 
 /**
@@ -140,7 +140,7 @@ export async function listMyJobs(p: PortalPrincipal, tab: JobsTab): Promise<JobC
       dueDate: true,
       scheduledFor: true,
       completedAt: true,
-      property: { select: { address: true, photoUrl: true } },
+      property: { select: { address: true } },
     },
     // A long history keeps its most recent 500.
     ...(tab === "done" ? { orderBy: { completedAt: "desc" as const } } : {}),
@@ -159,7 +159,6 @@ export async function listMyJobs(p: PortalPrincipal, tab: JobsTab): Promise<JobC
     title: r.title,
     status: r.status,
     address: r.property?.address ?? null,
-    photoUrl: r.property?.photoUrl ?? null,
     unitLabel: r.unitLabel,
     due: toYmd(r.dueDate),
     scheduled: toYmd(scheduledDay(r)),
@@ -283,15 +282,26 @@ export interface JobFile {
  */
 export interface JobUpdate {
   id: string;
-  /** "removed" is the trace of a comment HG took back after the contractor could have seen it: who and when, never its text. */
-  kind: "comment" | "status" | "attachment" | "removed";
+  /**
+   * "removed" is the trace of a comment HG took back after the contractor could have seen it: who and when, never its
+   * text. "event" is a line of the job's story (docs/specs/contractor-timeline.md), whose whole sentence is `body`.
+   */
+  kind: "comment" | "status" | "attachment" | "removed" | "event";
+  /** An event's word for a folded run ("due date", "checklist": activity.ts changeKind); null for the rest. */
+  change: string | null;
+  /**
+   * A line that never folds into "Show 4 updates", by the task page's own rule (activity.ts anchorsStretch): a
+   * decision (Sent for review, Approve, Sent back), the contractor's Start, and the job being added. Comments and
+   * their traces stay by kind. Everything else folds in a long enough run (Connor, Nov 22).
+   */
+  stays: boolean;
   /** "You" for the contractor's own, otherwise a first name ("Connor"). */
   actorLabel: string;
   /** The author is a contractor (the square avatar and "contractor" for screen readers). */
   contractor: boolean;
   /** The viewer wrote it. */
   you: boolean;
-  /** What happened for a status change or file post ("started the job"); null for a comment, whose text is `parts`. */
+  /** What happened for a status change or file post ("started the job"), an event's whole line; null for a comment, whose text is `parts`. */
   body: string | null;
   /** A comment's text, with this property's lockbox codes in imported comments already replaced. */
   parts: BodyPart[] | null;
@@ -309,14 +319,6 @@ export interface JobUpdate {
    * decision (activity 2.2 d). Null otherwise.
    */
   statusEventId: string | null;
-}
-
-/** What happened to the viewer's newest update after it posted: the partners get an email, or they got one. */
-export interface JobDelivery {
-  eventId: string;
-  state: "queued" | "emailed";
-  /** First names of the partners it went to. */
-  to: string[];
 }
 
 /**
@@ -353,8 +355,16 @@ export interface JobDetail {
   due: Ymd | null;
   /** Their scheduled day while the job is Scheduled (rules.ts scheduledDay), else null. */
   scheduled: Ymd | null;
+  /**
+   * The day they had planned, once started (In progress, Review, Done): the column keeps its last value after Start
+   * (rules.ts scheduledDay), so the card still shows it and the Schedule step stays done (Connor, Nov 22). Only when
+   * the job's last move out of Scheduled was its start or a straight finish. Null before Start.
+   */
+  plannedDay: Ymd | null;
   /** Someone lives there and Permission to enter is off: picking today or tomorrow gets the notice toast (Q7). */
   needsNotice: boolean;
+  /** The job's unit is known and nobody lives there: Getting in may say "No one lives here" (access-code.ts JobAccess). */
+  vacant: boolean;
   checklist: { id: string; title: string; done: boolean }[];
   media: JobMedia[];
   /** The ids in `media` sent with the latest Mark done, which lead under "At finish" (uploads 2.5). Empty with no Mark done set. */
@@ -366,7 +376,6 @@ export interface JobDetail {
    * above the first entry after it written by someone else.
    */
   newSince: string;
-  delivery: JobDelivery | null;
   /** The send back, date and notes changes since the viewer last looked, for the top of the page. */
   notice: JobNotice;
   /** D21: only for the assigned contractor while the job is active, and at an occupied home only with permission; else null. */
@@ -375,8 +384,6 @@ export interface JobDetail {
   tenants: JobTenants;
   /** First names of the partners a Mark done goes to, for the payoff line. */
   staffNames: string[];
-  /** HG's changes to their jobs email this contractor (job-emails.ts), so the payoff can say "You'll get an email". */
-  getsEmail: boolean;
   /** Photos Mark done asks for, from the job's playbook (TaskTemplate.finishPhotosRequired); null or 0 means optional. */
   finishPhotosRequired: number | null;
   /** When this contractor last sent the job to Review (ISO), while it is in Review: "Add photo/video" hides an hour later. Else null. */
@@ -486,7 +493,8 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
   // Where they last looked (the New divider and the notice) and the filter for codes in imported comments.
   const [since, mask] = await Promise.all([lastLooked(p, taskId), lockboxMasker(prisma, task.propertyId)]);
 
-  const [media, updates, access, staffNames, marked, notice, account] = await Promise.all([
+  const started = task.status === "IN_PROGRESS" || task.status === "REVIEW" || task.status === "DONE";
+  const [media, updates, access, staffNames, marked, notice, leftScheduled] = await Promise.all([
     prisma.taskAttachment.findMany({
       where: { taskId, ...visibleFile(p.contactId, ["IMAGE", "VIDEO"]) },
       select: { ...mediaSelect, eventId: true },
@@ -507,11 +515,17 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
       : null,
     // Only an open job has anything to tell: a closed one is read-only history.
     active ? jobNotice(p, task, since) : NO_NOTICE,
-    // Whether HG's changes email them, for the payoff's "what happens next".
-    prisma.portalAccount.findUnique({ where: { id: p.accountId }, select: JOB_EMAIL_SELECT }),
+    // The last move out of Scheduled, so a started job keeps the day only when it was started from that day (plannedDay).
+    started && task.scheduledFor
+      ? prisma.taskEvent.findFirst({
+          where: { taskId, kind: "STATUS", deletedAt: null, data: { path: ["from"], equals: "SCHEDULED" } },
+          orderBy: { createdAt: "desc" },
+          select: { data: true },
+        })
+      : null,
   ]);
+  const leftTo = leftScheduled?.data && typeof leftScheduled.data === "object" ? (leftScheduled.data as { to?: unknown }).to : null;
   const atFinish = await finishSet(taskId, media);
-  const delivery = await deliveryFor(taskId, updates);
 
   return {
     id: task.id,
@@ -523,19 +537,20 @@ export async function getJob(p: PortalPrincipal, taskId: string): Promise<JobDet
     unitLabel: task.unitLabel,
     due: toYmd(task.dueDate),
     scheduled: toYmd(scheduledDay(task)),
+    // Only when it left Scheduled to be started or finished: a day given up (to To do or Waiting) and a later start doesn't count.
+    plannedDay: leftTo === "IN_PROGRESS" || leftTo === "REVIEW" ? toYmd(task.scheduledFor) : null,
     needsNotice: access.needsNotice,
+    vacant: access.vacant,
     checklist: task.checklist,
     // The grid's order, as on the task page (lib/tasks/media.ts): the Mark done set under "At finish" first, then newest first.
     media: orderMedia(media, { atFinish }).map((a) => toMedia(p, a)),
     atFinish,
     updates,
     newSince: since.toISOString(),
-    delivery,
     notice,
     lockbox: jobLockbox(access.lockbox),
     tenants: { people: access.tenants, permitted: access.permitted },
     staffNames,
-    getsEmail: jobEmailState(account) === "on",
     finishPhotosRequired: task.taskTemplate?.finishPhotosRequired ?? null,
     markedDoneAt: marked && marked.actorContactId === p.contactId ? marked.createdAt.toISOString() : null,
   };
@@ -644,30 +659,6 @@ async function openSendBack(p: PortalPrincipal, taskId: string): Promise<JobNoti
 }
 
 /**
- * What happened to the contractor's newest update after it posted (activity
- * 2.6, portal side): queued while the partners' emails wait out the bundle
- * window, emailed once every one of them has gone. It stops there: partners
- * read updates in their email, so an app visit would say nothing about whether
- * they read it. The outbox rows are read for their state only (never their
- * items), matched on the event id the items carry.
- */
-async function deliveryFor(taskId: string, updates: readonly JobUpdate[]): Promise<JobDelivery | null> {
-  const mine = updates.findLast((u) => u.you);
-  if (!mine) return null;
-  // Through the client, never raw SQL: the only raw SQL that names the outbox is core.ts's and the send run's.
-  const rows = await prisma.notificationOutbox.findMany({
-    where: { taskId, recipientUserId: { not: null }, items: { array_contains: [{ eventId: mine.id }] } },
-    select: { sentAt: true, lastError: true, recipientUser: { select: { name: true, email: true } } },
-    orderBy: { recipientUser: { createdAt: "asc" } },
-  });
-  const partners = rows.flatMap((r) => (r.recipientUser ? [{ sentAt: r.sentAt, lastError: r.lastError, ...r.recipientUser }] : []));
-  // Emailed is sent with no error; a row closed with an error (nothing to send) said nothing to anyone.
-  const state = partnersEmailState(partners);
-  if (!state) return null;
-  return { eventId: mine.id, state, to: partners.map((r) => firstName(r.name || r.email.split("@")[0])) };
-}
-
-/**
  * Comments HG took back after the contractor could have read them (activity
  * question 3: leave "Connor removed a comment"). Their text is never read:
  * the rows carry who and when only. Whether this contractor could have read
@@ -694,6 +685,8 @@ async function removedComments(p: PortalPrincipal, taskId: string): Promise<JobU
   return rows.map((r) => ({
     id: r.id,
     kind: "removed" as const,
+    change: null,
+    stays: false,
     actorLabel: firstName(r.actorLabel),
     contractor: false,
     you: false,
@@ -711,7 +704,7 @@ async function removedComments(p: PortalPrincipal, taskId: string): Promise<JobU
 
 interface UpdateRow {
   id: string;
-  kind: "COMMENT" | "ATTACHMENT" | "STATUS";
+  kind: "COMMENT" | "ATTACHMENT" | "STATUS" | "CREATED" | "ASSIGNED" | "DUE" | "SCHEDULED" | "NOTES" | "CHECKLIST";
   source: string;
   actorLabel: string;
   actorUserId: string | null;
@@ -724,20 +717,33 @@ interface UpdateRow {
   statusTo: string | null;
   clientId: string | null;
   statusEventId: string | null;
+  itemTitle: string | null;
+  itemAction: string | null;
+  itemDone: string | null;
+  request: string | null;
+  statusDay: string | null;
 }
 
-/** The latest updates, oldest first, with the files posted in each. */
+/** The latest updates, oldest first, with the files posted in each, and the job's story among them. */
 async function jobUpdates(p: PortalPrincipal, taskId: string, mask: (body: string) => BodyPart[]): Promise<JobUpdate[]> {
   // Newest first, so a long history keeps its latest 500; then back to reading order.
-  // Only whitelisted keys of `data` are selected, one by one (from, to, edited, clientId, statusEventId), never the whole of it.
+  // Only whitelisted keys of `data` are selected, one by one (from, to, edited, clientId, statusEventId, a checklist
+  // item's title, action and tick, a request's flag, the day a move to Scheduled set), never the whole of it. From and to
+  // only where the line uses them: an assignment's or a creation's are people, and a notes edit's is the old text.
   const latest = await prisma.$queryRaw<UpdateRow[]>`
     SELECT e."id", e."kind"::text AS "kind", e."source"::text AS "source", e."actorLabel", e."actorUserId", e."actorContactId",
            e."body", e."createdAt", e."editedAt", e."data"->>'edited' AS "importedEdited",
-           e."data"->>'from' AS "statusFrom", e."data"->>'to' AS "statusTo",
+           CASE WHEN e."kind" IN ('STATUS', 'DUE', 'SCHEDULED', 'CHECKLIST') THEN e."data"->>'from' END AS "statusFrom",
+           CASE WHEN e."kind" IN ('STATUS', 'DUE', 'SCHEDULED', 'CHECKLIST') THEN e."data"->>'to' END AS "statusTo",
            CASE WHEN e."actorContactId" = ${p.contactId} THEN e."data"->>'clientId' END AS "clientId",
-           CASE WHEN e."kind" = 'COMMENT' THEN e."data"->>'statusEventId' END AS "statusEventId"
+           CASE WHEN e."kind" = 'COMMENT' THEN e."data"->>'statusEventId' END AS "statusEventId",
+           CASE WHEN e."kind" = 'CHECKLIST' THEN e."data"->>'title' END AS "itemTitle",
+           CASE WHEN e."kind" = 'CHECKLIST' THEN e."data"->>'action' END AS "itemAction",
+           CASE WHEN e."kind" = 'CHECKLIST' THEN e."data"->>'done' END AS "itemDone",
+           CASE WHEN e."kind" = 'CREATED' THEN e."data"->>'request' END AS "request",
+           CASE WHEN e."kind" = 'STATUS' THEN e."data"->>'scheduledFor' END AS "statusDay"
     FROM "TaskEvent" e
-    WHERE e."taskId" = ${taskId} AND ${portalEvents(p.contactId)}
+    WHERE e."taskId" = ${taskId} AND (${portalEvents(p.contactId)} OR ${storyEvents(p.contactId)})
     ORDER BY e."createdAt" DESC, e."id" DESC
     LIMIT 500`;
   const rows = latest.reverse();
@@ -756,7 +762,48 @@ async function jobUpdates(p: PortalPrincipal, taskId: string, mask: (body: strin
   }
 
   const out: JobUpdate[] = [];
+  const today = todayYmdEastern();
   for (const r of rows) {
+    const actorLabel = portalActorLabel(p.contactId, { userId: r.actorUserId, contactId: r.actorContactId, label: r.actorLabel }) ?? r.actorLabel;
+    // The job's story: one line each, from the contractor's own words (job-view.ts storyLine).
+    const story = r.kind !== "COMMENT" && r.kind !== "ATTACHMENT" && !(r.kind === "STATUS" && (PORTAL_STATUS_UPDATES as readonly string[]).includes(r.statusTo ?? ""));
+    if (story) {
+      const line = storyLine(
+        {
+          kind: r.kind,
+          actor: r.actorUserId || r.actorContactId ? actorLabel : null,
+          from: r.statusFrom,
+          to: r.statusTo,
+          itemTitle: r.itemTitle,
+          itemAction: r.itemAction,
+          itemDone: r.itemDone,
+          request: r.request === "true",
+          // A resident's own change (residents/requests.ts): a system line labeled "Dana Lee (resident)".
+          resident: !r.actorUserId && !r.actorContactId && r.actorLabel.endsWith(" (resident)"),
+        },
+        today,
+      );
+      if (!line) continue;
+      out.push({
+        id: r.id,
+        kind: "event",
+        change: changeKind({ kind: r.kind, data: null }),
+        stays: r.kind === "CREATED",
+        // Only a person's first name reaches the page: a system line (or a resident's) goes as HG Capital.
+        actorLabel: r.actorUserId || r.actorContactId ? actorLabel : "HG Capital",
+        contractor: !!r.actorContactId,
+        you: r.actorContactId === p.contactId,
+        body: line,
+        parts: null,
+        createdAt: r.createdAt,
+        edited: null,
+        statusTo: null,
+        attachments: { media: [], files: [] },
+        clientId: null,
+        statusEventId: null,
+      });
+      continue;
+    }
     const own = byEvent.get(r.id) ?? [];
     const attachments = {
       media: own.filter((f) => f.kind === "IMAGE" || f.kind === "VIDEO").map((f) => toMedia(p, f)),
@@ -774,12 +821,17 @@ async function jobUpdates(p: PortalPrincipal, taskId: string, mask: (body: strin
     out.push({
       id: r.id,
       kind: r.kind === "STATUS" ? "status" : r.kind === "ATTACHMENT" ? "attachment" : "comment",
-      actorLabel: portalActorLabel(p.contactId, { userId: r.actorUserId, contactId: r.actorContactId, label: r.actorLabel }) ?? r.actorLabel,
+      change: null,
+      // activity.ts isDecisionStatus: into or out of Review, or the contractor's own Start.
+      stays:
+        r.kind === "STATUS" &&
+        (r.statusTo === "REVIEW" || r.statusFrom === "REVIEW" || (!!r.actorContactId && r.statusTo === "IN_PROGRESS")),
+      actorLabel,
       contractor: !!r.actorContactId,
       you: r.actorContactId === p.contactId,
       body:
         r.kind === "STATUS"
-          ? statusUpdateText(r.statusFrom, r.statusTo, { contractor: !!r.actorContactId })
+          ? statusUpdateText(r.statusFrom, r.statusTo, { contractor: !!r.actorContactId }, { day: r.statusDay, today })
           : r.kind === "ATTACHMENT"
             ? addedText(own.map((f) => f.kind))
             : null,

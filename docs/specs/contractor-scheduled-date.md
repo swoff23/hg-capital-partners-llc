@@ -126,3 +126,64 @@ No migration: `Task.scheduledFor` and the `SCHEDULED` status already exist.
 - **One 8 am email per job per morning** holds through the whole 8 o'clock hour: a job that changes after its first line (a Start, a moved day) gets no second. The right-away heads-up (Q7) isn't held back by it.
 - **Copy**: the staff activity line reads "moved the scheduled day to Mon, Nov 23"; bulk edit's rare skip reads "needs a day" (the longer words broke the 90-character toast).
 - **Tests**: `src/lib/tasks/scheduled-day.pg.test.ts` covers the contractor's pick and the 8 am rules against a database.
+
+## 9. Job page layout A (Nov 21, Connor)
+
+Connor wants contractors to set a day as the job's first step (get the job, set a day, start, finish, then invoice and get paid once invoices ship), and found the Scheduled row easy to miss. He picked layout A from three drawn options.
+
+- **Steps** (`_components/job-steps.tsx`, rule `lib/portal/job-view.ts` `jobSteps`): Schedule, Start, Send for review, Approved, as dots joined by a line above the title, in place of the status badge. A day counts once it's set; Waiting and Canceled keep the status badge. Ink only, no gold and no status tone. On a phone only the current step is named. References: Airtasker's task steps and Amazon's order steps on Mobbin.
+- **Pick your day** (`JobDates`, editable): a card with "Pick your day" over "Due Tue, Nov 17" and a Schedule button; once set, "Scheduled" over the day (with the after-due mark) and Change. Same `DatePanel` in a `PickerLayer`, same toasts, same `?do=date`. On a phone the button is full width under the words. While the job is In progress it's the one Due row, as before. References: Lugg's and Angi's booked day on Mobbin.
+- **Layout**: the task page's grid (head, rail, main; a 320px sticky rail from lg). The rail holds Directions, Copy address, Share with crew, Tenants and Lockbox; the main column holds notes, checklist, photos and Updates. Below lg it's one column in that order. The rail has no Address heading, since the address sits under the title.
+- **Reuse**: `Card`, `buttonClass`, `PickerLayer`, `DatePanel`, `AfterDueMark`, `Section`, the task page's grid template. New: the steps list, composed from a plain `<ol>` since no stock stepper exists.
+- **Schedule stays secondary**: the bar's Start job is the page's one primary. Making Schedule the primary until a day is set is a follow-up for Connor to decide.
+
+- **Copy** (Connor, Nov 21): the first step and its button read "Schedule", not "Set a day"; the job email's button too.
+
+## 10. The job page on a phone (Nov 22, Connor)
+
+Worked phone first, replacing parts of section 9.
+
+- **Steps:** under the title, every step named under its dot and in the past tense once done (`job-view.ts` `jobSteps`): Schedule / Scheduled; Start, In progress while working, Completed once sent for review; Approval, Awaiting approval, Approved. A job started without a day passes Schedule by (no check). Names wrap to two lines rather than cut off. Send invoice / Invoice sent and Paid join once invoices ship.
+- **The job card** (card A): rows over hairlines in one card under the title. The short address on one line (it wraps on a narrow phone rather than cut off), with Directions and Copy address as square icon buttons; Due; Scheduled ("Not set" with a Schedule button, or the day, tap to change); Share with crew as a row (moved to the header, section 12). Gone: the "Pick your day" card and the full-width buttons.
+- **The bar:** on a phone the photo button is a 48px camera square. While no day is set, the bar is the camera, a light Start job and a dark Schedule, which opens the card's picker (one shared open state, `schedule-open.tsx`); once a day lands, the camera and a dark Start job.
+- **No orange or red for "not scheduled":** orange is In review's status mark on this page and red is the overdue date's (brand, one job per color), so the push is the dark button and the bar.
+- **Also:** no checklist progress bar; no "get an email" line under updates; toasts wrap instead of cut off (all toasts, `components/toast.tsx`).
+- **Open:** six drawn ideas for making Schedule louder still (day chips, a step box on top, date tiles, a to-do list) wait on Connor.
+
+## 11. Card B, Reschedule and Remove day (Nov 22, Connor)
+
+- **Card B:** the address (label over value, Directions and Copy as icon buttons), then one row split in two: Scheduled on the left, Due on the right, each a small label over the value, so the full day fits at 320. Under their day, a Schedule or Reschedule link (44px tall on touch). Share with crew moved to the header (section 12).
+- **Remove day:** the Reschedule picker's last pick, once there's a day (`DatePanel` `noneLabel`). It reverses decision 1 in section 4 ("they can move their day but not clear it"): a Scheduled job goes back to To do with no day (`core.ts` `unscheduleByContractor`, `rules.ts` `CONTRACTOR_CAN_UNSCHEDULE`), partners get "unscheduled "Fix the sink"", the toast reads "Scheduled day removed" and the line "You removed the scheduled day". Never once started. Test: `scheduled-day.pg.test.ts`.
+- **Kept after Start:** their day stays in the card while In progress or In review, without the link.
+- **Line wording:** "You scheduled the job for Fri, Nov 27" (the status event's `scheduledFor`).
+- **Updates fold** by the task page's rule (decisions, the contractor's Start and the job being added stay in view; their scheduling and status shuffles fold).
+- **My jobs:** no photo tile; a To do row with no day says "Not scheduled".
+- **Composer:** on a touch phone the field is 44px with its line centered, level with Send.
+- **Bar words** (Nov 22): "Start job" and "Schedule".
+
+## 12. Header, Getting in and the crew text (Nov 22, Connor)
+
+- **Header** (`job-header.tsx`, after Vrbo's and Angi's booking headers): the back arrow alone (`BackLink` `iconOnly`, "My jobs" as its label for screen readers), "Project details" over the short address in the middle, centered on the page, and on the right the share button, then Call HG Capital. The address stays in the card too.
+- **Share with crew** is the header's share icon (`crew-text.tsx`), opening the same sheet. Its text is option B: the title, the address, their day (else Due), then "Details, photos and updates:" and the link (`lib/portal/crew-text.ts`). No notes, checklist or code, so it never goes stale; the link shows the rest. This changes Q5 in docs/specs/contractor-job-emails.md.
+- **Getting in** (`GettingInSection`, option B, no icons): first in the rail, then Tenants. One entry line over a note: "Let yourself in" / "The tenant said it's OK" (permission and a code); "The tenant must be home" (or "A tenant must be home") / "Call/text them 24 hours in advance" (occupied, no permission); "Let yourself in" / "No one lives here" (vacant with a code). Then the code, the lockbox's place and its photo. Permission with no code shows nothing, since there's no way in to name. Shown while the job is active; a closed job shows neither section.
+- **Remove day** sits in the Reschedule picker as its last pick (section 11).
+
+### Decided before landing (Nov 22, Connor took every recommendation)
+
+1. **Toasts wrap app-wide**, staff pages included.
+2. **The composer's 44px touch field** stays on every composer (task page and deal log too), so they match.
+3. **A building-wide job behind a shared code** shows the code with no line about who lives there. "No one lives here" needs the job's own unit known and empty (`access-code.ts` `JobAccess.vacant`).
+4. **"A resident canceled this request"** on a request its resident canceled; "Connor canceled this job" otherwise.
+5. **Getting in stays while In review**, so a job sent back can be reached.
+6. **A job started with no day** leaves Schedule unchecked for good, as it was skipped.
+7. **A job handed away and back** shows the contractor both of their stretches and nothing between, with no "took you off" line.
+
+### Shared links and the device check (Nov 22, Connor)
+
+- **Someone the job was shared with** (a Share with crew link, `JobLink` kind CREW) sees that one job and no way to My jobs: no back arrow (its slot stays empty so the middle stays centered), no "Back to my jobs" on the not-available screen, and after Send for review "Back to the job", which closes the sheet. They may not be the contractor, so that sheet reads "Thanks!" and says the contractor gets the email. The flag is `PortalPrincipal.shared` (`lib/portal/session.ts`), handed to the page by `SharedLinkProvider` in the portal layout (`p/_components/shared-link.tsx`), so the loading and error screens know it too. A UI hint only: the session's `onlyTaskId` is what keeps them on the job.
+- **The contractor's own email link: Welcome back** (Connor picked option A of three drawn, Nov 22; the others were a password only, or the email link opening every job, which a forwarded email would hand to anyone). The back arrow, the not-available screen's "Back to my jobs" and the payoff's go to My jobs, which sends a one-job session to sign in, where `/login` shows "Welcome back, Zack" / "Sign in to see all your jobs.", their email beside their mark (not typed), Password, Sign in, Forgot password?, a divider and "Email me a sign-in link", with "Back to the job" above. References: Etsy's, Viator's, GetYourGuide's and Eventbrite's Welcome back on Mobbin (mobbin.com/screens/97215608-47d8-4103-8a92-c70894e4f4a9, 0f0d46dd-7a84-48ea-82aa-846fcefc9411, 578bae87-3a15-416e-902e-fa8b89ee410c, 49cb4721-c99d-4f17-aa73-251794e040ec).
+- **The sign-in link** goes only to the login's own email, never one typed in, so a forwarded job email can't reach the rest of their jobs. It works once, for 15 minutes, 3 an hour per login (`lib/portal/sign-in-link-core.ts`, `PortalSignInLink`, a `SIGN_IN_LINK_REQUESTED` audit row that counts against the daily email cap once sent). The email reads "Hi Zack, here's your link to sign in to HG Capital jobs." with a Sign in button. Its page, `/login/link`, asks for one tap on Sign in before it spends the link, since work email scanners open every link (as a reset link does), then opens a full session; a starting password is still changed first. A used or late link says "This link has expired" with Back to sign in. After the request: "Check your email" / "The link works once, for 15 minutes." / "Sent to zack@…". Not offered to a crew link, or on plain sign in.
+- **After review (Nov 22):** Welcome back has "Use a different email" under the address (Etsy's and Viator's wording), which ends the email link's session on that browser so a crew lead on a forwarded email, or a partner, can sign in as themselves; and a staff page that sent you to sign in always gets the plain form. Unused sign-in links die wherever reset links do (an email change, a password change or reset, Remove access) and on Sign out everywhere. A login still on its starting password goes from the link to Choose a new password, which asks for no old one, rather than to the first-password page, which does. The Sign in post is refused from another site (login CSRF, `Sec-Fetch-Site`). "Password changed" shows on Welcome back after a reset; mid-setup it has no Back to the job, since the job won't open until setup is done. A contractor's own email link replaces a crew link's session on the same job.
+- **Payoff line** (Connor, Nov 22: "should just be simple"): "Sent to Connor and Pieter for review." (HG Capital with three or more), with no email promise.
+- **The device check** sweeps a second job for its contractor, kept at To do with no day (`tests/devices/setup.ts` `seedPortalTodoJob`, page `/p/jobs/[id]#todo`), so the Schedule step, "Not set" and the three-control bar are in the report; the same job through a crew link (`/p/jobs/[id]#crew`); and Welcome back through an email link (`/login#welcome-back`, `seedLinkSessions`).
+

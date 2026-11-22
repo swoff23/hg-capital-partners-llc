@@ -4,6 +4,8 @@ import type { FileKind } from "@/lib/attachments/content-types";
 import { daysUntil, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { firstName as greetingName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
+import { STATUS_LABEL } from "@/lib/task-scope";
+import { eventLine, fmtShortDay } from "@/lib/tasks/activity";
 import { TOAST_ACTION_MS } from "@/lib/toast-time";
 
 /**
@@ -37,8 +39,6 @@ export interface JobCard {
   status: TaskStatus;
   /** The property's full address, or null for a job with no property. */
   address: string | null;
-  /** The property's front photo (public Blob), or null: the fallback tile. */
-  photoUrl: string | null;
   unitLabel: string | null;
   /** HG Capital's due date, never shown in red here. */
   due: Ymd | null;
@@ -177,10 +177,16 @@ export const PORTAL_STATUS_UPDATES = ["SCHEDULED", "IN_PROGRESS", "REVIEW", "DON
  * progress or Review is a status change ("Connor moved it to Review"), as in
  * the email, so a partner's move never reads as the contractor's own.
  */
-export function statusUpdateText(from: string | null, to: string | null, by: { contractor: boolean } = { contractor: true }): string {
+export function statusUpdateText(
+  from: string | null,
+  to: string | null,
+  by: { contractor: boolean } = { contractor: true },
+  // The day a move to Scheduled set, and today for its words: "scheduled the job for Fri, Nov 27" (Connor, Nov 22).
+  scheduled: { day: string | null; today: Ymd } | null = null,
+): string {
   switch (to) {
     case "SCHEDULED":
-      return "scheduled the job";
+      return scheduled?.day ? `scheduled the job for ${fmtShortDay(scheduled.day as Ymd, scheduled.today)}` : "scheduled the job";
     case "IN_PROGRESS":
       return from === "REVIEW" ? "sent it back" : by.contractor ? "started the job" : "moved it to In progress";
     case "REVIEW":
@@ -226,6 +232,76 @@ export function portalActorLabel(
   return actor.userId || actor.contactId ? firstName(label) : label;
 }
 
+/**
+ * Statuses only the job's story shows (docs/specs/contractor-timeline.md): a
+ * move to these is a plain line, never counted as new and never a rail mark.
+ */
+export const STORY_STATUSES = ["OPEN", "WAITING", "CANCELED"] as const satisfies readonly TaskStatus[];
+
+/**
+ * One event of the job's story, as the portal reads it (queries.ts
+ * jobUpdates): only the fields a line needs, never the event's whole `data`.
+ * `actor` is portalActorLabel's ("You", a first name), null for the system.
+ */
+export interface StoryRow {
+  kind: string;
+  actor: string | null;
+  from: string | null;
+  to: string | null;
+  /** CHECKLIST: the item, what was done to it ("renamed", "removed", "restored") and a tick's "true" or "false". */
+  itemTitle: string | null;
+  itemAction: string | null;
+  itemDone: string | null;
+  /** CREATED: a resident's request from their link. */
+  request: boolean;
+  /** A resident made the change (their request's cancel), so the line never names them or calls it HG Capital's. */
+  resident?: boolean;
+}
+
+/**
+ * The line a contractor reads for one event of the job's story
+ * (docs/specs/contractor-timeline.md, section 2), or null for anything off
+ * its list, so a kind added later never shows by accident. The staff page's
+ * own words (activity.ts eventLine) for dates, notes and the checklist; the
+ * contractor's for the rest: "Connor added this job", "Connor gave you this
+ * job", "Connor canceled this job". A resident who sent a request isn't
+ * named (call 1), and a move to Waiting never carries its reason (call 2:
+ * jobUpdates doesn't read it either).
+ */
+export function storyLine(r: StoryRow, today: Ymd): string | null {
+  const a = r.actor ?? "HG Capital";
+  switch (r.kind) {
+    case "CREATED":
+      return r.request ? "A resident sent this request" : `${a} added this job`;
+    case "ASSIGNED":
+      return r.actor ? `${a} gave you this job` : "This job was given to you";
+    case "STATUS":
+      if (r.from === "DRAFT") return null;
+      if (r.to === "CANCELED") return r.resident ? "A resident canceled this request" : `${a} canceled this job`;
+      // Their own Remove day (core.ts unscheduleByContractor) is a move from Scheduled back to To do.
+      if (r.to === "OPEN" && r.from === "SCHEDULED" && r.actor === "You") return "You removed the scheduled day";
+      if (r.to === "OPEN" || r.to === "WAITING") return `${a} set status to ${STATUS_LABEL[r.to]}`;
+      return null;
+    case "SCHEDULED":
+      // Their own Remove day on a To do or Waiting job that kept a day (core.ts unscheduleByContractor).
+      if (!r.to && r.actor === "You") return "You removed the scheduled day";
+    // falls through
+    case "DUE":
+    case "NOTES":
+    case "CHECKLIST": {
+      const data =
+        r.kind === "CHECKLIST"
+          ? { title: r.itemTitle, action: r.itemAction, from: r.from, to: r.to, done: r.itemDone === "true" ? true : r.itemDone === "false" ? false : undefined }
+          : { from: r.from, to: r.to };
+      // No ids: eventLine then names the actor by the label as given, which is already the portal's.
+      const event = { id: "", kind: r.kind, visibility: "INTERNAL", actorLabel: a, actorUserId: null, actorContactId: null, body: null, data, createdAt: new Date(0) } as const;
+      return eventLine(event, {}, today).text;
+    }
+    default:
+      return null;
+  }
+}
+
 /** "Connor and Pieter", "Connor, Pieter and Dana". */
 export function joinNames(names: string[]): string {
   if (names.length <= 1) return names[0] ?? "";
@@ -247,6 +323,42 @@ export function updateTimeLabel(at: Date, now: Date): string {
   if (d === -1) return "yesterday";
   if (d > -7 && d < 0) return fmt(day, { weekday: "short" });
   return fmt(day, { month: "short", day: "numeric", ...(day.slice(0, 4) === today.slice(0, 4) ? {} : { year: "numeric" }) });
+}
+
+/** One step on the job page: what it says, and whether it's done, the one they're on, still to come, or passed by. */
+export interface JobStepView {
+  label: string;
+  state: "done" | "current" | "next" | "skipped";
+}
+
+/**
+ * The job page's steps (Connor, Nov 22): Schedule, Start and Approval, each
+ * named for what's next and in the past tense once done: Schedule, then
+ * Scheduled; Start, In progress while they work, then Completed once it's
+ * sent for review; Approval, Awaiting approval while HG Capital reviews, then
+ * Approved. Send invoice and Paid join once invoices ship. A day counts once
+ * it's set, whatever the status says; a job started without one passes
+ * Schedule by ("skipped": no check, since nothing was scheduled). Null for
+ * Waiting and Canceled, which aren't steps: the page shows their status.
+ */
+export function jobSteps(status: TaskStatus, scheduled: string | null): JobStepView[] | null {
+  const before = status === "OPEN" || status === "SCHEDULED";
+  if (!before && status !== "IN_PROGRESS" && status !== "REVIEW" && status !== "DONE") return null;
+  const schedule: JobStepView = scheduled
+    ? { label: "Scheduled", state: "done" }
+    : { label: "Schedule", state: before ? "current" : "skipped" };
+  const work: JobStepView = before
+    ? { label: "Start", state: scheduled ? "current" : "next" }
+    : status === "IN_PROGRESS"
+      ? { label: "In progress", state: "current" }
+      : { label: "Completed", state: "done" };
+  const approval: JobStepView =
+    status === "DONE"
+      ? { label: "Approved", state: "done" }
+      : status === "REVIEW"
+        ? { label: "Awaiting approval", state: "current" }
+        : { label: "Approval", state: "next" };
+  return [schedule, work, approval];
 }
 
 /** The bottom bar's main button for a job in this state; null when it's read-only. */
@@ -480,13 +592,13 @@ export function undoWindowOpen(postedAt: Date | string, now: Date): boolean {
 }
 
 /**
- * The line on the Mark done payoff: who it went to and what happens next. An
- * email is promised only to a contractor who gets them
- * (src/lib/portal/job-emails.ts); with their Job emails switch off, the next
- * word from HG is here in the portal.
+ * The line on the Send for review payoff: who it went to, and that it's for
+ * review, in one sentence (Connor, Nov 22: "should just be simple"). It
+ * promised an email once, which depended on the contractor's Job emails
+ * switch and wasn't theirs to get on a shared link.
  */
-export function payoffLine(to: string, getsEmail: boolean): string {
-  return getsEmail ? `Sent to ${to}. You'll get an email if anything else is needed.` : `Sent to ${to}. Check back here if anything else is needed.`;
+export function payoffLine(to: string): string {
+  return `Sent to ${to} for review.`;
 }
 
 /** What the toast says after a batch posts: "3 photos posted", "1 video posted", "2 files posted". */

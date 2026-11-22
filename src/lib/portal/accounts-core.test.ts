@@ -32,6 +32,7 @@ function fakeAccounts(opts: { staffEmails?: string[] } = {}) {
   ];
   const writes: string[] = [];
   const events: { kind: string; data: unknown }[] = [];
+  const signInLinksSpentFor: string[] = [];
   const tx = {
     portalAccount: {
       findUnique: async ({ where }: { where: { id?: string; email?: string } }) => {
@@ -55,6 +56,13 @@ function fakeAccounts(opts: { staffEmails?: string[] } = {}) {
         return { count: hit.length };
       },
     },
+    portalSignInLink: {
+      updateMany: async ({ where }: { where: { accountId: string; usedAt: null } }) => {
+        writes.push("sign-in-links");
+        signInLinksSpentFor.push(where.accountId);
+        return { count: 1 };
+      },
+    },
     securityEvent: {
       create: async ({ data }: { data: { kind: string; data: unknown } }) => {
         writes.push("event");
@@ -62,11 +70,11 @@ function fakeAccounts(opts: { staffEmails?: string[] } = {}) {
       },
     },
   } as unknown as Prisma.TransactionClient;
-  return { tx, accounts, tokens, writes, events };
+  return { tx, accounts, tokens, writes, events, signInLinksSpentFor };
 }
 
-test("changePortalEmailIn: a reset link mailed to the old address stops working", async () => {
-  const { tx, accounts, tokens, writes, events } = fakeAccounts();
+test("changePortalEmailIn: a reset or sign-in link mailed to the old address stops working", async () => {
+  const { tx, accounts, tokens, writes, events, signInLinksSpentFor } = fakeAccounts();
   await changePortalEmailIn(tx, "a1", "zack@new.example", STAFF);
   assert.equal(accounts[0].email, "zack@new.example");
   // Both of this login's open links are spent; the used one and another contractor's are left alone.
@@ -74,8 +82,10 @@ test("changePortalEmailIn: a reset link mailed to the old address stops working"
   assert.equal(tokens.find((t) => t.id === "r2")!.usedAt instanceof Date, true);
   assert.equal(tokens.find((t) => t.id === "r3")!.usedAt, LATER);
   assert.equal(tokens.find((t) => t.id === "r4")!.usedAt, null);
+  // Welcome back's sign-in links go too (sign-in-link-core.ts).
+  assert.deepEqual(signInLinksSpentFor, ["a1"]);
   // After the email changes, in the same transaction, and before the log line.
-  assert.deepEqual(writes, ["account", "tokens", "event"]);
+  assert.deepEqual(writes, ["account", "tokens", "sign-in-links", "event"]);
   assert.deepEqual(events, [{ kind: "ACCOUNT_DISABLED", userId: "u-connor", contactId: "c-zack", ipHash: null, taskId: null, data: { action: "email-changed", from: "zack@old.example", to: "zack@new.example" } }]);
 });
 

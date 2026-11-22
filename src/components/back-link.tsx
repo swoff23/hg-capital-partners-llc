@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { useLeaveGuard } from "@/components/leave-guard";
+import { buttonClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 /**
@@ -44,7 +45,18 @@ function withoutAsk(href: string): string {
  * LeaveGuard it asks first while something holds the page (photos still
  * uploading on the contractor's job).
  */
-export function BackLink({ fallback, label, className }: { fallback: string; label: string; className?: string }) {
+export function BackLink({
+  fallback,
+  label,
+  className,
+  iconOnly = false,
+}: {
+  fallback: string;
+  label: string;
+  className?: string;
+  /** The arrow alone, as a 44px ghost icon button named by `label` (the contractor's job header; Connor, Nov 22). */
+  iconOnly?: boolean;
+}) {
   const router = useRouter();
   const guard = useLeaveGuard();
 
@@ -57,13 +69,16 @@ export function BackLink({ fallback, label, className }: { fallback: string; lab
     <button
       type="button"
       onClick={() => guard(goBack)}
+      aria-label={iconOnly ? label : undefined}
       className={cn(
-        "inline-flex items-center gap-1 text-meta font-medium text-fg-2 hover:text-foreground hover:underline pointer-coarse:min-h-11 print:hidden",
+        iconOnly
+          ? cn(buttonClass({ variant: "ghost", icon: true }), "h-11 w-11 print:hidden")
+          : "inline-flex items-center gap-1 text-meta font-medium text-fg-2 hover:text-foreground hover:underline pointer-coarse:min-h-11 print:hidden",
         className,
       )}
     >
-      <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-      {label}
+      <ArrowLeft className={iconOnly ? "size-5" : "h-3.5 w-3.5 shrink-0"} aria-hidden="true" />
+      {!iconOnly && label}
     </button>
   );
 }

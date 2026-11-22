@@ -14,6 +14,8 @@ const CONTRACTOR_CAN_START: readonly TaskStatus[] = ["OPEN", "SCHEDULED", "WAITI
 const CONTRACTOR_CAN_FINISH: readonly TaskStatus[] = ["OPEN", "SCHEDULED", "IN_PROGRESS", "WAITING"];
 /** Picking their day turns a To do or Waiting job Scheduled (docs/specs/contractor-scheduled-date.md, Q2). Only core.ts scheduleByContractor asks. */
 const CONTRACTOR_CAN_SCHEDULE: readonly TaskStatus[] = ["OPEN", "WAITING"];
+// Taking their day off a Scheduled job puts it back to To do (core.ts unscheduleByContractor; Connor, Nov 22).
+const CONTRACTOR_CAN_UNSCHEDULE: readonly TaskStatus[] = ["SCHEDULED"];
 
 /**
  * No status change goes to or from Draft, for anyone (docs/specs/tasks-from-claude.md 6.1): a draft becomes a task
@@ -26,6 +28,7 @@ export function canSetStatus(kind: PrincipalKind, from: TaskStatus, to: TaskStat
   if (to === "IN_PROGRESS") return CONTRACTOR_CAN_START.includes(from);
   if (to === "REVIEW") return CONTRACTOR_CAN_FINISH.includes(from);
   if (to === "SCHEDULED") return CONTRACTOR_CAN_SCHEDULE.includes(from);
+  if (to === "OPEN") return CONTRACTOR_CAN_UNSCHEDULE.includes(from);
   return false;
 }
 

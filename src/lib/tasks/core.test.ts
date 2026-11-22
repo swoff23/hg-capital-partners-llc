@@ -512,6 +512,9 @@ test("status email lines: Approve and the contractor's Start have their own word
   assert.equal(statusSummary({ ...base, from: "REVIEW", to: "DONE", actor: "staff" }, now), 'approved "Cabinet install"');
   assert.equal(statusSummary({ ...base, from: "OPEN", to: "DONE", actor: "staff" }, now), 'set "Cabinet install" to done');
   assert.equal(statusSummary({ ...base, from: "SCHEDULED", to: "IN_PROGRESS", actor: "contractor" }, now), 'started "Cabinet install"');
+  // A contractor's Remove day (unscheduleByContractor); staff putting it back to To do keeps the plain words.
+  assert.equal(statusSummary({ ...base, from: "SCHEDULED", to: "OPEN", actor: "contractor" }, now), 'unscheduled "Cabinet install"');
+  assert.equal(statusSummary({ ...base, from: "SCHEDULED", to: "OPEN", actor: "staff" }, now), 'set "Cabinet install" to open');
   assert.equal(statusSummary({ ...base, from: "SCHEDULED", to: "IN_PROGRESS", actor: "staff" }, now), 'set "Cabinet install" to in progress');
   assert.equal(statusSummary({ ...base, from: "REVIEW", to: "IN_PROGRESS", actor: "staff", note: "Level it" }, now), 'sent "Cabinet install" back: Level it');
   assert.equal(statusSummary({ ...base, from: "IN_PROGRESS", to: "REVIEW", actor: "contractor" }, now), 'sent "Cabinet install" for review');

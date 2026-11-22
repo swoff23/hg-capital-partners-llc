@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { todayYmdEastern } from "@/lib/dates";
-import { accessState, tenantUnit } from "@/lib/tasks/lockbox";
+import { accessState, homeIsVacant, tenantUnit } from "@/lib/tasks/lockbox";
 import { livingLease } from "@/lib/tenants/status";
 
 /**
@@ -109,11 +109,15 @@ export type JobTenant = { name: string; phone: string | null; dial: string | nul
  */
 /**
  * `needsNotice`: someone lives there and Permission to enter is off, so the contractor gives the tenant 24 hours'
- * notice before going (docs/specs/contractor-scheduled-date.md, Q6 and Q7).
+ * notice before going (docs/specs/contractor-scheduled-date.md, Q6 and Q7). `vacant`: the job's own unit is known
+ * and nobody lives there today (lockbox.ts homeIsVacant). Not the same as "not occupied": a building-wide job at a
+ * home of several units (no unit picked), a job on its house-meter row, or a unit saved before ids existed has no
+ * known household, and a shared code still shows, so the page says nothing about who lives there rather than "No
+ * one lives here".
  */
-export type JobAccess = { tenants: JobTenant[]; permitted: boolean; needsNotice: boolean; lockbox: LockboxAccess | null };
+export type JobAccess = { tenants: JobTenant[]; permitted: boolean; needsNotice: boolean; vacant: boolean; lockbox: LockboxAccess | null };
 
-export const NO_ACCESS: JobAccess = { tenants: [], permitted: false, needsNotice: false, lockbox: null };
+export const NO_ACCESS: JobAccess = { tenants: [], permitted: false, needsNotice: false, vacant: false, lockbox: null };
 
 type JobAccessReader = Pick<PrismaClient, "property" | "lease">;
 
@@ -145,6 +149,7 @@ export async function readJobAccess(
     tenants: (living?.tenants ?? []).map(({ tenant: t }) => ({ name: t.fullName, phone: t.phone, dial: t.phoneE164 ?? t.phone })),
     permitted: state.permitted,
     needsNotice: state.occupied && !state.permitted,
+    vacant: homeIsVacant(list, job.unitLabel, living),
     lockbox: state.showsLockbox ? pickLockboxAccess(row.units, job.unitLabel) : null,
   };
 }

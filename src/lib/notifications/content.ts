@@ -43,6 +43,11 @@ export interface OutboxItem {
    * notes. STATUS: the status. Absent on rows queued before Nov 15.
    */
   from?: string;
+  /**
+   * STATUS out of Scheduled: the day it had ("" for none), so Remove day and a new day in one bundle aren't read as
+   * nothing changed (undoneDropped). Absent before Nov 22, and on moves from any other status.
+   */
+  fromDay?: string;
   /** OFF ("took you off"): the job as they knew it then (jobKey), for offItems. Absent on lines queued before Nov 20. */
   job?: string;
 }
@@ -329,8 +334,13 @@ export function undoneDropped(
   };
   const undone = new Set<string>(UNDOABLE_KINDS.filter((kind) => {
     const first = items.find((i) => i.kind === kind);
-    return first?.from !== undefined && first.from === current[kind];
+    if (first?.from === undefined || first.from !== current[kind]) return false;
+    // Out of Scheduled and back is only put back when the day is too: Remove day, then a new day, is a real move.
+    if (kind === "STATUS" && first.from === "SCHEDULED" && first.fromDay !== undefined && first.fromDay !== current.DAY) return false;
+    return true;
   }));
+  // A status put back somewhere other than Scheduled takes any day set in between with it: that day is gone.
+  if (undone.has("STATUS") && now.status !== "SCHEDULED") undone.add("DAY");
   return items.filter((i) => !undone.has(i.kind));
 }
 
@@ -488,6 +498,7 @@ export function itemText(item: OutboxItem, title?: string): string {
       // The contractor's scheduled day; a contractor's own move carries "(was Tue, Nov 17)".
       const m = /^moved ".*" to (.+)$/.exec(s);
       if (m && m[1] !== "no date") return `moved the scheduled day to ${m[1]}`;
+      if (/^unscheduled ".*"/.test(s)) return "removed the scheduled day";
       return "cleared the scheduled day";
     }
     case "COMMENT": {
@@ -499,6 +510,8 @@ export function itemText(item: OutboxItem, title?: string): string {
       const scheduled = /^scheduled ".*" for (.+)$/.exec(s);
       if (scheduled) return `scheduled it for ${scheduled[1]}`;
       if (/^approved ".*"$/.test(s)) return "approved it";
+      // A contractor's Remove day (core.ts unscheduleByContractor): greedy, so a title with a quote stays whole.
+      if (/^unscheduled ".*"$/.test(s)) return "removed the scheduled day";
       // Only the contractor's own Start reads as starting the job (core.ts statusSummary).
       if (/^started ".*"$/.test(s)) return "started the job";
       const set = /^set ".*" to (.+)$/.exec(s);
@@ -678,7 +691,7 @@ export function threadKey(taskId: string): string {
   return `job-${taskId}`;
 }
 
-/** Directions to the building, the job page's target (job-details.tsx AddressActions). */
+/** Directions to the building, the job page's target (job-details.tsx AddressRow). */
 export function directionsUrl(address: string | null): string | null {
   return address ? `https://maps.apple.com/?daddr=${encodeURIComponent(address)}` : null;
 }
@@ -763,7 +776,7 @@ export function replyLine(staffNames: readonly string[]): string {
 
 /**
  * The buttons (spec 2.2, 3, 8): the job's next step first. A contractor's are
- * Start job, Mark done or See job, with Add photos and Text to my crew beside
+ * Start job, Mark done or See job, with Add photos and Share with crew beside
  * the first two while the job takes them; a partner's are Approve and Send
  * back while it waits in Review, otherwise Open task. See job and Open task
  * open at the first update in the bundle (rows queued before items named one
@@ -796,7 +809,7 @@ function buttons(input: {
   const to = (step: JobLinkStep | null, update: string | null = null) =>
     token ? jobLinkUrl(input.appUrl, token, step, update) : openUrl(input.appUrl, "contractor", input.taskId, update);
   const changeDay = token && contractorMaySetDate(input.status) ? [{ label: "Change day", url: to("date") }] : [];
-  // The 24-hour notice heads-up (Q6): reach the tenant (the job opens at its Tenants), or pick another day.
+  // The 24-hour notice heads-up (Q6): reach the tenant (the job opens at Getting in, the notice rule over the Tenants), or pick another day.
   if (input.items.some((i) => NOTICE_KINDS.has(i.kind)) && token && input.hasAccess) {
     return { primary: { label: "Text the tenant", url: to("access") }, secondary: changeDay };
   }
@@ -805,7 +818,7 @@ function buttons(input: {
   const extras: EmailButton[] =
     overdue && changeDay.length
       ? changeDay
-      : [{ label: "Add photos", url: to("photos") }, ...(token ? [{ label: "Text to my crew", url: to("share") }] : [])];
+      : [{ label: "Add photos", url: to("photos") }, ...(token ? [{ label: "Share with crew", url: to("share") }] : [])];
   const step = nextStep(input.status);
   if (step === "start") return { primary: { label: "Start job", url: to(null) }, secondary: extras };
   if (step === "done") return { primary: { label: "Send for review", url: to("done") }, secondary: extras };

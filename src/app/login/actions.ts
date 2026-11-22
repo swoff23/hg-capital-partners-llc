@@ -7,10 +7,11 @@ import { loginThrottle } from "@/lib/login-throttle";
 import { afterStaffSignIn, staffReturnPath } from "@/lib/next-path";
 import { verifyPassword } from "@/lib/password";
 import { authenticatePortalAccount } from "@/lib/portal/accounts";
-import { afterPortalSignIn, portalReturnPath } from "@/lib/portal/next-path";
+import { afterPortalSignIn, portalReturnPath, withNext } from "@/lib/portal/next-path";
 import { requestIpHash } from "@/lib/portal/request";
 import { startPasswordReset } from "@/lib/portal/reset";
-import { startPortalSession } from "@/lib/portal/session";
+import { endPortalSession, getPortalPrincipal, startPortalSession } from "@/lib/portal/session";
+import { emailSignInLink } from "@/lib/portal/sign-in-link";
 import { SESSION_COOKIE, SESSION_TTL_MS, signSession } from "@/lib/session";
 import type { LoginState } from "./login-state";
 
@@ -89,3 +90,30 @@ export async function requestPasswordReset(formData: FormData) {
   await startPasswordReset(String(formData.get("email") ?? ""), await requestIpHash());
   redirect("/login/forgot?sent=1");
 }
+
+/**
+ * Welcome back's "Email me a sign-in link" (docs/specs/contractor-scheduled-date.md section 12): only for a session
+ * an email's job link started, and only to that login's own email (lib/portal/sign-in-link.ts). Anyone else goes back
+ * to plain sign in. The page answers the same whether or not the hourly limit let it go.
+ */
+export async function requestSignInLink() {
+  if (!getEnv().portalEnabled) notFound();
+  const principal = await getPortalPrincipal();
+  if (!principal?.onlyTaskId || principal.shared) redirect("/login");
+  await emailSignInLink(principal, await requestIpHash());
+  redirect("/login?notice=link-sent");
+}
+
+/**
+ * Welcome back's "Use a different email" (Etsy's and Viator's Welcome back): ends the session the job email's link
+ * started, on this browser only, so /login shows the plain form for whoever is signing in (a crew lead on a
+ * forwarded email, or a partner). Their job emails' links still work. Only a one-job session is ended here.
+ */
+export async function signInAsSomeoneElse(formData: FormData) {
+  if (!getEnv().portalEnabled) notFound();
+  const principal = await getPortalPrincipal();
+  if (principal?.onlyTaskId) await endPortalSession(principal);
+  const rawNext = formData.get("next");
+  redirect(withNext("/login", portalReturnPath(rawNext) ?? staffReturnPath(rawNext)));
+}
+

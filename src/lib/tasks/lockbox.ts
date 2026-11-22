@@ -61,6 +61,21 @@ export function tenantUnit(units: readonly UnitCode[], unitLabel: string | null 
 }
 
 /**
+ * The job's home is known and nobody lives there today, so the job page may
+ * say "No one lives here" (docs/specs/contractor-scheduled-date.md section
+ * 12). Not the same as not occupied: a building with several units and none
+ * picked, or a unit saved before ids existed, names no household, and a
+ * house-meter row (a boiler or a hallway at a duplex) is the building's, not
+ * an empty home, so none of those is vacant.
+ */
+export function homeIsVacant(units: readonly UnitCode[], unitLabel: string | null | undefined, living: unknown): boolean {
+  if (living || !tenantUnit(units, unitLabel)) return false;
+  if (!clean(unitLabel)) return true;
+  const unit = units.find((u) => sameLabel(u.label, unitLabel));
+  return !!unit && !isHouseMeterRow(unit);
+}
+
+/**
  * What a job at an occupied or vacant home shows (docs/specs/tenant-contact.md
  * section 2, tenants.md section 8). `living` is the lease living in
  * tenantUnit's unit today (tenants/status.ts livingLease), or null when it's

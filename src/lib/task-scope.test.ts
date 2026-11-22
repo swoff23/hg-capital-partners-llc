@@ -212,6 +212,7 @@ test("every file that reaches tasks through another model or in raw SQL is on a 
     "lib/notifications/outbox.ts": "the send run reads each row's task, and closes a row for a draft unsent (content.ts dueRowVerdict)",
     "lib/portal/job-links.ts": "a link reads its task's status, and opens only an active job",
     "lib/portal/queries.ts": "raw reads of the lines and files of jobs contractorCanOpen returned, joined to an unrevoked access row",
+    "lib/portal/story-events.ts": "the job's story lines, a filter on the lines of a job getJob already opened (contractorCanOpen), timed from the viewer's unrevoked access row",
     "lib/properties/photo.ts": "the task title beside a photo takenHerePhotosWhere returned (never a draft's photo)",
     "lib/residents/requests.ts": "a resident's own requests and a row lock on one's task by id; submitRequest makes that task, which is never a draft",
     "lib/residents/updates.ts": "each resident request's task status for its update emails; that task is never a draft",

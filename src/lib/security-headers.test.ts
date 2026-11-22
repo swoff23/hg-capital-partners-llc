@@ -39,6 +39,13 @@ test("the file routes keep their own CSP, and the media viewer can still frame a
   assert.equal(h["x-content-type-options"], "nosniff");
 });
 
+test("a sign-in link's page keeps no-referrer and no-store, as the reset page does", async () => {
+  const h = await headersFor("/login/link");
+  assert.equal(h["referrer-policy"], "no-referrer");
+  assert.equal(h["cache-control"], "no-store");
+  assert.equal(h["x-frame-options"], "SAMEORIGIN");
+});
+
 test("the reset page keeps its no-referrer and no-store", async () => {
   const h = await headersFor("/login/reset");
   assert.equal(h["referrer-policy"], "no-referrer");

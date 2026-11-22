@@ -44,7 +44,7 @@ test("Add's Undo ends before the job email's quiet time does", () => {
   assert.ok(BUNDLE_QUIET_MS - APPROVAL_UNDO_MS >= 60_000, "a full minute to spare, the send run's own interval");
 });
 
-test("contractors can only Start job, Mark done and schedule their own day", () => {
+test("contractors can only Start job, Mark done, and schedule or unschedule their own day", () => {
   assert.equal(canSetStatus("contractor", "OPEN", "IN_PROGRESS"), true);
   assert.equal(canSetStatus("contractor", "SCHEDULED", "IN_PROGRESS"), true);
   assert.equal(canSetStatus("contractor", "IN_PROGRESS", "REVIEW"), true);
@@ -60,6 +60,12 @@ test("contractors can only Start job, Mark done and schedule their own day", () 
   assert.equal(canSetStatus("contractor", "WAITING", "SCHEDULED"), true);
   assert.equal(canSetStatus("contractor", "IN_PROGRESS", "SCHEDULED"), false);
   assert.equal(canSetStatus("contractor", "REVIEW", "SCHEDULED"), false);
+  // Taking their day off: only a Scheduled job goes back to To do.
+  assert.equal(canSetStatus("contractor", "SCHEDULED", "OPEN"), true);
+  assert.equal(canSetStatus("contractor", "WAITING", "OPEN"), false);
+  assert.equal(canSetStatus("contractor", "IN_PROGRESS", "OPEN"), false);
+  assert.equal(canSetStatus("contractor", "REVIEW", "OPEN"), false);
+  assert.equal(canSetStatus("contractor", "DONE", "OPEN"), false);
 });
 
 test("a stale tab's Start job or Mark done is told where the job is now, not the rule", () => {
