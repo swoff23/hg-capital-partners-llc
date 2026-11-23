@@ -1,5 +1,7 @@
 # Resident maintenance requests
 
+> **Partly superseded (Nov 22, 2026):** what sends, the layout, subject words, previews, From names and the morning emails now follow [emails-redesign.md](emails-redesign.md). Where the two disagree, that spec wins.
+
 Residents report repairs from their phone through a link of their own. Each request becomes a task in Needs you, with their words, photos or video, whether we can come in when they're not home and whether there are pets. They follow it on a three-step page (Received, Scheduled, Done) and hear about changes by email, but never see your comments. The goal is to move repair requests out of the group chats and into tracked tasks. It was planned with Connor on Nov 21, 2026, against `bd4ab1e`. He said "build it" the same day, paused it for computer memory, then said "build it" again; it was built on Nov 21. Section 10 lists where the build differs from this plan. The drawings are in [maintenance-requests/](maintenance-requests/).
 
 ## 1. Summary

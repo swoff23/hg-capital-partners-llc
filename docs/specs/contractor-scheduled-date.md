@@ -1,5 +1,7 @@
 # A contractor's scheduled day
 
+> **Partly superseded (Nov 22, 2026):** what sends, the layout, subject words, previews, From names and the morning emails now follow [emails-redesign.md](emails-redesign.md). Where the two disagree, that spec wins.
+
 Planned with Connor on Nov 21, 2026, one question at a time (Q1 to Q9 below, with his own asks between them). Mockups live in [contractor-scheduled-date/](contractor-scheduled-date/). He said "build it" the same day; section 8 lists where the build differs from this plan.
 
 ## 1. Summary

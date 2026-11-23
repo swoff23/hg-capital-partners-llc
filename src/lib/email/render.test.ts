@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { brandTokens } from "@/lib/brand-tokens";
-import { escapeHtml, escapeWithBreaks, renderJobEmail, renderPlainEmail } from "./render";
+import { escapeHtml, escapeWithBreaks, renderJobEmail, renderPlainEmail, type JobEmailDetails, type JobEmailInput } from "./render";
 
 const input = {
   line: "Choose a new password for your HG jobs login.",
@@ -106,115 +106,149 @@ test("the letterhead is the HG tile and the company name over a gold-deep rule",
   assert.ok(html.indexOf("HG Capital Partners") < html.indexOf(input.line));
 });
 
-const job = {
-  preview: 'Connor moved the due date to Mon, Nov 23. Connor: "Faucet\'s in the garage."',
-  headline: "Connor moved the due date to Mon, Nov 23.",
-  lines: ['Connor: "Faucet\'s in the garage."'],
-  primary: { label: "Start job", url: "https://hg.example.com/p/jobs/t1" },
-  secondary: [{ label: "Add photos", url: "https://hg.example.com/p/jobs/t1" }],
-  job: {
-    title: "Replace kitchen faucet",
-    where: "118 Congress St · Rear",
-    directionsUrl: "https://maps.apple.com/?daddr=118%20Congress%20St",
-    photoUrl: "https://blob.example.com/front.jpg",
-    due: "Mon, Nov 23",
-    notes: "New faucet is in the garage.\nShut-off sticks.",
-    checklist: [
-      { title: "Swap faucet", done: false },
-      { title: "Check for leaks", done: true },
+// ---------------------------------------------------------------------------
+// The job email (docs/specs/emails-redesign.md, Q3, Q4 and Q9)
+// ---------------------------------------------------------------------------
+
+const details: JobEmailDetails = {
+  title: "Vanity swap",
+  address: ["118 Congress St, Rear", "Buffalo, NY 14213"],
+  addressLabel: true,
+  dates: [
+    { label: "Scheduled", value: "Wed, Nov 25" },
+    { label: "Due", value: "Thu, Nov 26", changed: true },
+  ],
+  dayLink: { label: "Reschedule", url: "https://hg.example.com/j/tok?do=date" },
+  notes: { text: "36-inch vanity.\nOld one goes to the curb.", changed: true },
+  checklist: {
+    items: [
+      { title: "Pull the old vanity", done: false },
+      { title: "Set the new one", done: true },
     ],
-    contractor: null,
-    checklistLine: null,
   },
-  footnote: "Reply in the job so Connor and Pieter both see it.",
+  checklistLine: null,
+  photos: [{ src: "https://hg.example.com/api/files/task/p1?v=thumb&l=tok", href: "https://hg.example.com/j/tok" }],
+  morePhotos: 2,
+  gettingIn: { value: "The tenant must be home", note: "Call/text them 24 hours in advance" },
+};
+const job: JobEmailInput = {
+  preview: 'Connor: "Use the side door."',
+  headline: "Connor edited the notes.",
+  lines: ["Connor moved Due to Thu, Nov 26."],
+  quotes: ["Use the side door."],
+  quoteReply: "Reply to answer Connor.",
+  primary: { label: "Start job", url: "https://hg.example.com/j/tok" },
+  share: { label: "Share with crew", url: "https://hg.example.com/j/tok?do=share", icon: "https://hg.example.com/email/share.png" },
+  job: details,
+  footnote: "Reply to post an update or photos.",
+};
+const at = (html: string, s: string) => {
+  const i = html.indexOf(s);
+  assert.ok(i >= 0, `missing ${s}`);
+  return i;
 };
 
-test("job email: What's new, then the buttons, then the job, in that order", () => {
+test("job email: the mark, the headline, the lines, the quote, one button, Share with crew, then the job with Getting in last", () => {
   const rendered = renderJobEmail(job);
-  const { text } = rendered;
-  // After the hidden preview line, which repeats What's new.
-  const html = rendered.html.slice(rendered.html.indexOf("<table"));
-  const order = ["What's new", job.headline, "Faucet&#39;s in the garage", ">Start job</a>", ">Add photos</a>", "The job", 'src="https://blob.example.com/front.jpg"', "Replace kitchen faucet", ">Directions</a>", "Mon, Nov 23</td>", "Shut-off sticks", "Check for leaks", job.footnote];
-  const at = order.map((s) => html.indexOf(s));
-  assert.ok(at.every((i) => i >= 0), `missing: ${order.filter((_, i) => at[i] < 0).join(", ")}`);
-  assert.deepEqual([...at].sort((a, b) => a - b), at);
-  assert.ok(text.indexOf("What's new") < text.indexOf("Start job: https://hg.example.com/p/jobs/t1"));
-  assert.ok(text.indexOf("Add photos: https://hg.example.com/p/jobs/t1") < text.indexOf("The job"));
-  assert.ok(text.includes("Notes:\nNew faucet is in the garage.\nShut-off sticks."));
-  assert.ok(text.includes("[ ] Swap faucet\n[x] Check for leaks"));
+  const text = rendered.text;
+  // After the hidden preview line, which repeats the quote.
+  const html = rendered.html.slice(rendered.html.indexOf("mso-hide:all") + 300);
+  const order = [">HG Capital Partners</td>", "Connor edited the notes.", "Connor moved Due", "Use the side door.", "Reply to answer Connor.", ">Start job</a>", "Share with crew</a>", ">Vanity swap<", ">Address<", "Wed, Nov 25", "Reschedule", ">Notes<", ">Checklist<", ">Photos<", ">Getting in<", "Reply to post an update or photos."];
+  const positions = order.map((s) => at(html, s));
+  assert.deepEqual([...positions].sort((a, b) => a - b), positions, "in that order");
+  // The plain-text part, in the same order.
+  const textOrder = ["HG Capital Partners", "Connor edited the notes.", "> Use the side door.", "Start job: https://hg.example.com/j/tok", "Share with crew:", "Vanity swap", "Address:", "Scheduled: Wed, Nov 25", "Due: Thu, Nov 26 (changed)", "Reschedule:", "Notes (changed):", "Checklist:", "[x] Set the new one", "Photos: 3 on the job", "Getting in:", "Reply to post an update or photos."];
+  const tpos = textOrder.map((s) => at(text, s));
+  assert.deepEqual([...tpos].sort((a, b) => a - b), tpos);
 });
 
-test("job email: the preview line is hidden at the very top of the body", () => {
+test("job email: the one-line mark has no gold rule; the account emails keep the letterhead", () => {
+  const { html } = renderJobEmail(job);
+  assert.ok(!html.includes(brandTokens.goldDeep), "no gold rule");
+  assert.ok(html.includes("width:24px;height:24px"), "the 24px tile");
+  assert.ok(html.includes("font-size:13px;line-height:20px;font-weight:600;color:"), "the name at 13px semibold");
+  assert.ok(!html.includes("What&#39;s new") && !html.includes("What's new"));
+  assert.ok(renderPlainEmail(input).html.includes(`border-bottom:1px solid ${brandTokens.goldDeep}`));
+});
+
+test("job email: one dark full-width button, about 46px tall; text links 44px tall and never wrapped; nothing under 13px", () => {
+  const { html } = renderJobEmail({ ...job, link: { label: "Send back", url: "https://hg.example.com/tasks/t1?do=send-back" } });
+  const buttons = [...html.matchAll(/<a href="[^"]+" style="display:block;text-align:center;[^"]*"/g)];
+  assert.equal(buttons.length, 1);
+  assert.match(buttons[0][0], /font-size:15px;line-height:20px;[^"]*padding:13px 16px/);
+  const links = [...html.matchAll(/<a href="[^"]+" style="display:inline-block;padding:12px 0;font-size:15px;line-height:20px;[^"]*white-space:nowrap;"/g)];
+  assert.equal(links.length, 3, "Send back, Share with crew and Reschedule");
+  // Every font size in the email, but the mark's letters, is 13px or more.
+  const sizes = [...html.matchAll(/font-size:(\d+)px/g)].map((m) => Number(m[1]));
+  assert.deepEqual(sizes.filter((n) => n < 13), [10], "only the HG tile's letters");
+  assert.ok(html.includes("-webkit-text-size-adjust:100%"));
+  // The share icon is a hosted PNG with empty alt text, so the link reads "Share with crew".
+  assert.match(html, /<img src="https:\/\/hg\.example\.com\/email\/share\.png" width="16" height="16" alt=""/);
+  assert.ok(!html.includes("<svg"));
+  // No dark-mode styles and no outline buttons.
+  assert.ok(!html.includes("prefers-color-scheme") && !html.includes("<style"));
+  assert.ok(!html.includes(`border:1px solid ${brandTokens.lineStrong};margin:8px`));
+});
+
+test("job email: labels over values, the changed marks, Scheduled | Due side by side, at most the photos it is given", () => {
+  const { html } = renderJobEmail(job);
+  assert.ok(!html.includes('width="88"'), "no 88px label column");
+  assert.equal([...html.matchAll(/>changed</g)].length, 2, "Due and Notes");
+  assert.match(html, /<td width="50%" valign="top" style="width:50%;">.*Scheduled.*<\/td><td width="50%" valign="top" style="width:50%;padding-left:12px;">.*Due/);
+  assert.ok(html.includes('width="64" height="48"'));
+  assert.ok(html.includes(">+2</span>"));
+  // No green ticks: the done item's mark is muted.
+  assert.ok(!html.includes(brandTokens.ok));
+  assert.ok(html.includes("36-inch vanity.<br>Old one goes to the curb."));
+});
+
+test("job email: the short form is the headline and one line, no button, no job, no Share with crew", () => {
+  const { html, text } = renderJobEmail({ preview: "Connor canceled this job. No need to go.", headline: "Connor canceled this job. No need to go.", lines: [], quotes: [], primary: null, job: null, short: "Vanity swap, 118 Congress St, Rear" });
+  assert.equal([...html.matchAll(/<a /g)].length, 0);
+  assert.ok(html.includes(">Vanity swap, 118 Congress St, Rear</td>"));
+  assert.equal(text, "HG Capital Partners\n\nConnor canceled this job. No need to go.\n\nVanity swap, 118 Congress St, Rear");
+});
+
+test("job email: Review's two tiles at half the column, its note, Approve with Send back under it, a partner's details", () => {
+  const { html } = renderJobEmail({
+    preview: '"All set."',
+    headline: "Zack Miller sent this for review.",
+    lines: [],
+    quotes: ["All set."],
+    tiles: [
+      { src: "https://hg.example.com/api/files/task/a?v=thumb&l=t", href: "https://hg.example.com/tasks/t1" },
+      { src: "https://hg.example.com/api/files/task/b?v=thumb&l=t", href: "https://hg.example.com/tasks/t1" },
+    ],
+    tilesNote: "+3 more · Checklist 3 of 3 done",
+    primary: { label: "Approve", url: "https://hg.example.com/tasks/t1?do=approve" },
+    link: { label: "Send back", url: "https://hg.example.com/tasks/t1?do=send-back" },
+    job: { ...details, address: ["118 Congress St, Rear"], addressLabel: false, dayLink: null, notes: null, checklist: null, photos: [], morePhotos: 0, gettingIn: null, dates: [{ label: "Due", value: "Thu, Nov 26" }, { label: "Scheduled", value: "Wed, Nov 25" }] },
+    footnote: "Reply to answer Zack Miller.",
+  });
+  assert.equal([...html.matchAll(/<td width="50%" valign="top" style="width:50%;padding-(right|left):4px;">/g)].length, 2);
+  assert.ok(at(html, "+3 more · Checklist 3 of 3 done") < at(html, ">Approve</a>"));
+  assert.ok(at(html, ">Approve</a>") < at(html, ">Send back</a>"));
+  assert.ok(!html.includes(">Address<"), "a partner's street sits under the title");
+  assert.ok(at(html, ">Due<") < at(html, ">Scheduled<"));
+});
+
+test("job email: user text is escaped, quotes keep their breaks, every link is http(s), and colors are brand tokens", () => {
+  const { html } = renderJobEmail({ ...job, headline: "Fix <b>it</b>", quotes: ['He said "hi"\nthen <i>left</i>'] });
+  assert.ok(html.includes("Fix &lt;b&gt;it&lt;/b&gt;"));
+  assert.ok(html.includes("He said &quot;hi&quot;<br>then &lt;i&gt;left&lt;/i&gt;"));
+  assert.throws(() => renderJobEmail({ ...job, primary: { label: "x", url: "javascript:alert(1)" } }));
+  assert.throws(() => renderJobEmail({ ...job, share: { label: "x", url: "https://hg.example.com", icon: "data:image/png;base64,AA" } }));
+  const allowed = new Set(Object.values(brandTokens).map((v) => v.toLowerCase()));
+  const used = [...html.matchAll(/(?<!&)#[0-9a-f]{3,8}\b/gi)].map((m) => m[0].toLowerCase());
+  assert.ok(used.length > 0);
+  assert.deepEqual(used.filter((c) => !allowed.has(c)), []);
+});
+
+test("job email: the preview line is hidden at the very top of the body, and the column is 480 wide", () => {
   const { html } = renderJobEmail(job);
   const body = html.slice(html.indexOf("<body"));
-  const hidden = body.indexOf('<div style="display:none;');
-  assert.ok(hidden > 0 && hidden < body.indexOf("<table"));
-  assert.ok(body.includes("Connor moved the due date to Mon, Nov 23. Connor: &quot;Faucet&#39;s in the garage.&quot;"));
-});
-
-test("job email: what isn't there isn't drawn, and every link is http(s)", () => {
-  const bare = renderJobEmail({ ...job, secondary: [], footnote: undefined, job: { ...job.job, photoUrl: null, directionsUrl: null, due: null, notes: null, checklist: [] } });
-  assert.ok(!bare.html.includes("<img"));
-  assert.ok(!bare.html.includes("Directions"));
-  assert.ok(!bare.html.includes(">Due<"));
-  assert.equal([...bare.html.matchAll(/<a href="/g)].length, 1);
-  assert.throws(() => renderJobEmail({ ...job, primary: { label: "x", url: "javascript:alert(1)" } }));
-  assert.throws(() => renderJobEmail({ ...job, job: { ...job.job, photoUrl: "data:image/png;base64,AAAA" } }));
-});
-
-test("job email: a partner's copy names the contractor and the checklist's progress", () => {
-  const { html } = renderJobEmail({ ...job, job: { ...job.job, notes: null, checklist: [], contractor: "Zack Smith", checklistLine: "1 of 2 done" } });
-  assert.ok(html.indexOf(">Contractor<") < html.indexOf("Zack Smith"));
-  assert.ok(html.includes("1 of 2 done"));
-});
-
-test("job email: user text is escaped, comments keep their breaks, and colors are brand tokens", () => {
-  const { html } = renderJobEmail({ ...job, headline: 'Zack: "<b>Done</b>\nall set"', job: { ...job.job, title: "Fix <script>" } });
-  assert.ok(!html.includes("<script>") && !html.includes("<b>Done"));
-  assert.ok(html.includes("Zack: &quot;&lt;b&gt;Done&lt;/b&gt;<br>all set&quot;"));
-  const hexes = new Set([...html.matchAll(/#[0-9a-fA-F]{6}\b/g)].map((m) => m[0].toLowerCase()));
-  const tokens = new Set(Object.values(brandTokens).map((v) => String(v).toLowerCase()));
-  for (const hex of hexes) assert.ok(tokens.has(hex), `${hex} is not a brand token`);
-});
-
-test("job email: photo strips link each thumbnail, Due carries Add to calendar, and Access says Show access", () => {
-  const T = "https://hg.example.com/j/tok";
-  const { html, text } = renderJobEmail({
-    ...job,
-    photos: [{ src: "https://hg.example.com/api/files/task/p1?v=thumb&l=tok", href: T }],
-    morePhotos: 3,
-    job: {
-      ...job.job,
-      calendarUrl: `${T}/calendar`,
-      accessUrl: `${T}?do=access`,
-      photos: [{ src: "https://hg.example.com/api/files/task/h1?v=thumb&l=tok", href: T }],
-      morePhotos: 0,
-    },
-  });
-  assert.ok(html.includes(`<a href="${T}" style="display:inline-block;margin:0 6px 6px 0;text-decoration:none;"><img src="https://hg.example.com/api/files/task/p1?v=thumb&amp;l=tok"`));
-  assert.ok(html.includes(">+3</span>"));
-  assert.ok(html.indexOf(">Add to calendar</a>") > html.indexOf("Mon, Nov 23"));
-  assert.ok(html.includes(`href="${T}?do=access"`) && html.includes(">Show access</a>"));
-  assert.ok(html.indexOf("api/files/task/h1") > html.indexOf(">Photos<"));
-  assert.ok(text.includes(`Add to calendar: ${T}/calendar`));
-  assert.ok(text.includes(`Show access: ${T}?do=access`));
-  // The photos' lines never put a thumbnail's own URL in the text.
-  assert.ok(!text.includes("v=thumb"));
-});
-
-test("job email: an email with nothing to do has no buttons, and the Scheduled row can offer Change day", () => {
-  const off = renderJobEmail({ ...job, primary: null, secondary: [], footnote: undefined });
-  assert.equal([...off.html.matchAll(/<a href="/g)].length, 1, "only Directions");
-  assert.ok(!off.text.includes("Start job"));
-  const url = "https://hg.example.com/j/tok?do=date";
-  // No scheduled day yet: the row reads "Not set" and offers Schedule.
-  const open = renderJobEmail({ ...job, job: { ...job.job, dateUrl: url } });
-  assert.ok(open.html.includes(">Schedule</a>"));
-  assert.ok(open.text.includes(`Schedule: ${url}`));
-  assert.ok(open.text.includes("Not set"));
-  // With a day, the same link reads Change day and sits in the Scheduled row, not the Due row.
-  const dated = renderJobEmail({ ...job, job: { ...job.job, scheduled: "Thu, Oct 29", dateUrl: url } });
-  assert.ok(dated.html.includes(">Change day</a>"));
-  assert.ok(dated.text.includes(`Change day: ${url}`));
-  assert.ok(dated.text.indexOf("Change day") > dated.text.indexOf("Scheduled"));
+  assert.match(body, /^<body[^>]*>\n<div style="display:none;[^"]*">Connor: &quot;Use the side door.&quot;/);
+  assert.ok(html.includes("max-width:480px"));
+  assert.ok(html.includes("padding:16px;"), "16px around the card");
+  assert.ok(html.includes("padding:20px 24px 24px;"), "24px inside it: 238px of content at 320");
 });

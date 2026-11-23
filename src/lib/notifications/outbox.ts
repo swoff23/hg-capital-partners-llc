@@ -2,17 +2,20 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { replyAddress } from "@/lib/email/inbound";
 import { renderJobEmail } from "@/lib/email/render";
-import { todayYmdEastern } from "@/lib/dates";
+import { toYmd, todayYmdEastern } from "@/lib/dates";
 import { sendEmail } from "@/lib/email/send";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
 import { SEEABLE_FILE, contractorMaySee } from "@/lib/attachments/access";
 import { CODE_MASK, lockboxMasker, readJobAccess } from "@/lib/portal/access-code";
 import { mintJobLink } from "@/lib/portal/job-links";
+import { gettingInWords } from "@/lib/portal/job-view";
 import { staffFirstNames } from "@/lib/portal/queries";
 import {
   DAILY_EMAIL_CAP,
+  aboutContactId,
   claimedRowVerdict,
+  deletedRowVerdict,
   dueRowVerdict,
   easternDayStart,
   parseItems,
@@ -22,6 +25,7 @@ import {
   retryAt,
   sendBudget,
   sendFailureKind,
+  removedEmail,
   taskEmail,
   type EventSnapshot,
   type OutboxItem,
@@ -210,18 +214,21 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
         select: {
           title: true,
           unitLabel: true,
-          // Read at send time: the buttons follow the job's next step, and the reply line goes only on a job still open.
+          // Read at send time: the button follows the job's next step, and the reply line goes only on a job still open.
           status: true,
-          // The job as it stands when the email goes (docs/specs/contractor-job-emails.md 2.2).
+          // The job as it stands when the email goes (docs/specs/emails-redesign.md, Q4).
           dueDate: true,
           scheduledFor: true,
           description: true,
+          waitingOn: true,
           propertyId: true,
           // Permission to enter decides whether the lockbox shows at an occupied home (tenants.md section 8).
           entryPermittedAt: true,
           checklist: { select: { title: true, done: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] },
           assigneeContact: { select: { fullName: true } },
-          property: { select: { address: true, photoUrl: true } },
+          property: { select: { address: true } },
+          // A resident's request: their words in full and their answers, for the New request email (Q9).
+          resident: { select: { whatsWrong: true, details: true, letUsIn: true, pets: true, petsNote: true } },
           // Who can open the job right now (D12), checked again at send time.
           access: { where: { revokedAt: null }, select: { contactId: true } },
         },
@@ -238,11 +245,77 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
   let lastSendAt = 0;
   // Set once Resend refuses for its own limits: everything after waits.
   let refused = false;
-  // The partners a contractor's reply line names, read once per run.
+  // The partners a closed job's footer names, read once per run.
   let staffNames: string[] | null = null;
+  const replyConfig = getEnv().email;
+
+  /** Send one rendered email for a claimed row, and write what happened to the row. */
+  const deliver = async (rowId: string, attempts: number, msg: Parameters<typeof sendEmail>[0]): Promise<void> => {
+    const wait = lastSendAt + SEND_GAP_MS - Date.now();
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    lastSendAt = Date.now();
+    const res = await sendEmail(msg);
+    if (res.ok) {
+      await prisma.notificationOutbox.updateMany({ where: { id: rowId }, data: { sentAt: new Date(), lastError: null } });
+      result.sent++;
+      return;
+    }
+    const error = (res.error ?? "send failed").slice(0, 500);
+    const failure = sendFailureKind(res);
+    if (failure !== "error") {
+      // Resend's quota or rate limit, not this email's fault: give the try
+      // back, and leave this row and the rest of the batch for a later run.
+      refused = true;
+      result.held++;
+      const until = refusedRetryAt(failure, new Date());
+      await prisma.notificationOutbox.updateMany({
+        where: { id: rowId },
+        data: { sendAfter: until, attempts: { decrement: 1 }, lastError: error },
+      });
+      if (failure === "quota") {
+        // Everything else due waits too, so each later run doesn't spend a refused call. One statement across
+        // every task's rows: it takes them in id order, as every outbox lock in core.ts does, and passes over
+        // a row a write holds right now (a line queueing, an Undo reading it) instead of waiting on it, so it
+        // never deadlocks against them. A row passed over stays due and waits at the next run's refusal.
+        await pushBackDue(now, until);
+        logError("notifications:resend-quota", new Error("Resend's sending quota is used up; emails wait and retry hourly"), {
+          sentToday: sentBefore + result.sent,
+        });
+      }
+      return;
+    }
+    result.failed++;
+    const next = retryAt(attempts, new Date());
+    await prisma.notificationOutbox.updateMany({
+      where: { id: rowId },
+      data: next ? { sendAfter: next, lastError: error } : { sentAt: new Date(), lastError: `gave up: ${error}` },
+    });
+  };
 
   for (const row of rows) {
     if (Date.now() - started > TIME_BUDGET_MS) break;
+
+    // A deleted job's Removed email (core.ts deleteTask): a row of its own with no task, which says only that.
+    if (!row.taskId) {
+      const gone = deletedRowVerdict(row);
+      if (!gone.send) {
+        await closeUnsent(row.id, now, gone.reason);
+        result.skipped++;
+        continue;
+      }
+      if (refused || result.sent >= budget) {
+        result.held++;
+        continue;
+      }
+      const claimedGone = await claim(row.id, now);
+      if (!claimedGone) continue;
+      const off = parseItems(claimedGone.items).find((i) => i.kind === "OFF" && typeof i.title === "string") ?? gone.off;
+      const email = removedEmail({ off, title: off.title ?? "", where: off.where ?? "", short: [off.title, off.where?.replace(" · ", ", ")].filter(Boolean).join(", "), taskId: off.taskId ?? null, today: todayYmdEastern(now) });
+      const rendered = renderJobEmail(email);
+      // No reply address: a link needs the job, and the job is gone. A reply reaches the jobs inbox (replies.ts).
+      await deliver(row.id, claimedGone.attempts, { to: gone.to, subject: email.subject, text: rendered.text, html: rendered.html, threadKey: email.threadKey, fromName: email.fromName });
+      continue;
+    }
 
     // The first decision, on the row as the batch read found it: no task, a draft, no login, no access, emails off.
     const first = dueRowVerdict(row);
@@ -266,14 +339,30 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
     const photosByEvent = live.photosByEvent;
     // The job's state and the recipient's access, read again now the row is claimed: the batch read before the claim can
     // be a write behind (taken off and put back, canceled, a date moved, an Add undone), and these decide what goes.
-    const [fresh, accessRow] = await Promise.all([
-      prisma.task.findUnique({ where: { id: taskId }, select: { status: true, dueDate: true, scheduledFor: true, description: true } }),
+    const [fresh, accessRow, seen] = await Promise.all([
+      prisma.task.findUnique({
+        where: { id: taskId },
+        select: {
+          status: true,
+          dueDate: true,
+          scheduledFor: true,
+          description: true,
+          waitingOn: true,
+          assigneeContactId: true,
+          assigneeUserId: true,
+          checklist: { select: { title: true, done: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] },
+        },
+      }),
       delivery.audience === "contractor" && row.recipientContactId
         ? prisma.taskAccess.findFirst({ where: { taskId, contactId: row.recipientContactId, revokedAt: null }, select: { id: true } })
         : null,
+      // A partner who opened the task since its newest line already saw it in the app (Q6).
+      delivery.audience === "staff" && row.recipientUserId
+        ? prisma.taskReadState.findUnique({ where: { taskId_userId: { taskId, userId: row.recipientUserId } }, select: { lastSeenAt: true } })
+        : null,
     ]);
-    // The second decision: the task gone or a draft since, or nothing left to say.
-    // Who lives there, for the 24-hour notice (docs/specs/contractor-scheduled-date.md, Q6): read once for a contractor.
+    // The second decision: the task gone or a draft since, nothing left that leads an email, or seen in the app.
+    // Who lives there, for Tell the tenant and Getting in (docs/specs/emails-redesign.md, Q4 and Q8): read once for a contractor.
     const jobAccess = delivery.audience === "contractor" && row.recipientContactId ? await readJobAccess(prisma, first.task) : null;
     const second = claimedRowVerdict({
       audience: delivery.audience,
@@ -281,6 +370,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       job: fresh,
       hasAccess: !!accessRow,
       needsNotice: !!jobAccess?.needsNotice,
+      seenAt: seen?.lastSeenAt ?? null,
       today: todayYmdEastern(now),
     });
     if (!second.send) {
@@ -289,7 +379,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       continue;
     }
     const { items, due, scheduled, job } = second;
-    const task = { ...first.task, status: job.status, dueDate: job.dueDate, scheduledFor: job.scheduledFor, description: job.description };
+    const task = { ...first.task, ...job, checklist: fresh?.checklist ?? first.task.checklist };
     const off = items.some((i) => i.kind === "OFF");
 
     if (delivery.audience === "contractor") staffNames ??= await staffFirstNames();
@@ -301,7 +391,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
         : null;
     // The bundle's photos, in the order its lines are.
     const newPhotoIds = off ? [] : [...new Set(items.flatMap((i) => (i.eventId ? (photosByEvent.get(i.eventId) ?? []) : [])))];
-    // Off the job: no link, photos or lockbox (content.ts offEmail).
+    // Off the job: no link, photos or lockbox (content.ts removedEmail).
     const contractorId = delivery.audience === "contractor" && !off ? row.recipientContactId : null;
     const jobPhotoIds = contractorId ? await hgPhotoIds(taskId, contractorId, new Set(newPhotoIds)) : [];
     // The email's own link (job-links.ts): a contractor's opens the job as them; a partner's only shows its photos, so
@@ -311,17 +401,23 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       : row.recipientUserId && newPhotoIds.length
         ? await mintJobLink(prisma, { taskId: taskId, kind: "STAFF", userId: row.recipientUserId })
         : null;
-    // "Show access" when the job page would show the tenants or the lockbox (docs/specs/tenant-contact.md section 3).
+    // Getting in in the job page's own words, while the job is theirs and open (never the code, a name or a number).
     const access = contractorId ? jobAccess : null;
-    const hasAccess = !!access && (!!access.lockbox || access.tenants.length > 0);
-    // Its own reply address, while replies by email are on (section 5): a reply posts to this job as this recipient.
-    const replyConfig = getEnv().email;
-    const replyWho = row.recipientContactId ? { contactId: row.recipientContactId } : row.recipientUserId ? { userId: row.recipientUserId } : null;
-    const replyToken = replyConfig?.webhookSecret && !off && replyWho ? await mintJobLink(prisma, { taskId: taskId, kind: "REPLY", ...replyWho }) : null;
+    const gettingIn = access ? gettingInWords({ permitted: access.permitted, hasLockbox: !!access.lockbox, needsNotice: access.needsNotice, vacant: access.vacant, tenants: access.tenants.length }) : null;
+    // Its own reply address, while replies by email are on: a reply posts to this job as this recipient. Removed gets
+    // one too (section 7). A partner's names the contractor the email was about, so a reply about someone who left the
+    // job can post Internal (replies.ts). None on a resident's request nobody has yet: there is no one to answer.
+    const assigned = !!(job.assigneeContactId || job.assigneeUserId);
+    const unassignedRequest = delivery.audience === "staff" && !!first.task.resident && !assigned;
+    const replyWho = row.recipientContactId
+      ? { contactId: row.recipientContactId }
+      : row.recipientUserId
+        ? { userId: row.recipientUserId, contactId: aboutContactId(items) ?? job.assigneeContactId ?? null }
+        : null;
+    const replyToken = replyConfig?.webhookSecret && replyWho && !unassignedRequest ? await mintJobLink(prisma, { taskId: taskId, kind: "REPLY", ...replyWho }) : null;
     const email = taskEmail({
       items,
       linkToken,
-      hasAccess,
       newPhotoIds,
       jobPhotoIds,
       title: task.title,
@@ -333,62 +429,27 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       status: task.status,
       due,
       scheduled,
-      needsNotice: !!access?.needsNotice,
+      planned: toYmd(task.scheduledFor),
       today: todayYmdEastern(now),
       notes,
       checklist: task.checklist,
-      photoUrl: task.property?.photoUrl ?? null,
+      waitingOn: task.waitingOn,
+      gettingIn,
       contractorName: task.assigneeContact?.fullName ?? null,
       staffNames: staffNames ?? [],
       replyByEmail: !!replyToken,
+      assigned,
+      request: first.task.resident ?? null,
     });
     const rendered = renderJobEmail(email);
-    const wait = lastSendAt + SEND_GAP_MS - Date.now();
-    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-    lastSendAt = Date.now();
-    const res = await sendEmail({
+    await deliver(row.id, claimed.attempts, {
       to: delivery.to,
       subject: email.subject,
       text: rendered.text,
       html: rendered.html,
       threadKey: email.threadKey,
+      fromName: email.fromName,
       ...(replyToken && replyConfig ? { replyTo: replyAddress(replyToken, replyConfig.from) } : {}),
-    });
-
-    if (res.ok) {
-      await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: new Date(), lastError: null } });
-      result.sent++;
-      continue;
-    }
-    const error = (res.error ?? "send failed").slice(0, 500);
-    const failure = sendFailureKind(res);
-    if (failure !== "error") {
-      // Resend's quota or rate limit, not this email's fault: give the try
-      // back, and leave this row and the rest of the batch for a later run.
-      refused = true;
-      result.held++;
-      const until = refusedRetryAt(failure, new Date());
-      await prisma.notificationOutbox.updateMany({
-        where: { id: row.id },
-        data: { sendAfter: until, attempts: { decrement: 1 }, lastError: error },
-      });
-      if (failure === "quota") {
-        // Everything else due waits too, so each later run doesn't spend a refused call. One statement across
-        // every task's rows: it takes them in id order, as every outbox lock in core.ts does, and passes over
-        // a row a write holds right now (a line queueing, an Undo reading it) instead of waiting on it, so it
-        // never deadlocks against them. A row passed over stays due and waits at the next run's refusal.
-        await pushBackDue(now, until);
-        logError("notifications:resend-quota", new Error("Resend's sending quota is used up; emails wait and retry hourly"), {
-          sentToday: sentBefore + result.sent,
-        });
-      }
-      continue;
-    }
-    result.failed++;
-    const next = retryAt(claimed.attempts, new Date());
-    await prisma.notificationOutbox.updateMany({
-      where: { id: row.id },
-      data: next ? { sendAfter: next, lastError: error } : { sentAt: new Date(), lastError: `gave up: ${error}` },
     });
   }
 

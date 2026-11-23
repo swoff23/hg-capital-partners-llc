@@ -992,7 +992,9 @@ test("Delete refuses a draft under the row's lock; a task goes, and a discarded 
 
   const task = fakeTx({ status: "OPEN", dealId: "d1", attachments: [{ url: "https://blob.example.test/a.jpg", thumbPathname: null, posterPathname: "posters/a.jpg" }] });
   assert.deepEqual(await deleteTask(task.tx, "t1", PIETER, NOW), { id: "t1", propertyId: null, dealId: "d1", blobs: ["https://blob.example.test/a.jpg", "posters/a.jpg"] });
-  assert.deepEqual(writes(task.calls).map((c) => `${c.model}.${c.op}`), ["task.delete", "dealNote.create"]);
+  // Its contractor's Removed email is a row of its own, written after the delete took the job's own rows
+  // (docs/specs/emails-redesign.md, Q2).
+  assert.deepEqual(writes(task.calls).map((c) => `${c.model}.${c.op}`), ["task.delete", "notificationOutbox.create", "dealNote.create"]);
 
   // A discarded draft is gone to everyone: as a missing task, nothing written, no refusal.
   const discarded = fakeTx({ discardedAt: NOW, attachments: [] });

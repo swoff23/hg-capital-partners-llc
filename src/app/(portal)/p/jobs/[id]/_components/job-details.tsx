@@ -9,7 +9,7 @@ import { Button, Checkbox, Section, buttonClass } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import { telHref, textHref } from "@/lib/contacts";
 import type { JobLockbox, JobTenants } from "@/lib/portal/queries";
-import { firstName } from "@/lib/portal/job-view";
+import { firstName, gettingInWords } from "@/lib/portal/job-view";
 import { cn } from "@/lib/utils";
 import { setChecklistItemAction } from "../actions";
 
@@ -134,17 +134,10 @@ export function GettingInSection({
 }) {
   const [viewing, setViewing] = useState(false);
   const [broken, setBroken] = useState(false);
-  const one = tenants.people.length === 1;
-  const entry = !rule
-    ? null
-    : // Permission with no code on file is no way in yet, so nothing is said (as the Lockbox's line was, before).
-      tenants.permitted && lockbox
-      ? { value: "Let yourself in", note: one ? "The tenant said it's OK" : "The tenants said it's OK", ok: true }
-      : needsNotice
-        ? { value: one ? "The tenant must be home" : "A tenant must be home", note: "Call/text them 24 hours in advance", ok: false }
-        : lockbox && vacant
-          ? { value: "Let yourself in", note: "No one lives here", ok: true }
-          : null;
+  // The same words the job emails use (job-view.ts gettingInWords). Permission with no code on file is no way in yet, so
+  // nothing is said (as the Lockbox's line was, before).
+  const words = rule ? gettingInWords({ permitted: tenants.permitted, hasLockbox: !!lockbox, needsNotice, vacant, tenants: tenants.people.length }) : null;
+  const entry = words ? { ...words, ok: words.value === "Let yourself in" } : null;
   if (!entry && !lockbox) return null;
   const url = `/api/files/lockbox/${encodeURIComponent(taskId)}`;
   const photo = broken || !lockbox ? null : lockbox.photo;

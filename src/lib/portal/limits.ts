@@ -38,6 +38,18 @@ export function sessionIsLive(s: { expiresAt: Date; revokedAt: Date | null }, no
   return !s.revokedAt && s.expiresAt.getTime() > now.getTime();
 }
 
+/**
+ * How long a deleted job's crew link keeps saying so (docs/specs/emails-redesign.md, Q7; gone-crew-jobs.ts): 30 days,
+ * a full session's life. After that it goes to sign in, as any dead link does.
+ */
+export const GONE_CREW_JOB_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** When a deleted job's note for one crew link or session stops being read: 30 days on, or the session's end if sooner. */
+export function goneCrewJobExpiresAt(deletedAt: Date, sessionEndsAt: Date | null = null): Date {
+  const keep = deletedAt.getTime() + GONE_CREW_JOB_KEEP_MS;
+  return new Date(sessionEndsAt ? Math.min(keep, sessionEndsAt.getTime()) : keep);
+}
+
 export function shouldTouchSession(lastUsedAt: Date, now: Date): boolean {
   return now.getTime() - lastUsedAt.getTime() >= SESSION_TOUCH_INTERVAL_MS;
 }

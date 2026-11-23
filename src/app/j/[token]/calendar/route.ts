@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { toYmd } from "@/lib/dates";
 import { getEnv } from "@/lib/env";
@@ -18,15 +19,19 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   if (!getEnv().portalEnabled) return notFound();
   const { token } = await params;
   const link = await resolveJobLink(token);
-  if (!link || link.kind === "STAFF" || !link.opensJob) return notFound();
+  if (!link || link.kind === "STAFF") return notFound();
+  const appUrl = getEnv().appUrl;
+  // An old email's Add to calendar on a job that's closed, gone from them or has no day: the link itself says what
+  // happened (the job, the gone screen or sign-in), never a bare Not found (docs/specs/emails-redesign.md, section 7).
+  const toJob = () => NextResponse.redirect(jobLinkUrl(appUrl, token), { status: 303, headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
+  if (!link.opensJob) return toJob();
   const task = await prisma.task.findUnique({
     where: { id: link.taskId },
     select: { id: true, title: true, unitLabel: true, status: true, dueDate: true, scheduledFor: true, property: { select: { address: true } } },
   });
   // Their scheduled day when they have one, else Due (docs/specs/contractor-scheduled-date.md, section 4).
   const date = task ? toYmd(jobDay(task)) : null;
-  if (!task || !date) return notFound();
-  const appUrl = getEnv().appUrl;
+  if (!task || !date) return toJob();
   const address = task.property?.address ?? null;
   const body = jobCalendar({
     taskId: task.id,

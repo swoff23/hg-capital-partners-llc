@@ -36,6 +36,10 @@ model User {
   // null: no address yet, or Disconnect retired it.
   claudeKeyId       String?
   claudeKeyHash     String?   @unique
+  // Mail to this partner that isn't getting through, as on PortalAccount below (src/lib/email/delivery-events.ts).
+  emailProblem      EmailProblem?
+  emailEventAt      DateTime?
+  emailEventTo      String?
   createdAt         DateTime  @default(now())
 
   asanaGid String? @unique // Asana user gid, matched once by the import
@@ -755,6 +759,13 @@ enum PortalAccountStatus {
   DISABLED
 }
 
+// What Resend's webhook last said about mail to an address (docs/specs/emails-redesign.md, section 5).
+enum EmailProblem {
+  BOUNCED // the receiving server refused it for good
+  SUPPRESSED // Resend didn't send it: the address is on its suppression list after a bounce or a spam report
+  COMPLAINED // delivered, then marked as spam
+}
+
 model PortalAccount {
   id                 String              @id @default(cuid())
   contact            Contact             @relation(fields: [contactId], references: [id], onDelete: Cascade)
@@ -769,6 +780,14 @@ model PortalAccount {
   // Off stops every task email to them. Emails also wait for the first sign-in (lastSignInAt below);
   // the rule that reads both is src/lib/portal/job-emails.ts.
   jobEmails          Boolean             @default(true)
+  // Mail to this login that isn't getting through (src/lib/email/delivery-events.ts): a bounce, a suppression or a
+  // spam report, null when none. emailEventAt is when Resend saw the newest event applied (one of those, or a
+  // delivery that cleared one), so a late or repeated webhook changes nothing; emailEventTo is the address it was
+  // about. A problem counts only while emailEventTo is still `email`, so changing the address clears it. It never
+  // touches jobEmails.
+  emailProblem       EmailProblem?
+  emailEventAt       DateTime?
+  emailEventTo       String?
   createdBy          User?               @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   createdByUserId    String?
   lastSignInAt       DateTime?
@@ -833,6 +852,28 @@ enum JobLinkKind {
   CREW // the contractor's "Text to my crew"
   STAFF // a partner's job email: photos only
   REPLY // a job email's reply address: lets a reply post to the job, never opens it
+}
+
+/// What a crew member's link, or the job page they have open, says once the job is deleted
+/// (docs/specs/emails-redesign.md, Q7). A delete takes the job's links and sessions with it, so deleteTask keeps one
+/// row per CREW link and per live crew session, under that token's hash, with only the words the page shows: "This
+/// job is canceled. No need to go.", the title and the short street. No foreign keys, since the job is gone. Never
+/// read past expiresAt (30 days, or the session's own end if sooner); the next delete that writes notes purges them
+/// (src/lib/portal/gone-crew-jobs.ts, the only writer).
+model GoneCrewJob {
+  tokenHash String          @id
+  kind      GoneCrewJobKind
+  title     String
+  street    String?
+  deletedAt DateTime        @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+enum GoneCrewJobKind {
+  LINK // a CREW JobLink's tokenHash: /j/<token>
+  SESSION // a crew PortalSession's tokenHash: the portal cookie
 }
 
 // A "Forgot password" link, for a contractor login or a staff User

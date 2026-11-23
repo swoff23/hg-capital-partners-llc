@@ -77,6 +77,8 @@ export type EntityPickerProps = {
   /** "public" puts the dark public tokens on the list. */
   surface?: "app" | "public";
   className?: string;
+  /** Opens the list once, when the picker first shows: an email button that asks for it (`?do=assign` on the task page). */
+  autoOpen?: boolean;
 };
 
 export function EntityPicker({
@@ -95,8 +97,10 @@ export function EntityPicker({
   isDisabled,
   surface,
   className,
+  autoOpen,
 }: EntityPickerProps) {
-  const [open, setOpen] = useState(false);
+  // `autoOpen` starts it open, as an email's button asked; overlays draw on the client only, so the server's HTML is unchanged.
+  const [open, setOpen] = useState(!!autoOpen);
   // A list with a search field needs room to type; a short one is as wide as its widest row or the trigger.
   const searchable = countOptions({ pinned, items, sections }) >= SEARCH_FROM;
   return (
@@ -307,6 +311,7 @@ export function AssigneePicker({
   isDisabled,
   surface,
   className,
+  autoOpen,
 }: {
   value: AssigneeValue;
   users: AssigneeUser[];
@@ -326,6 +331,8 @@ export function AssigneePicker({
   isDisabled?: boolean;
   surface?: "app" | "public";
   className?: string;
+  /** Opens the list once on load (an email's Assign button). */
+  autoOpen?: boolean;
 }) {
   const user = value && "userId" in value ? users.find((u) => u.id === value.userId) : undefined;
   const contractor = value && "contactId" in value ? contractors.find((c) => c.id === value.contactId) : undefined;
@@ -363,6 +370,7 @@ export function AssigneePicker({
       isDisabled={isDisabled}
       surface={surface}
       className={className}
+      autoOpen={autoOpen}
     />
   );
 }

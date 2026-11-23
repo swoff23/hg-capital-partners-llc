@@ -9,7 +9,9 @@ import {
   canSetStatus,
   contractorSeesRow,
   contractorStatusRefusal,
+  DUE_SOON_DAYS,
   notifyAudience,
+  staffStatusEmails,
   statusEventVisibility,
   isAfterDue,
   jobDay,
@@ -196,4 +198,26 @@ test("a contractor who gets no task emails is queued nothing by staff, and still
     // What the contractor does goes to the partners either way: the switch is about email to them, not from them.
     assert.equal(notifyAudience("contractor", { kind, visibility: "SHARED" }, quiet), "staff", kind);
   }
+});
+
+// docs/specs/emails-redesign.md, Q2: a partner's checklist edit and on hold now email the contractor; which status a
+// partner sets for them makes an email of its own, and which only rides along.
+test("a partner's checklist edit and on hold reach the contractor; a contractor's checklist ticks reach nobody", () => {
+  const login = { contractorGetsEmail: true };
+  assert.equal(notifyAudience("staff", { kind: "CHECKLIST", visibility: "SHARED" }, login), "contractor");
+  assert.equal(notifyAudience("staff", { kind: "HOLD", visibility: "SHARED" }, login), "contractor");
+  assert.equal(notifyAudience("staff", { kind: "HOLD", visibility: "SHARED" }, { contractorGetsEmail: false }), null);
+  assert.equal(notifyAudience("contractor", { kind: "HOLD", visibility: "SHARED" }, login), null);
+  assert.equal(notifyAudience("system", { kind: "CHECKLIST", visibility: "SHARED" }, login), null);
+});
+
+test("staffStatusEmails: a send-back and their day set or taken away email; any other status a partner sets rides along", () => {
+  assert.equal(staffStatusEmails("REVIEW", "IN_PROGRESS"), true);
+  assert.equal(staffStatusEmails("OPEN", "SCHEDULED"), true);
+  assert.equal(staffStatusEmails("WAITING", "SCHEDULED"), true);
+  assert.equal(staffStatusEmails("SCHEDULED", "OPEN"), true);
+  for (const [from, to] of [["OPEN", "IN_PROGRESS"], ["SCHEDULED", "IN_PROGRESS"], ["IN_PROGRESS", "REVIEW"], ["WAITING", "OPEN"], ["OPEN", "WAITING"], ["IN_PROGRESS", "DONE"]] as const) {
+    assert.equal(staffStatusEmails(from, to), false, `${from} to ${to}`);
+  }
+  assert.equal(DUE_SOON_DAYS, 3);
 });

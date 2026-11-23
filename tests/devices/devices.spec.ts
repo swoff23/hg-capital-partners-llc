@@ -20,6 +20,7 @@ const PORTAL_TOKEN_ENV = {
   "portal-setup": "DEVICE_PORTAL_SETUP_TOKEN",
   "portal-email-link": "DEVICE_PORTAL_EMAIL_LINK_TOKEN",
   "portal-crew-link": "DEVICE_PORTAL_CREW_LINK_TOKEN",
+  "portal-crew-gone": "DEVICE_PORTAL_CREW_GONE_TOKEN",
 } as const;
 
 // Every width from the responsiveness rule, including both sides of each

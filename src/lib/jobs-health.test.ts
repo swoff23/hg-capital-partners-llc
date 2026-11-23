@@ -8,7 +8,7 @@ import { type JobsSnapshot, jobReasons, jobsSwitches, readJobsSnapshot } from ".
 const NOW = new Date("2026-11-14T15:00:00Z");
 const minutes = (n: number) => new Date(NOW.getTime() - n * 60_000);
 const hours = (n: number) => minutes(n * 60);
-const calmEmail = { sentToday: 4, oldestDueAt: null, retrying: 0, gaveUpRecently: 0 };
+const calmEmail = { sentToday: 4, oldestDueAt: null, retrying: 0, gaveUpRecently: 0, complainedRecently: 0 };
 
 function reasons(snapshot: Partial<JobsSnapshot>) {
   return jobReasons({ email: null, qbo: null, ...snapshot }, NOW);
@@ -35,6 +35,11 @@ test("emails held by the daily cap aren't stuck: the cap is its own reason (Q15)
 test("an email on its third try is failing, and so is one that gave up today, so a drop isn't a recovery (Q15)", () => {
   assert.deepEqual(reasons({ email: { ...calmEmail, retrying: 1 } }), ["email_failing"]);
   assert.deepEqual(reasons({ email: { ...calmEmail, gaveUpRecently: 1 } }), ["email_failing"]);
+});
+
+test("a spam report in the last day alerts like the daily cap, and clears on its own (emails redesign, section 5)", () => {
+  assert.deepEqual(reasons({ email: { ...calmEmail, complainedRecently: 1 } }), ["email_complained"]);
+  assert.deepEqual(reasons({ email: { ...calmEmail, sentToday: DAILY_EMAIL_CAP, complainedRecently: 2 } }), ["email_capped", "email_complained"]);
 });
 
 test("QuickBooks is stale after 26 hours without a successful sync, counted from the connection if it never synced", () => {
@@ -81,10 +86,15 @@ test("the snapshot asks the queue the questions the rules need, and skips what's
     }),
     securityEvent: model("securityEvent", { count: 1 }),
     quickbooksConnection: model("qbo", { findFirst: null }),
+    // Spam reports in the last day: one on a contractor's login, none on a partner.
+    portalAccount: model("portalAccount", { count: 1 }),
+    user: model("user", { count: 0 }),
   } as unknown as Parameters<typeof readJobsSnapshot>[0];
 
   const snapshot = await readJobsSnapshot(db, { email: true, qbo: true }, NOW);
-  assert.deepEqual(snapshot.email, { sentToday: 8, oldestDueAt: minutes(20), retrying: 2, gaveUpRecently: 1 });
+  assert.deepEqual(snapshot.email, { sentToday: 8, oldestDueAt: minutes(20), retrying: 2, gaveUpRecently: 1, complainedRecently: 1 });
+  const complaints = calls.find((c) => c.model === "portalAccount")?.args as { where: unknown };
+  assert.deepEqual(complaints.where, { emailProblem: "COMPLAINED", emailEventAt: { gte: hours(24) } });
   assert.equal(snapshot.qbo, null, "no connection that isn't revoked");
 
   const qboQuery = calls.find((c) => c.model === "qbo")?.args as { where: unknown };

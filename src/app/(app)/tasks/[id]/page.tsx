@@ -15,7 +15,8 @@ import { assigneeOptions } from "@/lib/tasks/assignee-options";
 import { draftContractor } from "@/lib/tasks/drafts";
 import { asanaProfileGids, asanaTaskGids, taskIdsIn } from "@/lib/tasks/body-links";
 import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
-import { emailStatesIn } from "@/lib/tasks/delivery";
+import { EMAIL_PROBLEM_SELECT, emailProblemOf } from "@/lib/email/delivery-events";
+import { emailStatesIn, taskEmailState } from "@/lib/tasks/delivery";
 import { lockboxState } from "@/lib/tasks/lockbox";
 import { readTaskHome } from "@/lib/tenants/living";
 import { lastSeen, markTaskSeen, otherPartnersSeen, seenBaseline } from "@/lib/tasks/read-state";
@@ -25,6 +26,7 @@ import { isDraftUpload, markDoneComment, mediaItem, reviewPhotos, taskMedia, tas
 import { linkedTasksWhere, taskPageWhere } from "@/lib/tasks/list-query";
 import { OVERDUE_ELIGIBLE, isActiveStatus } from "@/lib/task-scope";
 import { shapeActivity } from "./activity-rows";
+import { asked, assignedBy } from "./landing";
 import type { ReviewDecision, ReviewProof } from "./review-banner";
 import type { TaskLockbox, TaskTenants } from "./fields";
 import { TaskPageView } from "./view";
@@ -43,9 +45,9 @@ export async function generateMetadata({ params }: PageProps<"/tasks/[id]">): Pr
  */
 export default async function TaskPage({ params, searchParams }: PageProps<"/tasks/[id]">) {
   const { id } = await params;
-  // A partner's email asked for Send back (docs/specs/contractor-job-emails.md, section 8). Approve opens the page as
-  // is: it acts on one tap, so a link never presses it.
-  const openSendBack = (await searchParams).do === "send-back";
+  // What a partner's email button asked the page to have ready (docs/specs/emails-redesign.md, Q9): Send back's sheet,
+  // Approve in focus, or the assignee picker. It never acts: Approve and an assignment each take a tap on the page.
+  const ask = asked((await searchParams).do);
 
   // The first wave: the task, each of its lists, and what needs only its id and the viewer, all at once.
   // The session check runs beside them and is awaited with them, so nothing is shown without it.
@@ -71,7 +73,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
       assigneeContactId: true,
       assigneeName: true,
       createdBy: { select: { name: true, email: true } },
-      assigneeContact: { select: { id: true, fullName: true, active: true, portalAccount: { select: JOB_EMAIL_SELECT } } },
+      assigneeContact: { select: { id: true, fullName: true, active: true, portalAccount: { select: { ...JOB_EMAIL_SELECT, ...EMAIL_PROBLEM_SELECT } } } },
       // A resident's request (docs/specs/maintenance-requests.md, section 4.1): who sent it and their pets answer.
       resident: { select: { leaseId: true, tenantName: true, pets: true, petsNote: true } },
     },
@@ -190,7 +192,8 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
   const contractorHasLogin = !!contractor?.active && contractors.some((c) => c.id === contractor.id && c.hasLogin);
   // Whether a change here emails them, or why not: no login, never signed in, or their Job emails switch is off
   // (docs/specs/contractor-email-switch.md). The same rule core.ts queues by.
-  const contractorEmails = contractor ? jobEmailState(contractor.portalAccount, contractor.active) : "no-login";
+  // And whether it gets there: a bounce, a suppression or a spam report on their address (docs/specs/emails-redesign.md, 5).
+  const contractorEmails = contractor ? taskEmailState(jobEmailState(contractor.portalAccount, contractor.active), emailProblemOf(contractor.portalAccount)) : "no-login";
   const lockbox = ((): TaskLockbox | null => {
     if (!contractorFirst || !home || !active) return null;
     const who = { contractor: contractorFirst, hasLogin: contractorHasLogin };
@@ -249,6 +252,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
         ? {
             id: contractor.id,
             first: contractorFirst ?? contractor.fullName,
+            name: contractor.fullName,
             emails: contractorEmails,
             accessActive: task.access.some((a) => a.contactId === contactId),
             seenAt: contractorSeen?.lastSeenAt ?? null,
@@ -296,9 +300,18 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
   const createdBy = task.createdBy ? firstName(userName(task.createdBy)) || userName(task.createdBy) : null;
   const created = [createdBy, fmtDay(easternDay(task.createdAt), { year: "auto", now: today })].filter(Boolean).join(" · ");
 
+  // Assign: with nobody on the job the picker opens; with someone already on it (the other partner got there first)
+  // the page says who instead. Approve and Send back on a job already decided say what was decided (`decision`).
+  const assigned = !!(task.assigneeUserId || task.assigneeContactId);
+  const assignedLine = ask === "assign" && assigned ? assignedBy(live, task, contractor?.fullName ?? names.users[task.assigneeUserId ?? ""] ?? null) : null;
+
   return (
     <TaskPageView
-      openSendBack={openSendBack}
+      openSendBack={ask === "send-back"}
+      focusApprove={ask === "approve" && !!review}
+      landed={(ask === "approve" || ask === "send-back") && !review}
+      openAssignee={ask === "assign" && !assigned && active && !isDraft}
+      assignedLine={assignedLine}
       task={{
         id: task.id,
         title: task.title,
@@ -338,7 +351,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
       contractorFirst={contractorFirst}
       contractorHasLogin={contractorHasLogin}
       contractor={
-        contractor ? { id: contractor.id, first: contractorFirst ?? contractor.fullName, hasLogin: contractorHasLogin, emails: contractorEmails } : null
+        contractor ? { id: contractor.id, first: contractorFirst ?? contractor.fullName, name: contractor.fullName, hasLogin: contractorHasLogin, emails: contractorEmails } : null
       }
       staffFirstNames={staffFirstNames}
       draft={isDraft ? { contractor: draftContractor(task.assigneeContact) } : null}

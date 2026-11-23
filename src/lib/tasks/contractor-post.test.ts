@@ -125,6 +125,8 @@ test("addComment: a contractor's batch is marked, and its line names its event",
       summary: "added files (+1 file)",
       at: POSTED.toISOString(),
       eventId: "e-batch",
+      // Who wrote it, so a partner's reply link names them (docs/specs/emails-redesign.md, section 7).
+      contactId: "c-zack",
     });
   }
 });
@@ -708,7 +710,7 @@ test("addLateContractorBatch: one email line per partner for the batch, naming i
   const inserts = outboxInserts(calls);
   assert.equal(inserts.length, 2, "one line for each partner, not one per file");
   for (const c of inserts) {
-    assert.deepEqual(insertedItem(c), { kind: "COMMENT", actorLabel: "Zack Outlaw", summary: "added files (+3 files)", at: POSTED.toISOString(), eventId: "e-late" });
+    assert.deepEqual(insertedItem(c), { kind: "COMMENT", actorLabel: "Zack Outlaw", summary: "added files (+3 files)", at: POSTED.toISOString(), eventId: "e-late", contactId: "c-zack" });
     // Into the same 10-minute bundle as every other line for the task.
     assert.match(c.op, /ON CONFLICT \("openKey"\) DO UPDATE SET/);
   }

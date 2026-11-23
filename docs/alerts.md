@@ -49,11 +49,12 @@ You get one email the first time each kind happens. Repeats are grouped under th
 | `email_stuck` | An email is more than 15 minutes past its send time and hasn't gone |
 | `email_failing` | An email has failed 3 times, or gave up after 5 tries in the last day |
 | `email_capped` | 100 emails went today, the daily cap. The rest wait for tomorrow. On a normal day that many means something is looping |
+| `email_complained` | Someone marked one of our emails as spam in the last day. The task page shows "Emails don't reach Zack Miller." on that contractor's tasks; Resend's Emails page, filtered to Complained, shows who for a partner. Call them. Their Job emails switch stays as it was. Clears on its own after 24 hours |
 | `qbo_stale` | QuickBooks is on and hasn't synced in 26 hours. Check Financials, then Settings: the connection may need a reconnect |
 
 **What to send Claude:** the alert. Claude reads which reason it is from the health check's detail (`/api/health` with the health token, under `jobs`), and Vercel's logs for the job.
 
-**Can wait?** `email_capped` and `email_stuck` mean contractors aren't getting job emails, so look the same day. `qbo_stale` can wait a day.
+**Can wait?** `email_capped` and `email_stuck` mean contractors aren't getting job emails, so look the same day. So does `email_complained`: enough spam reports and Resend stops sending for the whole domain. `qbo_stale` can wait a day.
 
 ## Not an alert
 

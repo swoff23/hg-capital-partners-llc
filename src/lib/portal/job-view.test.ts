@@ -18,6 +18,7 @@ import {
   addedText,
   addedToJobText,
   addressLine,
+  gettingInWords,
   backOnTray,
   dayLabel,
   finishCountLabel,
@@ -591,4 +592,17 @@ test("statusUpdateText: a move to Scheduled names its day when the event has one
   assert.equal(statusUpdateText("OPEN", "SCHEDULED", { contractor: true }, { day: "2026-11-27", today: "2026-11-22" }), "scheduled the job for Fri, Nov 27");
   assert.equal(statusUpdateText("OPEN", "SCHEDULED", { contractor: true }, { day: null, today: "2026-11-22" }), "scheduled the job");
   assert.equal(statusUpdateText("OPEN", "SCHEDULED"), "scheduled the job");
+});
+
+// docs/specs/emails-redesign.md, Q4: the job emails say Getting in in the job page's own words (job-details.tsx).
+test("gettingInWords: the job page's two lines, never the code, a name or a number", () => {
+  const a = { permitted: false, hasLockbox: false, needsNotice: false, vacant: false, tenants: 0 };
+  assert.deepEqual(gettingInWords({ ...a, permitted: true, hasLockbox: true, tenants: 1 }), { value: "Let yourself in", note: "The tenant said it's OK" });
+  assert.deepEqual(gettingInWords({ ...a, permitted: true, hasLockbox: true, tenants: 2 }), { value: "Let yourself in", note: "The tenants said it's OK" });
+  assert.deepEqual(gettingInWords({ ...a, needsNotice: true, tenants: 1 }), { value: "The tenant must be home", note: "Call/text them 24 hours in advance" });
+  assert.deepEqual(gettingInWords({ ...a, needsNotice: true, tenants: 2 }), { value: "A tenant must be home", note: "Call/text them 24 hours in advance" });
+  assert.deepEqual(gettingInWords({ ...a, hasLockbox: true, vacant: true }), { value: "Let yourself in", note: "No one lives here" });
+  // Permission with no code on file is no way in yet; a code with no known household says nothing about who lives there.
+  assert.equal(gettingInWords({ ...a, permitted: true, tenants: 1 }), null);
+  assert.equal(gettingInWords({ ...a, hasLockbox: true }), null);
 });

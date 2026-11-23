@@ -3,11 +3,12 @@ import { Prisma, type EventSource, type Task, type TaskAttachment, type TaskChec
 import { fmtDay, todayYmdEastern, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
 import { stableJson } from "@/lib/drafts";
 import { firstName } from "@/lib/names";
-import { jobKey, notesFingerprint } from "@/lib/notifications/content";
+import { checklistFingerprint, jobKey, jobWhere, notesFingerprint } from "@/lib/notifications/content";
 import { unitDisplay, unitLabels } from "@/lib/picker-options-shape";
 import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
+import { keepGoneCrewJob } from "@/lib/portal/gone-crew-jobs";
 import { contractorMaySetDate } from "@/lib/portal/job-link-paths";
-import type { ReminderKind } from "@/lib/notifications/reminder-rules";
+import { REMINDER_KINDS, inTellWindow, type LegacyReminderKind, type ReminderKind } from "@/lib/notifications/reminder-rules";
 import { renamedLabel, type UnitRename } from "@/lib/property-types";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, STATUS_LABEL, draftTask, isActiveStatus, isDiscarded } from "@/lib/task-scope";
 import { homeOccupied, readTaskHome } from "@/lib/tenants/living";
@@ -25,6 +26,7 @@ import {
   contractorStatusRefusal,
   notifyAudience,
   scheduledDay,
+  staffStatusEmails,
   statusEventVisibility,
   writeAudience,
   type NotifyChange,
@@ -368,8 +370,8 @@ async function archivedAssigneeToGiveBack(tx: Tx, taskId: string, from: TaskStat
 // ---------------------------------------------------------------------------
 
 export interface OutboxItem {
-  // OFF: taken off the job or canceled (notifyOff); DUE_TODAY and OVERDUE: the 8 am emails (notifications/reminders.ts).
-  kind: NotifyChange["kind"] | "OFF" | ReminderKind;
+  // OFF: taken off the job, canceled or deleted (notifyOff, deleteTask); the morning kinds: notifications/reminders.ts.
+  kind: NotifyChange["kind"] | "OFF" | ReminderKind | LegacyReminderKind;
   actorLabel: string;
   summary: string;
   at: string;
@@ -387,12 +389,13 @@ export interface OutboxItem {
   noteEventId?: string;
   /** Legacy (rows queued before Nov 21): a TARGET line whose date was the scheduled day. DAY lines carry that now. */
   visit?: boolean;
-  /** DUE_TODAY and OVERDUE (notifications/reminders.ts): the date the reminder is for, which keeps it to once per date. */
+  /** The morning lines (notifications/reminders.ts): the date the line is for, which keeps it to once per date. */
   due?: string;
   /**
-   * TARGET, DAY, NOTES and STATUS: what the job had before this change, so the drain drops a change put back before
-   * the email goes (notifications/content.ts undoneDropped). TARGET the due date and DAY the scheduled day ("" for
-   * none), NOTES notesFingerprint, STATUS the status.
+   * TARGET, DAY, NOTES, CHECKLIST, HOLD and STATUS: what the job had before this change, so the drain drops a change
+   * put back before the email goes (notifications/content.ts undoneDropped). TARGET the due date and DAY the scheduled
+   * day ("" for none), NOTES notesFingerprint, CHECKLIST checklistFingerprint, STATUS and HOLD the status. OFF: the
+   * status the job had, so a Removed email can ask for what's done so far on work under way.
    */
   from?: string;
   /** STATUS out of Scheduled: the day it had ("" for none), for undoneDropped (notifications/content.ts). */
@@ -402,10 +405,22 @@ export interface OutboxItem {
    * jobKey), so giving it straight back says nothing unless the job changed meanwhile (offItems).
    */
   job?: string;
+  /** STATUS: the status it moved to (content.ts reads the old words when it's missing). */
+  to?: string;
+  /** DAY, and a move to Scheduled: the day set, "YYYY-MM-DD" ("" for none). */
+  day?: string;
+  /** A contractor's line: who it was, so a partner's reply link names them (notifications/outbox.ts). */
+  contactId?: string;
+  /** A contractor's Send for review note: its status line's event, so the note goes when its Review email does. */
+  statusEventId?: string;
+  /** OFF on a deleted job, whose row is gone (deleteTask): its id, its title, and its street and unit. */
+  taskId?: string;
+  title?: string;
+  where?: string;
 }
 
 /** What a line carries beside its summary (OutboxItem's optional fields). */
-type ItemRefs = Pick<OutboxItem, "eventId" | "noteEventId" | "visit" | "from" | "fromDay">;
+type ItemRefs = Pick<OutboxItem, "eventId" | "noteEventId" | "visit" | "from" | "fromDay" | "to" | "day" | "statusEventId">;
 
 /** What a notification reads from the task. Its status says whether it is still a draft, which emails nobody. */
 type NotifyTask = Pick<Task, "id" | "assigneeContactId" | "status">;
@@ -483,7 +498,7 @@ async function notify(
   const getsEmail = await contractorGetsEmail(tx, task.assigneeContactId);
   const audience = notifyAudience(kindOf(p), change, { contractorGetsEmail: getsEmail });
   if (!audience) return null;
-  const item: OutboxItem = { kind: change.kind, actorLabel: p.label, summary, at: now.toISOString(), ...refs };
+  const item: OutboxItem = { kind: change.kind, actorLabel: p.label, summary, at: now.toISOString(), ...refs, ...(p.kind === "contractor" ? { contactId: p.contactId } : {}) };
   if (audience === "contractor" && task.assigneeContactId) {
     await enqueue(tx, { contactId: task.assigneeContactId }, task.id, item, now);
   } else if (audience === "staff") {
@@ -505,45 +520,72 @@ export async function notifyPartners(tx: Tx, taskId: string, item: OutboxItem, n
 }
 
 /**
- * "You're off this job" (docs/specs/contractor-job-emails.md, section 6): a
- * partner took the contractor off an open job, or canceled it. Queued for
- * that contractor under the same email rules as any staff change (a login,
- * a first sign-in, their switch on). The send run delivers it though their
- * access is gone, and carries nothing else about the job. Never for a draft:
- * a contractor taken off one never knew of it.
+ * Removed (docs/specs/emails-redesign.md, Q2): a partner took the contractor
+ * off an open job or canceled it, or a resident canceled their request (a
+ * system principal labeled as the resident, residents/requests.ts). Queued
+ * for that contractor under the same email rules as any staff change (a
+ * login, a first sign-in, their switch on). The send run delivers it though
+ * their access is gone, and carries nothing else about the job. `from` is the
+ * status the job had, so work under way is asked what's done so far. Never for
+ * a draft (a contractor taken off one never knew of it), and never from a job
+ * in review: their work is done, so there's no trip to call off. The callers
+ * pass only an open job.
  */
-async function notifyOff(tx: Tx, task: NotifyTask, contactId: string, p: Principal, summary: string, now: Date, job?: string): Promise<void> {
-  if (task.status === "DRAFT") return;
-  if (p.kind !== "staff" || !(await contractorGetsEmail(tx, contactId))) return;
-  await enqueue(tx, { contactId }, task.id, { kind: "OFF", actorLabel: p.label, summary, at: now.toISOString(), ...(job ? { job } : {}) }, now);
+async function notifyOff(tx: Tx, task: NotifyTask, contactId: string, p: Principal, summary: string, now: Date, opts: { job?: string; from: TaskStatus }): Promise<void> {
+  if (task.status === "DRAFT" || opts.from === "REVIEW") return;
+  if ((p.kind !== "staff" && p.kind !== "system") || !(await contractorGetsEmail(tx, contactId))) return;
+  const item: OutboxItem = { kind: "OFF", actorLabel: p.label, summary, at: now.toISOString(), from: opts.from, ...(opts.job ? { job: opts.job } : {}) };
+  await enqueue(tx, { contactId }, task.id, item, now);
 }
 
-/** The stored words of each 8 am line (content.ts itemText writes what the email says). */
-const REMINDER_SUMMARY: Record<ReminderKind, string> = {
+/**
+ * Tell the tenant at once (docs/specs/emails-redesign.md, Q8): their day was set, by them or a partner, inside its
+ * window (from two mornings before it through the day itself) at a home that needs notice (someone lives there and
+ * Permission to enter is off). Queued as the 7 am run would queue it, so neither sends it twice; in a partner's
+ * bundle it joins the Moved or New line, and picks the email's word (Q9). Not for a draft or a job with no day.
+ */
+export async function queueTellTenantNow(
+  tx: Tx,
+  task: Pick<Task, "id" | "status" | "scheduledFor" | "assigneeContactId" | "propertyId" | "unitLabel" | "entryPermittedAt">,
+  now: Date,
+): Promise<boolean> {
+  const day = toYmd(scheduledDay(task));
+  if (!task.assigneeContactId || !day || !inTellWindow(day, todayYmdEastern(now))) return false;
+  const home = await readTaskHome(tx, task, now);
+  if (!home || !home.access.occupied || home.access.permitted) return false;
+  return queueDueReminder(tx, { id: task.id, assigneeContactId: task.assigneeContactId }, "TELL_TENANT", day, now);
+}
+
+/** The stored words of each morning line (content.ts itemText writes what the email says). */
+const REMINDER_SUMMARY: Record<ReminderKind | LegacyReminderKind, string> = {
+  TELL_TENANT: "tell the tenant",
   SCHEDULED_TODAY: "scheduled today",
-  SCHEDULED_TOMORROW: "scheduled tomorrow",
+  STILL_OPEN: "still open",
+  NO_DAY: "no day yet",
   DUE_TODAY: "due today",
-  DUE_TOMORROW: "due tomorrow",
   OVERDUE: "due yesterday",
+  SCHEDULED_TOMORROW: "scheduled tomorrow",
+  DUE_TOMORROW: "due tomorrow",
 };
 
 /** Advisory-lock namespace for the 8 am reminders (portal uses 7301 to 7303). */
 const REMINDER_LOCK = 7304;
 
 /**
- * One 8 am line (docs/specs/contractor-job-emails.md, section 6;
- * docs/specs/contractor-scheduled-date.md): its kind and day, under the same
- * rules as any email to a contractor (a login, a first sign-in, their switch
- * on). Once per job, contractor, kind and day: one already queued or sent is
- * found in the outbox and not queued again, under a lock so two runs at once
- * queue one. A line the send run dropped as no longer true ("nothing to
- * send") doesn't count, so a day moved away and back gets its heads-up.
+ * One morning line (docs/specs/emails-redesign.md, Q8): its kind and day,
+ * under the same rules as any email to a contractor (a login, a first
+ * sign-in, their switch on). Once per job, contractor, kind and day: one
+ * already queued or sent is found in the outbox and not queued again, under a
+ * lock so two runs at once queue one. No day yet is once per job and
+ * contractor, whatever the day. A line the send run dropped as no longer true
+ * ("nothing to send") doesn't count, so a day moved away and back gets its
+ * Tell the tenant.
  *
- * `morningStart`: the 8 am run's own rule, one line per job per morning
- * (spec section 4): any reminder line queued for this job since that instant
- * holds this one back, so a job that changes during the 8 o'clock hour (a
- * Start, a moved day) doesn't get a second email. The right-away heads-up
- * (reminders.ts queueNoticeNow) passes none. Returns whether it queued.
+ * `morningStart`: the 7 am run's own rule, one line per job per morning
+ * (Q8): any morning line queued for this job since that instant holds this
+ * one back, so a job that changes during the 7 o'clock hour (a Start, a moved
+ * day) doesn't get a second email. Tell the tenant at once (queueTellTenantNow)
+ * passes none. Returns whether it queued.
  *
  * Never for a draft, read here again inside the transaction: the run's own
  * list of jobs can be a moment old, and an Add's Undo may have made the job a
@@ -553,7 +595,7 @@ const REMINDER_LOCK = 7304;
 export async function queueDueReminder(
   tx: Tx,
   task: { id: string; assigneeContactId: string },
-  kind: ReminderKind,
+  kind: ReminderKind | LegacyReminderKind,
   due: Ymd,
   now: Date,
   morningStart?: Date,
@@ -563,7 +605,7 @@ export async function queueDueReminder(
   if (!row || row.status === "DRAFT") return false;
   if (!(await contractorGetsEmail(tx, contactId))) return false;
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${REMINDER_LOCK}::int, hashtext(${`${contactId}:${task.id}`}))`;
-  const marker = JSON.stringify([{ kind, due }]);
+  const marker = JSON.stringify([kind === "NO_DAY" ? { kind } : { kind, due }]);
   const seen = await tx.$queryRaw<{ one: number }[]>`
     SELECT 1 AS one FROM "NotificationOutbox"
     WHERE "recipientContactId" = ${contactId} AND "taskId" = ${task.id} AND "items" @> ${marker}::jsonb
@@ -571,7 +613,7 @@ export async function queueDueReminder(
     LIMIT 1`;
   if (seen.length > 0) return false;
   if (morningStart) {
-    const kinds = Object.keys(REMINDER_SUMMARY);
+    const kinds = [...REMINDER_KINDS];
     const thisMorning = await tx.$queryRaw<{ one: number }[]>`
       SELECT 1 AS one FROM "NotificationOutbox" o, jsonb_array_elements(o."items") AS i
       WHERE o."recipientContactId" = ${contactId} AND o."taskId" = ${task.id}
@@ -884,7 +926,9 @@ export async function createTask(tx: Tx, input: NewTaskInput, p: Principal, now 
   if (!draft) {
     if (assigneeContactId) {
       await syncAssigneeAccess(tx, task, assigneeContactId, p, now);
-      await notify(tx, task, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(task, now), now);
+      const audience = await notify(tx, task, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(task, now), now);
+      // A new job whose day is close, at a home that needs notice, also says Tell the tenant (Q8, Q9).
+      if (audience === "contractor") await queueTellTenantNow(tx, task, now);
     }
     await logDeal(tx, task.dealId, p, `Task added: ${task.title}`, now);
   }
@@ -1438,16 +1482,63 @@ export async function deleteTask(tx: Tx, id: string, p: Principal, now = new Dat
       discardedAt: true,
       propertyId: true,
       dealId: true,
+      assigneeContactId: true,
+      unitLabel: true,
+      property: { select: { address: true } },
       attachments: { select: { url: true, thumbPathname: true, posterPathname: true } },
     },
   });
   if (!task || isDiscarded(task)) return null;
   if (task.status === "DRAFT") throw new TaskRuleError(DRAFT_DELETE_LINE);
+  // Its contractor's Removed email, read before the delete takes the job's own rows with it (removedOnDelete).
+  const removed = await removedOnDelete(tx, task, p, now);
+  // The crew's link and open page say the job is canceled, not sign in (portal/gone-crew-jobs.ts).
+  await keepGoneCrewJob(tx, id, now);
   await tx.task.delete({ where: { id } });
+  // After the delete: the job's own rows went with it (cascade), and this one has no task to go with.
+  if (removed) await tx.notificationOutbox.create({ data: removed });
   if (task.dealId) {
     await tx.dealNote.create({ data: { dealId: task.dealId, body: `Task deleted: ${task.title}  ·  ${p.label}`, noteDate: now, source: "change" } });
   }
   return { id: task.id, propertyId: task.propertyId, dealId: task.dealId, blobs: blobsOf(task.attachments) };
+}
+
+/**
+ * The Removed email for a deleted job (docs/specs/emails-redesign.md, Q2): the job's rows go with it, so its
+ * contractor's line is a row of its own with no task, carrying the title and the street and unit (content.ts
+ * deletedRowVerdict). Only for an open job a partner deletes, not one in review, under the usual email rules, and
+ * not when the job was handed to them in the bundle still waiting: no email ever told them they had it.
+ */
+async function removedOnDelete(
+  tx: Tx,
+  task: { id: string; title: string; status: TaskStatus; assigneeContactId: string | null; unitLabel: string | null; property: { address: string } | null },
+  p: Principal,
+  now: Date,
+): Promise<Prisma.NotificationOutboxUncheckedCreateInput | null> {
+  const contactId = task.assigneeContactId;
+  if (p.kind !== "staff" || !contactId || !isActiveStatus(task.status) || task.status === "REVIEW") return null;
+  if (!(await contractorGetsEmail(tx, contactId))) return null;
+  const waiting = await tx.notificationOutbox.findFirst({ where: { recipientContactId: contactId, taskId: task.id, sentAt: null }, select: { items: true } });
+  const handedNow = Array.isArray(waiting?.items) && waiting.items.some((i) => !!i && typeof i === "object" && (i as { kind?: unknown }).kind === "ASSIGNED");
+  if (handedNow) return null;
+  const item: OutboxItem = {
+    kind: "OFF",
+    actorLabel: p.label,
+    summary: `deleted "${task.title}"`,
+    at: now.toISOString(),
+    from: task.status,
+    taskId: task.id,
+    title: task.title,
+    where: jobWhere(task.property?.address ?? null, task.unitLabel),
+  };
+  return {
+    recipientContactId: contactId,
+    taskId: null,
+    items: [item] as unknown as Prisma.InputJsonValue,
+    firstAt: now,
+    sendAfter: new Date(now.getTime() + BUNDLE_QUIET_MS),
+    createdAt: now,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1635,18 +1726,33 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   // send-back note is already inside the status line (statusSummary), so the status line names it and the
   // drain re-reads it; it is never listed twice.
   if (noteEvent && p.kind === "contractor") {
-    await notify(tx, task, p, { kind: "COMMENT", visibility: "SHARED" }, commentSummary(note ?? "", noteEvent.linked), now, { eventId: noteEvent.event.id });
+    // Tied to its status line, so a Send for review note goes when its Review email does (content.ts partnerKept).
+    await notify(tx, task, p, { kind: "COMMENT", visibility: "SHARED" }, commentSummary(note ?? "", noteEvent.linked), now, {
+      eventId: noteEvent.event.id,
+      ...(to === "REVIEW" ? { statusEventId: statusEvent.id } : {}),
+    });
   }
   const audience = await notify(tx, task, p, { kind: "STATUS", visibility, to }, summary, now, {
     eventId: statusEvent.id,
     from: before.status,
+    to,
+    ...(to === "SCHEDULED" ? { day: toYmd(scheduledFor) ?? "" } : {}),
     ...(before.status === "SCHEDULED" ? { fromDay: toYmd(before.scheduledFor) ?? "" } : {}),
     ...(noteEvent && p.kind !== "contractor" && note ? { noteEventId: noteEvent.event.id } : {}),
   });
-  // A canceled open job tells its contractor there's no need to go (the Canceled line itself stays Internal).
+  // On hold (docs/specs/emails-redesign.md, Q2): a partner puts a job the contractor already has to Waiting. Its own
+  // line, since the Waiting status line stays Internal; the email names what it waits on (Task.waitingOn) as it sends.
+  const held =
+    to === "WAITING" && p.kind === "staff" && !!task.assigneeContactId && before.status !== "WAITING"
+      ? await notify(tx, task, p, { kind: "HOLD", visibility: "SHARED" }, `put "${task.title}" on hold`, now, { from: before.status })
+      : null;
+  // A canceled open job tells its contractor there's no need to go (the Canceled line itself stays Internal), a
+  // resident's cancel included; never one already in review (notifyOff).
   if (to === "CANCELED" && isActiveStatus(before.status) && task.assigneeContactId) {
-    await notifyOff(tx, task, task.assigneeContactId, p, `canceled "${task.title}"`, now);
+    await notifyOff(tx, task, task.assigneeContactId, p, `canceled "${task.title}"`, now, { from: before.status });
   }
+  // A partner setting their day close to it, at a home that needs notice, also says Tell the tenant (Q8).
+  if (to === "SCHEDULED" && p.kind === "staff" && audience === "contractor") await queueTellTenantNow(tx, task, now);
 
   if (to === "DONE" || reopening) {
     await logDeal(tx, task.dealId, p, `Task ${to === "DONE" ? "completed" : "reopened"}: ${task.title}`, now, to === "DONE" ? statusEvent.id : undefined);
@@ -1655,7 +1761,10 @@ export async function setStatus(tx: Tx, taskId: string, to: TaskStatus, p: Princ
   const nextDue = nextTaskId ? toYmd((await tx.task.findUnique({ where: { id: nextTaskId }, select: { dueDate: true } }))?.dueDate) : null;
   // Done to Canceled isn't a reopen: the copy stays.
   if (before.status === "DONE" && isActiveStatus(to)) await takeBackRepeat(tx, taskId);
-  return { task, nextTaskId, nextDue, statusEventId: statusEvent.id, noteEventId: noteEvent?.event.id ?? null, emailsContractor: audience === "contractor" };
+  // "Zack gets an email" only when the change makes one of its own (rules.ts staffStatusEmails); a status a partner
+  // sets for them otherwise rides along in the next email that goes.
+  const emails = (audience === "contractor" && staffStatusEmails(before.status, to)) || held === "contractor";
+  return { task, nextTaskId, nextDue, statusEventId: statusEvent.id, noteEventId: noteEvent?.event.id ?? null, emailsContractor: emails };
 }
 
 type ApprovalEmail = { sentAt: Date | null; lastError: string | null; openKey: string | null; attempts: number };
@@ -2162,16 +2271,20 @@ async function writePatch(tx: Tx, taskId: string, patch: TaskPatch, p: Principal
 
   if (newContactId !== undefined) {
     await syncAssigneeAccess(tx, after, newContactId, p, now);
-    if (newContactId) await notify(tx, after, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(after, now), now);
-    // The contractor taken off an open job hears so, so nobody makes the trip (docs/specs/contractor-job-emails.md 6).
+    if (newContactId && (await notify(tx, after, p, { kind: "ASSIGNED", visibility: "SHARED" }, assignedSummary(after, now), now)) === "contractor") {
+      await queueTellTenantNow(tx, after, now);
+    }
+    // The contractor taken off an open job hears so, so nobody makes the trip (docs/specs/emails-redesign.md, Q2); not
+    // one in review, whose work is done (notifyOff).
     if (before.assigneeContactId && isActiveStatus(before.status)) {
       // The job as they knew it, so giving it straight back says nothing unless it changed meanwhile (content.ts offItems).
       const job = jobKey({ status: before.status, due: toYmd(before.dueDate), scheduled: toYmd(scheduledDay(before)), notes: before.description });
-      await notifyOff(tx, after, before.assigneeContactId, p, `took you off "${after.title}"`, now, job);
+      await notifyOff(tx, after, before.assigneeContactId, p, `took you off "${after.title}"`, now, { job, from: before.status });
     }
-  } else if (after.assigneeContactId) {
-    // Same contractor: tell them about what they can see change. Due (TARGET) and their scheduled day (DAY) are
-    // separate lines (docs/specs/contractor-scheduled-date.md), so the email names which one moved.
+  } else if (after.assigneeContactId && after.status !== "REVIEW") {
+    // Same contractor: tell them about what they can see change (docs/specs/emails-redesign.md, Q2: every Due change,
+    // their day, the notes). Due (TARGET) and their scheduled day (DAY) are separate lines, so the email names which
+    // one moved. Nothing while the job is in review: their work is done.
     const dueBefore = toYmd(before.dueDate);
     const dueAfter = toYmd(after.dueDate);
     if (dueBefore !== dueAfter) {
@@ -2182,7 +2295,9 @@ async function writePatch(tx: Tx, taskId: string, patch: TaskPatch, p: Principal
     const dayAfter = toYmd(scheduledDay(after));
     if (dayBefore !== dayAfter) {
       const to = dayAfter ? emailDay(dayAfter, now) : "no date";
-      await notify(tx, after, p, { kind: "DAY", visibility: "SHARED" }, `moved "${after.title}" to ${to}`, now, { from: dayBefore ?? "" });
+      const audience = await notify(tx, after, p, { kind: "DAY", visibility: "SHARED" }, `moved "${after.title}" to ${to}`, now, { from: dayBefore ?? "", day: dayAfter ?? "" });
+      // A day moved close, at a home that needs notice, also says Tell the tenant (Q8).
+      if (audience === "contractor") await queueTellTenantNow(tx, after, now);
     }
     if (events.some((e) => e.kind === "NOTES")) {
       await notify(tx, after, p, { kind: "NOTES", visibility: "SHARED" }, `updated the notes on "${after.title}"`, now, { from: notesFingerprint(before.description) });
@@ -2215,7 +2330,7 @@ export async function scheduleByContractor(tx: Tx, taskId: string, date: Ymd, p:
   const after = await tx.task.update({ where: { id: taskId }, data: { scheduledFor: ymdToDate(date), ...editStamp(p, now) } });
   await addEvent(tx, taskId, p, { kind: "SCHEDULED", data: { from, to: date } });
   const was = from ? ` (was ${emailDay(from, now)})` : "";
-  await notify(tx, after, p, { kind: "DAY", visibility: "SHARED" }, `moved "${after.title}" to ${emailDay(date, now)}${was}`, now, { from: from ?? "" });
+  await notify(tx, after, p, { kind: "DAY", visibility: "SHARED" }, `moved "${after.title}" to ${emailDay(date, now)}${was}`, now, { from: from ?? "", day: date });
   return after;
 }
 
@@ -2238,7 +2353,7 @@ export async function unscheduleByContractor(tx: Tx, taskId: string, p: Extract<
   if (!from) return before;
   const after = await tx.task.update({ where: { id: taskId }, data: { scheduledFor: null, ...editStamp(p, now) } });
   await addEvent(tx, taskId, p, { kind: "SCHEDULED", data: { from, to: null } });
-  await notify(tx, after, p, { kind: "DAY", visibility: "SHARED" }, `unscheduled "${after.title}" (was ${emailDay(from, now)})`, now, { from });
+  await notify(tx, after, p, { kind: "DAY", visibility: "SHARED" }, `unscheduled "${after.title}" (was ${emailDay(from, now)})`, now, { from, day: "" });
   return after;
 }
 
@@ -2956,10 +3071,12 @@ export async function addChecklistItem(tx: Tx, taskId: string, title: string, p:
   if (!task) throw new TaskRuleError("That task no longer exists.");
   refuseDiscarded(task);
   const last = await tx.taskChecklistItem.findFirst({ where: { taskId }, orderBy: { position: "desc" }, select: { position: true } });
+  const before = await checklistPrint(tx, taskId, p);
   const item = await tx.taskChecklistItem.create({ data: { taskId, title: t, position: (last?.position ?? -1) + 1, checkKey } });
   // Stamped like every other edit, so a repeat copy someone added to counts
   // as touched and isn't taken back when the finished task reopens.
   await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
+  await notifyChecklist(tx, taskId, p, `added "${t}" to the checklist`, before, now);
   return item;
 }
 
@@ -2998,9 +3115,42 @@ function checklistStaffOnly(p: Principal): void {
 }
 
 /**
+ * The checklist's fingerprint before a partner's edit (notifications/content.ts checklistFingerprint), so the email the
+ * edit sends says nothing when the list is put back as it was. Null for anyone else: only a partner's edit emails.
+ */
+async function checklistPrint(tx: Tx, taskId: string, p: Principal): Promise<string | null> {
+  if (p.kind !== "staff") return null;
+  // Only a job a contractor has, open and not in review, emails (notifyChecklist): anything else reads no list.
+  const task = await tx.task.findUnique({ where: { id: taskId }, select: { status: true, assigneeContactId: true } });
+  if (!task?.assigneeContactId || task.status === "REVIEW" || !isActiveStatus(task.status)) return null;
+  const rows = await tx.taskChecklistItem.findMany({ where: { taskId }, orderBy: [{ position: "asc" }, { createdAt: "asc" }], select: { title: true } });
+  return checklistFingerprint(rows);
+}
+
+/**
+ * A partner's checklist edit emails the contractor on an open job (docs/specs/emails-redesign.md, Q2: it changes what
+ * they do), as an Update with the checklist marked "changed". Not a tick: that is work, not a change to the list. Not
+ * while the job is in review or closed.
+ */
+async function notifyChecklist(tx: Tx, taskId: string, p: Principal, summary: string, before: string | null, now: Date): Promise<void> {
+  if (p.kind !== "staff" || before === null) return;
+  const task = await tx.task.findUnique({ where: { id: taskId }, select: { id: true, status: true, assigneeContactId: true } });
+  if (!task?.assigneeContactId || task.status === "REVIEW" || !isActiveStatus(task.status)) return;
+  await notify(tx, task, p, { kind: "CHECKLIST", visibility: "SHARED" }, summary, now, { from: before });
+}
+
+/** What a checklist edit's email line says (content.ts itemText reads it back). */
+function checklistSummary(action: ChecklistAction, change: { from: string | null; to: string | null }): string {
+  if (action === "renamed") return `renamed "${change.from ?? ""}" to "${change.to ?? ""}" on the checklist`;
+  if (action === "removed") return `removed "${change.from ?? ""}" from the checklist`;
+  return `put back "${change.to ?? ""}" on the checklist`;
+}
+
+/**
  * One CHECKLIST event saying what happened, `{ action, itemId, title, from, to }`,
  * and the task's edit stamp, like every other edit, so a repeat copy someone
- * changed counts as touched. No email goes out for these.
+ * changed counts as touched. A partner's edit also emails the contractor
+ * (notifyChecklist), with `before` the list's fingerprint before it.
  */
 async function recordChecklistEdit(
   tx: Tx,
@@ -3010,12 +3160,14 @@ async function recordChecklistEdit(
   item: { id: string; title: string },
   change: { from: string | null; to: string | null },
   now: Date,
+  before: string | null = null,
 ): Promise<void> {
   await addEvent(tx, taskId, p, {
     kind: "CHECKLIST",
     data: { action, itemId: item.id, title: item.title, from: change.from, to: change.to },
   });
   await tx.task.update({ where: { id: taskId }, data: editStamp(p, now) });
+  await notifyChecklist(tx, taskId, p, checklistSummary(action, change), before, now);
 }
 
 /**
@@ -3057,8 +3209,9 @@ export async function renameChecklistItem(tx: Tx, itemId: string, title: string,
   if (!item) throw new TaskRuleError("That checklist item no longer exists.");
   refuseDiscarded(item.task);
   if (item.title === next) return item;
+  const before = await checklistPrint(tx, item.taskId, p);
   const updated = await tx.taskChecklistItem.update({ where: { id: itemId }, data: { title: next } });
-  await recordChecklistEdit(tx, item.taskId, p, "renamed", { id: itemId, title: next }, { from: item.title, to: next }, now);
+  await recordChecklistEdit(tx, item.taskId, p, "renamed", { id: itemId, title: next }, { from: item.title, to: next }, now, before);
   return updated;
 }
 
@@ -3073,8 +3226,9 @@ export async function removeChecklistItem(tx: Tx, itemId: string, p: Principal, 
   const item = await tx.taskChecklistItem.findUnique({ where: { id: itemId }, include: { task: { select: { discardedAt: true } } } });
   if (!item) throw new TaskRuleError("That checklist item no longer exists.");
   refuseDiscarded(item.task);
+  const before = await checklistPrint(tx, item.taskId, p);
   await tx.taskChecklistItem.delete({ where: { id: itemId } });
-  await recordChecklistEdit(tx, item.taskId, p, "removed", { id: itemId, title: item.title }, { from: item.title, to: null }, now);
+  await recordChecklistEdit(tx, item.taskId, p, "removed", { id: itemId, title: item.title }, { from: item.title, to: null }, now, before);
   return {
     id: item.id,
     taskId: item.taskId,
@@ -3107,6 +3261,7 @@ export async function restoreChecklistItem(tx: Tx, snapshot: ChecklistSnapshot, 
   const task = await tx.task.findUnique({ where: { id: snapshot.taskId }, select: { id: true, discardedAt: true } });
   if (!task) throw new TaskRuleError("This task is gone, so the item can't come back.");
   refuseDiscarded(task);
+  const before = await checklistPrint(tx, snapshot.taskId, p);
   await tx.taskChecklistItem.create({
     data: {
       id: snapshot.id,
@@ -3123,5 +3278,5 @@ export async function restoreChecklistItem(tx: Tx, snapshot: ChecklistSnapshot, 
       createdAt: new Date(snapshot.createdAt),
     },
   });
-  await recordChecklistEdit(tx, snapshot.taskId, p, "restored", { id: snapshot.id, title: snapshot.title }, { from: null, to: snapshot.title }, now);
+  await recordChecklistEdit(tx, snapshot.taskId, p, "restored", { id: snapshot.id, title: snapshot.title }, { from: null, to: snapshot.title }, now, before);
 }

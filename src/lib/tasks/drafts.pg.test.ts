@@ -565,7 +565,8 @@ test("Undo removes only the access an assignment made, and the send run closes a
   assert.deepEqual(await idsIn(contractorCanOpen(amy.id), [draft.id]), [], "she still can't open a draft");
 
   // Rows that outlived the Undo: one to Amy, who holds an access row and a login, and one to a partner.
-  const item = { kind: "COMMENT", actorLabel: "Pieter Louw", summary: "commented", at: new Date().toISOString() };
+  // A comment with words: a line that leads an email of its own (notifications/content.ts leadsEmail), so only the draft holds it.
+  const item = { kind: "COMMENT", actorLabel: "Pieter Louw", summary: '"Doors arrive Thursday"', at: new Date().toISOString() };
   await prisma.notificationOutbox.create({ data: { openKey: `c:${amy.id}:${draft.id}`, recipientContactId: amy.id, taskId: draft.id, items: [item], sendAfter: new Date() } });
   await prisma.notificationOutbox.create({ data: { openKey: `u:${connor.userId}:${draft.id}`, recipientUserId: connor.userId, taskId: draft.id, items: [item], sendAfter: new Date() } });
   const rows = () => prisma.notificationOutbox.findMany({ where: { taskId: draft.id, OR: [{ recipientContactId: amy.id }, { recipientUserId: connor.userId }] }, orderBy: { openKey: "asc" }, select: RUN_ROW });

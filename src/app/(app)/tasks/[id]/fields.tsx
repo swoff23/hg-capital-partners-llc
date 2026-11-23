@@ -88,6 +88,7 @@ export function TaskFields({
   entryOffered,
   resident = null,
   created,
+  openAssignee = false,
   className,
 }: {
   taskId: string;
@@ -115,6 +116,8 @@ export function TaskFields({
   /** Set when a resident sent it: the Pets and Requested by rows (drawing 13 A). */
   resident?: TaskResident | null;
   created: string;
+  /** An email's Assign button (`?do=assign`): the assignee picker opens once on load. */
+  openAssignee?: boolean;
   className?: string;
 }) {
   const { run } = useRun();
@@ -244,6 +247,7 @@ export function TaskFields({
             size="sm"
             // The rail's empty fact is a verb.
             placeholder="Assign"
+            autoOpen={openAssignee}
             onChange={assign}
           />
         </Row>

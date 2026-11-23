@@ -109,15 +109,25 @@ export function isAfterDue(scheduled: Ymd | null | undefined, due: Ymd | null | 
 /**
  * Email only crosses the staff/contractor line (D19, D20):
  *   - staff change a contractor's job → the contractor hears about it
- *     (assignment, a shared comment or file, a shared status, target date or
- *     notes changes). Internal notes never email a contractor, and neither
- *     does a move to Done: Approve, or a partner closing the job, is only
- *     shown on the job (docs/specs/send-for-review.md, section 2). The
- *     contractor hears back about finished work only when it's sent back.
+ *     (assignment, a shared comment or file, a shared status, Due, their
+ *     day, the notes, the checklist, on hold). Internal notes never email a
+ *     contractor, and neither does a move to Done: Approve, or a partner
+ *     closing the job, is only shown on the job (docs/specs/send-for-review.md,
+ *     section 2). The contractor hears back about finished work only when
+ *     it's sent back.
  *   - a contractor changes their job → both partners hear about it.
  *   - staff changing staff tasks, the system and the importer email nobody.
- * `TARGET` stands for "the due date moved" and `DAY` for "the scheduled day
- * moved" (docs/specs/contractor-scheduled-date.md); core decides which.
+ * `TARGET` stands for "the due date moved", `DAY` for "the scheduled day
+ * moved" (docs/specs/contractor-scheduled-date.md) and `HOLD` for "a partner
+ * put the job on hold" (docs/specs/emails-redesign.md, Q2); core decides which.
+ *
+ * Who hears is not the same as whether the line makes an email of its own
+ * (docs/specs/emails-redesign.md, Q2 and Q6): every line here is queued, but
+ * photos with no words, a partner changing the status for a contractor, and a
+ * contractor's Start or on-time day only ride along in an email something
+ * else sends. content.ts decides that as the email goes (leadsEmail), and
+ * staffStatusEmails below says it for a partner's status change, for the
+ * toast's "Zack gets an email".
  *
  * `contractorGetsEmail` is the whole rule for a contractor's task emails
  * (src/lib/portal/job-emails.ts): an active login, signed in at least once,
@@ -125,13 +135,15 @@ export function isAfterDue(scheduled: Ymd | null | undefined, due: Ymd | null | 
  * and nothing is sent later to catch them up.
  */
 export type NotifyChange = {
-  kind: TaskEventKind | "TARGET" | "DAY";
+  kind: TaskEventKind | "TARGET" | "DAY" | "HOLD";
   visibility: Visibility;
   /** A STATUS change's new status: a staff move to Done emails nobody. */
   to?: TaskStatus;
 };
 
-const STAFF_TO_CONTRACTOR: ReadonlySet<NotifyChange["kind"]> = new Set(["ASSIGNED", "TARGET", "DAY", "NOTES"]);
+// CHECKLIST: a partner added, renamed, removed or put back an item (Q2: it changes what they do). HOLD: a partner put
+// a job they already have on hold.
+const STAFF_TO_CONTRACTOR: ReadonlySet<NotifyChange["kind"]> = new Set(["ASSIGNED", "TARGET", "DAY", "NOTES", "CHECKLIST", "HOLD"]);
 // DAY: the contractor moved their scheduled day (core.ts scheduleByContractor). TARGET stays for rows queued before
 // Nov 21, when a contractor's pick moved the due date.
 const CONTRACTOR_TO_STAFF: ReadonlySet<NotifyChange["kind"]> = new Set(["COMMENT", "ATTACHMENT", "STATUS", "TARGET", "DAY"]);
@@ -152,6 +164,24 @@ export function notifyAudience(
   if (actor === "contractor") return CONTRACTOR_TO_STAFF.has(change.kind) ? "staff" : null;
   return null;
 }
+
+/**
+ * Whether a partner's status change emails the contractor on its own (docs/specs/emails-redesign.md, Q2): a send-back
+ * (Sent back), setting their day (a move to Scheduled) or taking it away (Scheduled back to To do), both Moved. Any
+ * other status a partner sets for them is only a line in an email that's already going. On hold is its own line
+ * (HOLD), and a cancel its own (core.ts notifyOff).
+ */
+export function staffStatusEmails(from: TaskStatus, to: TaskStatus): boolean {
+  if (from === "REVIEW" && to === "IN_PROGRESS") return true;
+  if (to === "SCHEDULED") return true;
+  return from === "SCHEDULED" && to === "OPEN";
+}
+
+/**
+ * A contractor's day emails the partners only when it puts the job at risk (docs/specs/emails-redesign.md, Q6): a
+ * day picked after Due, or their day taken off with Due this many days out or less (or already past).
+ */
+export const DUE_SOON_DAYS = 3;
 
 /**
  * Bundling: everything for one recipient about one task goes out as one email.

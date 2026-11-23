@@ -153,6 +153,21 @@ export function groupJobs(jobs: JobCard[], opts: { tab: JobsTab; group: JobsGrou
   return opts.group === "property" ? groupByProperty(jobs, by) : groupByDate(jobs, opts.today, by);
 }
 
+/**
+ * Getting in's two lines, in the job page's own words (job-details.tsx GettingInSection, Connor, Nov 22): with
+ * Permission to enter and a code, "Let yourself in" over who said so; at a home someone lives in without it,
+ * someone must be home after 24 hours' notice; nobody living there with a code, "Let yourself in" over "No one
+ * lives here". Null when the page says nothing about getting in. The job emails use it (docs/specs/emails-redesign.md,
+ * Q4), never with the code or a tenant's name or number.
+ */
+export function gettingInWords(a: { permitted: boolean; hasLockbox: boolean; needsNotice: boolean; vacant: boolean; tenants: number }): { value: string; note: string } | null {
+  const one = a.tenants === 1;
+  if (a.permitted && a.hasLockbox) return { value: "Let yourself in", note: one ? "The tenant said it's OK" : "The tenants said it's OK" };
+  if (a.needsNotice) return { value: one ? "The tenant must be home" : "A tenant must be home", note: "Call/text them 24 hours in advance" };
+  if (a.hasLockbox && a.vacant) return { value: "Let yourself in", note: "No one lives here" };
+  return null;
+}
+
 /** "23 Sherwood St · Upper" for a card; the full address on the job page. */
 export function addressLine(address: string | null, unitLabel: string | null, opts: { short?: boolean } = {}): string {
   const street = address ? (opts.short ? shortAddress(address) || address : address) : "";

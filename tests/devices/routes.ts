@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { PrismaClient } from "@prisma/client";
-import { residentLinkToken, signupLinkToken } from "../../src/lib/portal/tokens";
+import { hashToken, residentLinkToken, signupLinkToken } from "../../src/lib/portal/tokens";
 
 const APP_DIR = path.join(__dirname, "../../src/app");
 
@@ -79,6 +79,14 @@ export const SAMPLE_PARAMS: Record<string, FindRow> = {
     const row = await db.residentLink.findUnique({ where: { id: "devicecheckresidentlink" }, select: { id: true } });
     return row && secret ? { id: residentLinkToken(row.id, secret) } : null;
   },
+  // A crew link's verdict once its job is deleted (docs/specs/emails-redesign.md, Q7): the note setup.ts
+  // seedGoneCrewJobs keeps under a fresh crew link token each run. The page loads signed out, as a crew member's would.
+  "j/[token]": async (db) => {
+    const token = process.env.DEVICE_GONE_LINK_TOKEN;
+    if (!token) return null;
+    const note = await db.goneCrewJob.findUnique({ where: { tokenHash: hashToken(token) }, select: { kind: true } });
+    return note?.kind === "LINK" ? { id: token } : null;
+  },
   "[token]/[requestId]": async (db) => {
     const link = await db.residentLink.findUnique({ where: { id: "devicecheckresidentlink" }, select: { leaseId: true } });
     return link ? db.residentRequest.findFirst({ where: { leaseId: link.leaseId }, select: { id: true }, orderBy: { createdAt: "desc" } }) : null;
@@ -104,9 +112,19 @@ export const SAMPLE_PARAMS: Record<string, FindRow> = {
  * /login load signed out. "portal-welcome" is the second fixture, still on
  * its starting password, for the one page only it can see. "portal-email-link"
  * and "portal-crew-link" are the "portal" fixture through a job email's link
- * and a Share with crew link (setup.ts seedLinkSessions).
+ * and a Share with crew link (setup.ts seedLinkSessions). "portal-crew-gone" is
+ * a crew session whose job was deleted, which only /j/gone reads (setup.ts
+ * seedGoneCrewJobs).
  */
-export type RouteSession = "none" | "staff" | "portal" | "portal-welcome" | "portal-setup" | "portal-email-link" | "portal-crew-link";
+export type RouteSession =
+  | "none"
+  | "staff"
+  | "portal"
+  | "portal-welcome"
+  | "portal-setup"
+  | "portal-email-link"
+  | "portal-crew-link"
+  | "portal-crew-gone";
 
 export interface Route {
   /** The URL pattern, e.g. /deals/[id] */
@@ -127,6 +145,8 @@ export const ROUTE_SESSION_OVERRIDE: Record<string, RouteSession> = {
   "/p/welcome/password": "portal-welcome",
   // Setup is for people who came in by an invite or the sign-up link; the fixture staff added would only bounce to /p.
   "/p/setup": "portal-setup",
+  // A crew session's verdict once its job is gone (docs/specs/emails-redesign.md, Q7); with no session it only goes to sign in.
+  "/j/gone": "portal-crew-gone",
 };
 
 /**

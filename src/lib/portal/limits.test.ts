@@ -1,12 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  GONE_CREW_JOB_KEEP_MS,
   PORTAL_SESSION_TTL_MS,
   RESET_LIMITS,
   RESET_TOKEN_TTL_MS,
   resetRequestAllowed,
   resetTokenExpiresAt,
   resetWindowStart,
+  goneCrewJobExpiresAt,
   sessionExpiresAt,
   sessionIsLive,
   shouldTouchSession,
@@ -47,4 +49,13 @@ test("3 per email and 10 per IP per hour", () => {
   assert.equal(resetRequestAllowed({ email: 3, ip: 0 }), false);
   assert.equal(resetRequestAllowed({ email: 0, ip: 10 }), false);
   assert.equal(resetRequestAllowed({ email: 1, ip: 1 }, { perEmail: 1, perIp: 5 }), false);
+});
+
+test("a deleted job's crew note lasts 30 days, or until the crew session would have ended", () => {
+  assert.equal(GONE_CREW_JOB_KEEP_MS, PORTAL_SESSION_TTL_MS);
+  assert.equal(goneCrewJobExpiresAt(now).toISOString(), "2026-11-25T15:00:00.000Z");
+  const soon = new Date(now.getTime() + 2 * HOUR);
+  assert.equal(goneCrewJobExpiresAt(now, soon).toISOString(), soon.toISOString(), "a session ending sooner ends its note");
+  const later = new Date(now.getTime() + 40 * 24 * HOUR);
+  assert.equal(goneCrewJobExpiresAt(now, later).toISOString(), "2026-11-25T15:00:00.000Z", "never past 30 days");
 });

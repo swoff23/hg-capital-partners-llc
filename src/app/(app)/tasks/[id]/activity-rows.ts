@@ -3,7 +3,6 @@ import type { FileLink } from "@/components/files-list";
 import type { MediaItem } from "@/components/media-grid";
 import type { Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
-import type { JobEmailState } from "@/lib/portal/job-emails";
 import {
   anchorsStretch,
   buildActivity,
@@ -16,7 +15,7 @@ import {
   type LineEntry,
 } from "@/lib/tasks/activity";
 import { bodySegments, type BodyLinkContext, type BodySegment } from "@/lib/tasks/body-links";
-import { deliveryLine, type Delivery, type EmailState } from "@/lib/tasks/delivery";
+import { deliveryLine, type Delivery, type EmailState, type TaskEmailState } from "@/lib/tasks/delivery";
 import { fileLink, isMediaRow, mediaItem, type TaskMediaRow } from "@/lib/tasks/media";
 import { contractorSeesRow } from "@/lib/tasks/rules";
 
@@ -125,8 +124,10 @@ export interface ShapeInput {
   contractor: {
     id: string;
     first: string;
-    /** Whether task emails reach them, or why not (src/lib/portal/job-emails.ts). */
-    emails: JobEmailState;
+    /** Their full name, for "Emails don't reach Zack Miller." */
+    name?: string;
+    /** Whether task emails reach them, or why not (src/lib/portal/job-emails.ts, tasks/delivery.ts taskEmailState). */
+    emails: TaskEmailState;
     /** Their access to the job is unrevoked. */
     accessActive: boolean;
     /** When they last opened the job, from their own read state. */
@@ -214,6 +215,7 @@ export function shapeActivity(input: ShapeInput): ActivityRow[] {
   if (contractor && target) {
     const line = deliveryLine({
       to: contractor.first,
+      name: contractor.name,
       emails: contractor.emails,
       email: input.emailStates.get(target.eventId) ?? null,
       seenAt: contractor.seenAt,

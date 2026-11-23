@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { todayYmdEastern, ymdToDate } from "../../src/lib/dates";
 import { hashPassword } from "../../src/lib/password";
+import { goneJobStreet } from "../../src/lib/portal/gone-job-text";
 import { generateStartingPassword, hashToken, newToken, residentLinkToken, signupLinkToken } from "../../src/lib/portal/tokens";
 import { addDaysYmd } from "../../src/lib/quick-dates";
 import { signSessionToken } from "../../src/lib/session-token";
@@ -302,6 +303,31 @@ async function seedLinkSessions(db: PrismaClient, contactId: string): Promise<{ 
 }
 
 /**
+ * The crew's verdict screens for a deleted job (docs/specs/emails-redesign.md, Q7): one note under a crew link's token,
+ * for /j/[token]/gone, and one under a crew session's cookie, for /j/gone. Notes only, with the To do fixture job's
+ * title and street, as deleteTask keeps them (src/lib/portal/gone-crew-jobs.ts), so no job is deleted to make them and
+ * no job, link or session has to exist. Each run writes fresh tokens; an earlier run's notes run out a day later and
+ * go with the other expired ones here, as a delete purges them.
+ */
+export async function seedGoneCrewJobs(db: PrismaClient): Promise<{ link: string; session: string } | null> {
+  assertLocalDb();
+  const job = await db.task.findFirst({
+    where: { description: { endsWith: TODO_FIXTURE_MARK } },
+    select: { title: true, unitLabel: true, property: { select: { address: true } } },
+  });
+  if (!job) return null;
+  const now = new Date();
+  const note = { title: job.title, street: goneJobStreet(job.property?.address ?? null, job.unitLabel), deletedAt: now, expiresAt: new Date(now.getTime() + DAY_MS) };
+  const tokens = { link: newToken(), session: newToken() };
+  await db.$transaction([
+    db.goneCrewJob.deleteMany({ where: { expiresAt: { lte: now } } }),
+    db.goneCrewJob.create({ data: { ...note, tokenHash: hashToken(tokens.link), kind: "LINK" } }),
+    db.goneCrewJob.create({ data: { ...note, tokenHash: hashToken(tokens.session), kind: "SESSION" } }),
+  ]);
+  return tokens;
+}
+
+/**
  * One open rehab when the local DB has none (docs/specs/rehab-draws.md), so /draws and /draws/[id] render
  * with a budget, a draw at the lender and a draft. Written through src/lib/draws/core.ts like any rehab.
  * A DB that already has an open rehab is left alone.
@@ -425,6 +451,10 @@ export default async function setup() {
     const links = await seedLinkSessions(db, portal.contactId);
     process.env.DEVICE_PORTAL_EMAIL_LINK_TOKEN = links?.email ?? "";
     process.env.DEVICE_PORTAL_CREW_LINK_TOKEN = links?.crew ?? "";
+    // Read by SAMPLE_PARAMS["j/[token]"] below and by the "portal-crew-gone" session.
+    const gone = await seedGoneCrewJobs(db);
+    process.env.DEVICE_GONE_LINK_TOKEN = gone?.link ?? "";
+    process.env.DEVICE_PORTAL_CREW_GONE_TOKEN = gone?.session ?? "";
     process.env.DEVICE_PORTAL_WELCOME_TOKEN = (await seedPortalFixture(db, PORTAL_WELCOME_FIXTURE)).token;
     const setup = await seedPortalFixture(db, PORTAL_SETUP_FIXTURE);
     // Back to the start of setup every run: came in by an invite, details checked, nothing after.

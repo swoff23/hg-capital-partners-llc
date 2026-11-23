@@ -1,5 +1,7 @@
 # Job emails that carry the job
 
+> **Partly superseded (Nov 22, 2026):** what sends, the layout, subject words, previews, From names and the morning emails now follow [emails-redesign.md](emails-redesign.md). Where the two disagree, that spec wins.
+
 Planned with Connor on Nov 14, 2026, one question at a time, each with a low-fi visual. He took the recommendation on most questions and changed several (marked "Connor's call" below). Nothing here is built until Connor says "build it" in chat.
 
 ## 1. Summary
@@ -161,7 +163,7 @@ The taken-off email carries only the job's title and address: no access, notes, 
 | Says "done" | A comment only. A reply never changes status |
 | Clutter | Quoted email, "Sent from my iPhone" and signatures are cut. Out-of-office and empty replies are ignored |
 
-**How it's built.** Each job email carries a REPLY link (`JobLink` kind `REPLY`) as its reply address; it lets a reply post to that job as the person the email went to and never opens the job. The webhook (`src/app/api/email/inbound/route.ts`) checks Resend's Svix signature with `RESEND_WEBHOOK_SECRET`, then `src/lib/email/replies.ts` fetches the email and its files from Resend and posts them (`core.addComment`, once per email by its id). Rule 2's sender shows as a last line, "From mike@gmail.com", which everyone on the job sees. Files that post: the portal's photos and videos, and the staff side's documents too (PDFs, an invoice), within each kind's size cap; a signature's small inline logo is left out. Files sent by email have no thumbnail (the server can't make one), so the app shows the full picture. A reply to plain `jobs@` is matched by its thread only when the sender's domain passes DMARC, since a From line and a References header can be forged. Gmail and Outlook publish no enforcing DMARC policy, so their users' replies match only through the r+ address (which their apps use); one that ignores Reply-To is dropped. More than 50 files in one reply: the first 50 post and the contractor gets a note to add the rest on the job. That note, and the one for a video too big to post, has the subject `Error:` and the job, street and unit (2.1), so a contractor with several jobs knows which one.
+**How it's built.** Each job email carries a REPLY link (`JobLink` kind `REPLY`) as its reply address; it lets a reply post to that job as the person the email went to and never opens the job. The webhook (`src/app/api/email/inbound/route.ts`) checks Resend's Svix signature with `RESEND_WEBHOOK_SECRET`, then `src/lib/email/replies.ts` fetches the email and its files from Resend and posts them (`core.addComment`, once per email by its id). Rule 2's sender shows as a last line, "From mike@gmail.com", which everyone on the job sees. Files that post: the portal's photos and videos, and the staff side's documents too (PDFs, an invoice), within each kind's size cap; a signature's small inline logo is left out. Files sent by email have no thumbnail (the server can't make one), so the app shows the full picture. A reply to plain `jobs@` is matched by its thread only when the sender's domain passes DMARC, since a From line and a References header can be forged. Gmail and Outlook publish no enforcing DMARC policy, so their users' replies match only through the r+ address (which their apps use); one that ignores Reply-To is dropped. More than 50 files in one reply: the first 50 post and the contractor gets a note to add the rest on the job. That note, and the one for a file too big to post or sent as an iCloud or Drive link, has the subject `Some files didn't post:` and the job, street and unit (2.1), so a contractor with several jobs knows which one, and says the rest of the reply posted (emails redesign, section 7).
 
 **Staff replies (Q9).** A reply to Connor or Pieter's copy posts as their Shared comment, addressed to the contractor, who gets it by email as any staff comment today. Their copy's footer says so: "Reply to answer Zack."
 
@@ -217,7 +219,7 @@ Same shell, subject and threading as section 2, sent to both partners as today. 
 ## 9. For Connor to set up
 
 1. **DMARC.** A TXT record at `_dmarc` on the root domain (`v=DMARC1; p=none`), which covers `mail.` and `reply.` too, so work inboxes like `outlawcarpentry.com` don't junk the emails. Resend's DKIM and SPF are already in place.
-2. **Receiving.** Receiving turned on for `mail.hgcapitalpartners.com` in Resend (its MX record, `10 receive.forge.rmta.net`, was live Nov 14), and the receiving webhook (`email.received`) at `https://www.hgcapitalpartners.com/api/email/inbound`.
+2. **Receiving.** Receiving turned on for `mail.hgcapitalpartners.com` in Resend (its MX record, `10 receive.forge.rmta.net`, was live Nov 14), and the receiving webhook (`email.received`) at `https://www.hgcapitalpartners.com/api/email/inbound`. Since the emails redesign the same webhook also takes `email.bounced`, `email.suppressed`, `email.complained` and `email.delivered` (src/lib/email/delivery-events.ts).
 3. **One env var** in Vercel: `RESEND_WEBHOOK_SECRET`, from that webhook.
 
 Sections 2 to 4 and 6 to 8 need none of this. Reply by email waits on 2 and 3.

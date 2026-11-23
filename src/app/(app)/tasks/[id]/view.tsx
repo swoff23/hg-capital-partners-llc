@@ -6,8 +6,8 @@ import type { MediaItem } from "@/components/media-grid";
 import { ComposerDropZone, PendingSendsProvider } from "@/components/composer";
 import { Section } from "@/components/ui";
 import type { Ymd } from "@/lib/dates";
-import type { JobEmailState } from "@/lib/portal/job-emails";
 import { personRefs } from "@/lib/tasks/assignee-people";
+import type { TaskEmailState } from "@/lib/tasks/delivery";
 import type { DraftContractor } from "@/lib/tasks/drafts";
 import { TaskActivity, type ActivityRow } from "./activity";
 import { Checklist, type ChecklistRow } from "./checklist";
@@ -16,7 +16,7 @@ import { DraftBanner } from "./draft-banner";
 import { TaskFields, type PropertyOption, type TaskFieldValues, type TaskLockbox, type TaskResident, type TaskTenants } from "./fields";
 import { MoreMenu, TitleField } from "./header";
 import { NotesField } from "./notes";
-import { ReviewSlot, type ReviewDecision, type ReviewProof } from "./review-banner";
+import { OutcomeLine, ReviewSlot, type ReviewDecision, type ReviewProof } from "./review-banner";
 import { StatusControl, WaitingReason } from "./status-control";
 import { StatusRunProvider } from "./status-run";
 import { TaskMediaSection } from "./task-media";
@@ -57,7 +57,7 @@ export interface TaskPageViewProps {
   /** The assigned contractor has a portal login; until then nothing here says they'll see it now. */
   contractorHasLogin: boolean;
   /** The assigned contractor, for the composer's line over the field. */
-  contractor: { id: string; first: string; hasLogin: boolean; emails: JobEmailState } | null;
+  contractor: { id: string; first: string; name?: string; hasLogin: boolean; emails: TaskEmailState } | null;
   /** The partners' first names: who sees an Internal note. */
   staffFirstNames: string[];
   /** Set while the task is a draft from Claude: the banner in place of the status control, and who hears when it's added. */
@@ -68,6 +68,14 @@ export interface TaskPageViewProps {
   decision: ReviewDecision | null;
   /** An email's Send back (`?do=send-back`, docs/specs/contractor-job-emails.md 8): the banner opens its sheet once. */
   openSendBack?: boolean;
+  /** An email's Approve (`?do=approve`): the Review banner comes into view with Approve focused. */
+  focusApprove?: boolean;
+  /** An email's Approve or Send back found the job already decided: the outcome line shows. */
+  landed?: boolean;
+  /** An email's Assign (`?do=assign`) on an unassigned job: the assignee picker opens once. */
+  openAssignee?: boolean;
+  /** An email's Assign on a job that already has someone: "Pieter assigned Zack Miller · 9:20 AM", above the fields. */
+  assignedLine?: { text: string; at: string | null } | null;
   checklist: ChecklistRow[];
   media: MediaItem[];
   files: FileLink[];
@@ -151,6 +159,11 @@ export function TaskPageView(p: TaskPageViewProps) {
         <aside aria-label="Task details" className="min-w-0 [grid-area:fields] lg:sticky lg:top-20 lg:self-start">
           {/* The Details heading and its rule from lg, where the fields are a rail; below
               that they're a row of chips under the title, with no heading. */}
+          {p.assignedLine && (
+            <div className="mb-2 lg:mb-0 lg:pb-3">
+              <OutcomeLine text={p.assignedLine.text} at={p.assignedLine.at} now={p.now} />
+            </div>
+          )}
           <Section title="Details" className="max-lg:[&>div:first-child]:hidden max-lg:[&>div:last-child]:pt-0">
             <TaskFields
               taskId={task.id}
@@ -170,6 +183,7 @@ export function TaskPageView(p: TaskPageViewProps) {
               entryOffered={p.entryOffered}
               resident={p.resident}
               created={p.created}
+              openAssignee={p.openAssignee}
             />
           </Section>
         </aside>
@@ -185,6 +199,8 @@ export function TaskPageView(p: TaskPageViewProps) {
               hasLogin={p.contractorHasLogin}
               now={p.now}
               openSendBack={p.openSendBack}
+              focusApprove={p.focusApprove}
+              landed={p.landed}
             />
 
             <div>

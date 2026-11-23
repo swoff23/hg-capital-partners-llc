@@ -1,5 +1,7 @@
 # Send for review
 
+> **Partly superseded (Nov 22, 2026):** what sends, the layout, subject words, previews, From names and the morning emails now follow [emails-redesign.md](emails-redesign.md). Where the two disagree, that spec wins.
+
 Planned with Connor on Nov 15, 2026, in two questions (Q1 and Q2 below). He took both recommendations and said "build it" the same day. Section 9 lists what the build did that this plan didn't name.
 
 ## 1. Summary

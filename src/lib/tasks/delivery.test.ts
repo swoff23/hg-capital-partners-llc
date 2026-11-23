@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { contactsWhoSaw, deleteEmailNote, deliveryLine, emailStateOf, emailStatesIn, partnersEmailState, sawComment } from "./delivery";
+import { contactsWhoSaw, deleteEmailNote, deliveryLine, emailStateOf, emailStatesIn, partnersEmailState, sawComment, taskEmailState } from "./delivery";
 
 const sent = new Date("2026-10-23T15:03:00Z");
 
@@ -188,4 +188,26 @@ test("emailStatesIn: asks the outbox once, for this contractor's rows on this ta
   // Nothing to look up asks nothing.
   assert.equal((await emailStatesIn(db as never, "t1", "c-zack", [])).size, 0);
   assert.equal(calls.length, 1);
+});
+
+// docs/specs/emails-redesign.md, section 5: a bounced, suppressed or spam-flagged address.
+test("taskEmailState: an address Resend says isn't getting mail counts only while emails go", () => {
+  assert.equal(taskEmailState("on", "BOUNCED"), "not-getting-through");
+  assert.equal(taskEmailState("on", "SUPPRESSED"), "not-getting-through");
+  assert.equal(taskEmailState("on", "COMPLAINED"), "not-getting-through");
+  assert.equal(taskEmailState("on", null), "on");
+  // No login, never signed in or the switch off already say why nothing arrives.
+  assert.equal(taskEmailState("off", "BOUNCED"), "off");
+  assert.equal(taskEmailState("no-login", "BOUNCED"), "no-login");
+  assert.equal(taskEmailState("not-signed-in", "COMPLAINED"), "not-signed-in");
+});
+
+test("deliveryLine: not getting through names them in full, over Emailed and over one waiting, but not over Seen", () => {
+  const base = { to: "Zack", name: "Zack Miller", emails: "not-getting-through", email: null, seenAt: null, eventAt: "2026-10-23T15:00:00Z" } as const;
+  const line = { state: "not-getting-through", to: "Zack Miller" };
+  assert.deepEqual(deliveryLine(base), line, "under an entry with no email on record too");
+  assert.deepEqual(deliveryLine({ ...base, email: "emailed" }), line, "it left, and didn't arrive");
+  assert.deepEqual(deliveryLine({ ...base, email: "queued" }), line);
+  assert.deepEqual(deliveryLine({ ...base, seenAt: new Date("2026-10-23T18:14:00Z") }), { state: "seen", to: "Zack", at: "2026-10-23T18:14:00.000Z" });
+  assert.deepEqual(deliveryLine({ ...base, name: undefined }), { state: "not-getting-through", to: "Zack" }, "no full name: the first");
 });

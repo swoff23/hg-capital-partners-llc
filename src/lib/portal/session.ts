@@ -9,6 +9,7 @@ import type { JobLinkKind, TaskStatus } from "@prisma/client";
 import { LATE_UPLOAD_WINDOW_MS } from "@/lib/attachments/access";
 import { isActiveStatus } from "@/lib/task-scope";
 import type { Principal } from "@/lib/tasks/core";
+import { GONE_SESSION_PATH, goneJobForCrewSession } from "./gone-job";
 import { sessionExpiresAt, sessionIsLive, shouldTouchSession } from "./limits";
 import { linkSessionMayOpen } from "./job-link-paths";
 import { PORTAL_HOME, SETUP_PATH, WELCOME_PASSWORD_PATH, afterPortalSignIn, isSetupPath, withNext } from "./next-path";
@@ -81,7 +82,8 @@ const readSession = cache(async (): Promise<PortalSessionState | null> => {
       revokedAt: true,
       lastUsedAt: true,
       onlyTaskId: true,
-      onlyTask: { select: { status: true, completedAt: true } },
+      // Who still holds the job, for a crew session (linkSessionStillOpens). A job has a few rows at most.
+      onlyTask: { select: { status: true, completedAt: true, access: { where: { revokedAt: null }, select: { contactId: true } } } },
       jobLinkId: true,
       jobLink: { select: { kind: true } },
       account: {
@@ -96,7 +98,8 @@ const readSession = cache(async (): Promise<PortalSessionState | null> => {
     },
   });
   if (!row || !sessionIsLive(row, now)) return null;
-  if (row.onlyTaskId && !linkSessionStillOpens(row.onlyTask, row.jobLinkId ? (row.jobLink?.kind ?? null) : "EMAIL", now)) return null;
+  const contractorOnJob = !!row.onlyTask?.access.some((a) => a.contactId === row.account.contact.id);
+  if (row.onlyTaskId && !linkSessionStillOpens(row.onlyTask, row.jobLinkId ? (row.jobLink?.kind ?? null) : "EMAIL", contractorOnJob, now)) return null;
   if (row.account.status !== "ACTIVE" || !row.account.contact.active) return null;
 
   if (shouldTouchSession(row.lastUsedAt, now)) {
@@ -130,14 +133,20 @@ const readSession = cache(async (): Promise<PortalSessionState | null> => {
  * Mark done (attachments/access.ts LATE_UPLOAD_WINDOW_MS) and the uploads in flight need the session. Only a session a
  * button link started counts: one a REPLY or STAFF link started (a reply address opened the job while that was
  * possible, before Nov 14's fix) never does.
+ *
+ * A crew session also ends once the contractor is taken off the job (docs/specs/emails-redesign.md, Q7), so whoever
+ * holds the shared link reads that on /j/gone (signedOut), on a reload, a tap or any /p page, instead of a refusal
+ * toast. The contractor's own email-link session is left as it was: the job page and its actions refuse it.
  */
 function linkSessionStillOpens(
   task: { status: TaskStatus; completedAt: Date | null } | null,
   linkKind: JobLinkKind | null,
+  contractorOnJob: boolean,
   now: Date,
 ): boolean {
   if (linkKind !== "EMAIL" && linkKind !== "CREW") return false;
   if (!task || task.status === "CANCELED") return false;
+  if (linkKind === "CREW" && !contractorOnJob) return false;
   if (isActiveStatus(task.status)) return true;
   return task.status === "DONE" && !!task.completedAt && now.getTime() - task.completedAt.getTime() <= LATE_UPLOAD_WINDOW_MS;
 }
@@ -166,7 +175,7 @@ export async function getPortalPrincipal(opts: { allowStartingPassword?: boolean
 /**
  * For every /p page and portal action:
  *  - 404 while PORTAL_ENABLED is off;
- *  - /login when signed out;
+ *  - /login when signed out (a crew session whose job is gone: /j/gone, signedOut below);
  *  - /p/welcome/password while the starting password is still in use.
  * The welcome page itself passes `{ passwordPage: true }`, which flips the
  * last rule: it sends anyone who has already chosen a password on to /p.
@@ -178,7 +187,7 @@ export async function getPortalPrincipal(opts: { allowStartingPassword?: boolean
 export async function requirePortalPrincipal(opts: { passwordPage?: boolean } = {}): Promise<PortalPrincipal> {
   if (!(await portalOnForRequest())) notFound();
   const state = await readSession();
-  if (!state) redirect(withNext("/login", await requestedPortalPath()));
+  if (!state) return signedOut();
   if (state.principal.onlyTaskId) {
     // A link session stays on its job (job-link-paths.ts linkSessionMayOpen); anywhere else, they sign in in full.
     // Someone still in setup signs in and finishes it first, job or no job.
@@ -210,7 +219,7 @@ export async function requirePortalPrincipal(opts: { passwordPage?: boolean } = 
 export async function requirePortalSession(): Promise<PortalPrincipal> {
   if (!(await portalOnForRequest())) notFound();
   const state = await readSession();
-  if (!state) redirect(withNext("/login", await requestedPortalPath()));
+  if (!state) return signedOut();
   // A link session off its job goes to sign in here too, as a real redirect rather than one streamed after a 200.
   if (state.principal.onlyTaskId) {
     const path = await requestedPortalPath();
@@ -222,6 +231,17 @@ export async function requirePortalSession(): Promise<PortalPrincipal> {
   // reads as the steps (portalReturnPath), so it isn't sent back.
   if (state.inSetup && !isSetupPath(await requestedPortalPath())) redirect(SETUP_PATH);
   return state.principal;
+}
+
+/**
+ * A visit with no session that opens anything goes to sign in, with the page it asked for. One exception
+ * (docs/specs/emails-redesign.md, Q7): a crew session whose job was canceled or deleted, or whose contractor was taken
+ * off it, goes to /j/gone, which says so, since the person holding the shared job may not be the contractor. A
+ * contractor's own session, full or from their email link, still goes to sign in.
+ */
+async function signedOut(): Promise<never> {
+  if (await goneJobForCrewSession()) redirect(GONE_SESSION_PATH);
+  redirect(withNext("/login", await requestedPortalPath()));
 }
 
 /**
