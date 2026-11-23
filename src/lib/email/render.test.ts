@@ -130,6 +130,7 @@ const details: JobEmailDetails = {
   photos: [{ src: "https://hg.example.com/api/files/task/p1?v=thumb&l=tok", href: "https://hg.example.com/j/tok" }],
   morePhotos: 2,
   gettingIn: { value: "The tenant must be home", note: "Call/text them 24 hours in advance" },
+  tenants: [{ name: "Dana Lee", phone: "(716) 555-0134", tel: "tel:+17165550134" }],
 };
 const job: JobEmailInput = {
   preview: 'Connor: "Use the side door."',
@@ -153,11 +154,11 @@ test("job email: the mark, the headline, the lines, the quote, one button, Share
   const text = rendered.text;
   // After the hidden preview line, which repeats the quote.
   const html = rendered.html.slice(rendered.html.indexOf("mso-hide:all") + 300);
-  const order = [">HG Capital Partners</td>", "Connor edited the notes.", "Connor moved Due", "Use the side door.", "Reply to answer Connor.", ">Start job</a>", "Share with crew</a>", ">Vanity swap<", ">Address<", "Wed, Nov 25", "Reschedule", ">Notes<", ">Checklist<", ">Photos<", ">Getting in<", "Reply to post an update or photos."];
+  const order = [">HG Capital Partners</td>", "Connor edited the notes.", "Connor moved Due", "Use the side door.", "Reply to answer Connor.", ">Start job</a>", "Share with crew</a>", ">Vanity swap<", ">Address<", "Wed, Nov 25", "Reschedule", ">Notes<", ">Checklist<", ">Photos<", ">Getting in<", ">Tenant<", ">Dana Lee<", 'href="tel:+17165550134"', "Reply to post an update or photos."];
   const positions = order.map((s) => at(html, s));
   assert.deepEqual([...positions].sort((a, b) => a - b), positions, "in that order");
   // The plain-text part, in the same order.
-  const textOrder = ["HG Capital Partners", "Connor edited the notes.", "> Use the side door.", "Start job: https://hg.example.com/j/tok", "Share with crew:", "Vanity swap", "Address:", "Scheduled: Wed, Nov 25", "Due: Thu, Nov 26 (changed)", "Reschedule:", "Notes (changed):", "Checklist:", "[x] Set the new one", "Photos: 3 on the job", "Getting in:", "Reply to post an update or photos."];
+  const textOrder = ["HG Capital Partners", "Connor edited the notes.", "> Use the side door.", "Start job: https://hg.example.com/j/tok", "Share with crew:", "Vanity swap", "Address:", "Scheduled: Wed, Nov 25", "Due: Thu, Nov 26 (changed)", "Reschedule:", "Notes (changed):", "Checklist:", "[x] Set the new one", "Photos: 3 on the job", "Getting in:", "Tenant:", "Dana Lee", "(716) 555-0134", "Reply to post an update or photos."];
   const tpos = textOrder.map((s) => at(text, s));
   assert.deepEqual([...tpos].sort((a, b) => a - b), tpos);
 });

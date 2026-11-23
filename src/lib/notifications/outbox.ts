@@ -401,7 +401,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       : row.recipientUserId && newPhotoIds.length
         ? await mintJobLink(prisma, { taskId: taskId, kind: "STAFF", userId: row.recipientUserId })
         : null;
-    // Getting in in the job page's own words, while the job is theirs and open (never the code, a name or a number).
+    // Getting in in the job page's own words, and who lives there under it, while the job is theirs and open (never the code).
     const access = contractorId ? jobAccess : null;
     const gettingIn = access ? gettingInWords({ permitted: access.permitted, hasLockbox: !!access.lockbox, needsNotice: access.needsNotice, vacant: access.vacant, tenants: access.tenants.length }) : null;
     // Its own reply address, while replies by email are on: a reply posts to this job as this recipient. Removed gets
@@ -435,6 +435,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       checklist: task.checklist,
       waitingOn: task.waitingOn,
       gettingIn,
+      tenants: access?.tenants ?? [],
       contractorName: task.assigneeContact?.fullName ?? null,
       staffNames: staffNames ?? [],
       replyByEmail: !!replyToken,

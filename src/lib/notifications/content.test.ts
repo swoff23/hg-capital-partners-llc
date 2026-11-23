@@ -124,14 +124,16 @@ test("the contractor's word, highest first when a bundle mixes kinds (Q9)", () =
   assert.equal(word([tell], scheduledOn("2026-11-24")), "Tell the tenant");
   assert.equal(word([item("SCHEDULED_TODAY", "scheduled today", "HG", { due: "2026-11-22" })], scheduledOn("2026-11-22")), "Today");
   assert.equal(word([item("STILL_OPEN", "still open", "HG", { due: "2026-11-21" })], scheduledOn("2026-11-21")), "Still open");
-  assert.equal(word([item("NO_DAY", "no day yet", "HG", { due: "2026-11-22" })]), "No day yet");
+  // No day yet names Due instead when there is one (Connor, Nov 23).
+  assert.equal(word([item("NO_DAY", "no day yet", "HG", { due: "2026-11-22" })]), "Due Thu, Nov 26");
+  assert.equal(word([item("NO_DAY", "no day yet", "HG", { due: "2026-11-22" })], { due: null }), "No day yet");
   assert.equal(word([item("DUE_TODAY", "due today", "HG", { due: "2026-11-22" })], { due: "2026-11-22" }), "Due today");
   assert.equal(word([item("OVERDUE", "due yesterday", "HG", { due: "2026-11-21" })], { due: "2026-11-21" }), "Due yesterday");
   // A partner's change in the same bundle as a morning line leads it.
   assert.equal(word([notes, item("SCHEDULED_TODAY", "scheduled today", "HG", { due: "2026-11-22" })], scheduledOn("2026-11-22")), "Update");
   // Rows queued before Nov 22 under the old names read as what they became.
   assert.equal(word([item("SCHEDULED_TOMORROW", "scheduled tomorrow", "HG", { due: "2026-11-23" })], scheduledOn("2026-11-23")), "Tell the tenant");
-  assert.equal(word([item("DUE_TOMORROW", "due tomorrow", "HG", { due: "2026-11-23" })], { due: "2026-11-23" }), "No day yet");
+  assert.equal(word([item("DUE_TOMORROW", "due tomorrow", "HG", { due: "2026-11-23" })], { due: "2026-11-23" }), "Due Mon, Nov 23");
   // Removed is its own email.
   assert.equal(word([item("OFF", `canceled "${T}"`, "Connor Swofford", { from: "OPEN" })]), "Removed");
 });
@@ -317,7 +319,8 @@ test("the morning emails: Today, Still open, No day yet, Due today and Due yeste
     "Start job",
   ]);
   const noDay = taskEmail(zackJob({ items: [item("NO_DAY", "no day yet", "HG", { due: "2026-11-22" })] }));
-  assert.deepEqual([noDay.headline, noDay.preview, noDay.primary?.label], ["This job has no day yet.", "Due Thu, Nov 26. Pick a day to go.", "Schedule"]);
+  assert.deepEqual([noDay.headline, noDay.preview, noDay.primary?.label], ["This job has no day yet.", "No day yet. Pick a day to go.", "Schedule"]);
+  assert.equal(noDay.subject, "Due Thu, Nov 26: Vanity swap, 118 Congress St · Rear");
   const dueToday = taskEmail(zackJob({ due: "2026-11-22", items: [item("DUE_TODAY", "due today", "HG", { due: "2026-11-22" })] }));
   assert.deepEqual([dueToday.headline, dueToday.primary?.label], ["This job is due today.", "Schedule"]);
   assert.equal(taskEmail(zackJob({ due: "2026-11-21", items: [item("OVERDUE", "due yesterday", "HG", { due: "2026-11-21" })] })).headline, "This job was due yesterday.");
@@ -338,6 +341,13 @@ test("the open job below the button: Share with crew with its icon, the address 
   assert.deepEqual(email.job?.address, ["118 Congress St, Rear", "Buffalo, NY 14213"]);
   assert.equal(email.job?.addressLabel, true);
   assert.deepEqual(email.job?.gettingIn, { value: "The tenant must be home", note: "Call/text them 24 hours in advance" });
+  assert.deepEqual(email.job?.tenants, []);
+  // Who lives there, under Getting in: the number as typed, a tel: link when it dials.
+  const lived = taskEmail(zackJob({ tenants: [{ name: "Dana Lee", phone: "(716) 555-0134", dial: "+17165550134" }, { name: "Sam Lee", phone: null, dial: null }], items: [item("NOTES", "updated the notes", "Connor Swofford", { from: "x" })] }));
+  assert.deepEqual(lived.job?.tenants, [
+    { name: "Dana Lee", phone: "(716) 555-0134", tel: "tel:+17165550134" },
+    { name: "Sam Lee", phone: null, tel: null },
+  ]);
   assert.deepEqual(email.job?.photos.map((p) => p.src), ["n1", "h1", "h2"].map((id) => `${APP}/api/files/task/${id}?v=thumb&l=${TOKEN}`));
   assert.equal(email.job?.morePhotos, 2);
   assert.equal(email.footnote, "Reply to post an update or photos.");

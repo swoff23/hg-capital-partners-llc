@@ -8,6 +8,7 @@ import { contractorMaySetDate, jobLinkDestination, jobLinkUrl, type JobLinkStep 
 import { DUE_SOON_DAYS, isAfterDue, scheduledDay, staffStatusEmails } from "@/lib/tasks/rules";
 import { canonicalReminder, isReminderKind, reminderStillTrue, type ReminderKind } from "./reminder-rules";
 import { addressLine, firstName, joinNames } from "@/lib/portal/job-view";
+import { telHref } from "@/lib/contacts";
 
 /**
  * What a bundled task email says, who it goes to, and the send rules
@@ -1006,6 +1007,15 @@ const MORNING_WORD: Record<ReminderKind, string> = {
   OVERDUE: "Due yesterday",
 };
 
+/**
+ * A morning line's subject word. No day yet names the Due date instead when there is one (Connor, Nov 23): the
+ * missing day is already the headline, and the subject should say when it has to be done: "Due Thu, Nov 26".
+ */
+function morningWord(kind: ReminderKind, due: Ymd | null | undefined, today: Ymd): string {
+  if (kind === "NO_DAY" && due) return `Due ${dayText(due, today)}`;
+  return MORNING_WORD[kind];
+}
+
 /** Highest first when a bundle has more than one (Q9). */
 const MORNING_ORDER: readonly ReminderKind[] = ["TELL_TENANT", "SCHEDULED_TODAY", "STILL_OPEN", "NO_DAY", "DUE_TODAY", "OVERDUE"];
 
@@ -1052,6 +1062,8 @@ export interface TaskEmailInput {
   waitingOn?: string | null;
   /** Contractor: Getting in's two lines (job-view.ts gettingInWords), or null when the job page says nothing. */
   gettingIn?: { value: string; note: string } | null;
+  /** Contractor: who lives there today (access-code.ts readJobAccess), shown under Getting in. Empty or absent when nobody does. */
+  tenants?: readonly { name: string; phone: string | null; dial: string | null }[];
   /** Partner: the contractor on the job, by full name (Contact.fullName). */
   contractorName?: string | null;
   /** First names of the partners, for a closed job's "Reply to reach Connor and Pieter.". */
@@ -1161,7 +1173,7 @@ function contractorEmail(input: TaskEmailInput): TaskEmail {
             : items.some((i) => !isMorning(i))
               ? "Update"
               : mornings.length
-                ? MORNING_WORD[mornings[0].kind]
+                ? morningWord(mornings[0].kind, due, today)
                 : "Update";
 
   // The lead's headline, and the lines that came with it. A new job carries the whole job, so its other edits say
@@ -1334,6 +1346,7 @@ function contractorEmail(input: TaskEmailInput): TaskEmail {
     photos: strip.photos,
     morePhotos: strip.morePhotos,
     gettingIn: input.gettingIn ?? null,
+    tenants: (input.tenants ?? []).map((p) => ({ name: oneLine(p.name), phone: p.phone?.trim() ? oneLine(p.phone) : null, tel: telHref(p.dial) })),
   };
   return {
     ...base,
@@ -1385,7 +1398,8 @@ function morningPreview(kind: ReminderKind, input: TaskEmailInput): string {
     case "STILL_OPEN":
       return input.scheduled ? `Your day was ${dayText(input.scheduled, input.today)}. Start the job or pick a new day.` : "Start the job or pick a new day.";
     case "NO_DAY":
-      return due ? `Due ${due}. Pick a day to go.` : "Pick a day to go.";
+      // The subject already says Due (morningWord), so the preview says what's missing.
+      return due ? "No day yet. Pick a day to go." : "Pick a day to go.";
     case "DUE_TODAY":
     case "OVERDUE":
       return "No day is set yet.";

@@ -155,8 +155,13 @@ export interface JobEmailDetails {
   checklistLine: string | null;
   photos: JobEmailPhoto[];
   morePhotos: number;
-  /** The job page's own two lines, never the code or a tenant's name or number. */
+  /** The job page's own two lines, never the code. */
   gettingIn: { value: string; note: string } | null;
+  /**
+   * Who lives there, under Getting in (Connor, Nov 23: the crew calls or texts them from the inbox): the name over
+   * the number as typed, the number a tel: link. Empty when nobody lives there or the job isn't theirs and open.
+   */
+  tenants?: { name: string; phone: string | null; tel: string | null }[];
 }
 
 export interface JobEmailInput {
@@ -307,6 +312,16 @@ function detailsHtml(job: JobEmailDetails): string {
       `${labelHtml("Getting in")}<div style="${BODY_TEXT}color:${t.foreground};">${escapeHtml(job.gettingIn.value)}</div><div style="${META}color:${t.fg2};">${escapeHtml(job.gettingIn.note)}</div>`,
     );
   }
+  const tenants = job.tenants ?? [];
+  if (tenants.length) {
+    const people = tenants
+      .map((p, i) => {
+        const phone = p.phone ? (p.tel ? `<a href="${escapeHtml(p.tel)}" style="color:${t.foreground};text-decoration:underline;white-space:nowrap;">${escapeHtml(p.phone)}</a>` : escapeHtml(p.phone)) : "";
+        return `<div style="${i ? "padding-top:8px;" : ""}"><div style="${BODY_TEXT}color:${t.foreground};">${escapeHtml(p.name)}</div>${phone ? `<div style="${BODY_TEXT}color:${t.foreground};">${phone}</div>` : ""}</div>`;
+      })
+      .join("");
+    sections.push(`${labelHtml(tenants.length === 1 ? "Tenant" : "Tenants")}${people}`);
+  }
   const street = !job.addressLabel && job.address.length ? row("2px 0 0", escapeHtml(job.address.join(" ")), `${BODY_TEXT}color:${t.fg2};`) : "";
   const title = row("16px 0 0", escapeHtml(job.title), `font-size:16px;line-height:22px;font-weight:600;color:${t.foreground};`);
   // The address sits right under the title; every other section under a hairline, 12px either side of it.
@@ -327,6 +342,8 @@ function detailsText(job: JobEmailDetails): string[] {
   if (job.checklistLine) out.push("", job.checklistLine);
   if (job.photos.length) out.push("", `Photos: ${job.photos.length + job.morePhotos} on the job`);
   if (job.gettingIn) out.push("", "Getting in:", job.gettingIn.value, job.gettingIn.note);
+  const tenants = job.tenants ?? [];
+  if (tenants.length) out.push("", tenants.length === 1 ? "Tenant:" : "Tenants:", ...tenants.flatMap((p) => [p.name, ...(p.phone ? [p.phone] : [])]));
   return out;
 }
 

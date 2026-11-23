@@ -158,7 +158,7 @@ export function groupJobs(jobs: JobCard[], opts: { tab: JobsTab; group: JobsGrou
  * Permission to enter and a code, "Let yourself in" over who said so; at a home someone lives in without it,
  * someone must be home after 24 hours' notice; nobody living there with a code, "Let yourself in" over "No one
  * lives here". Null when the page says nothing about getting in. The job emails use it (docs/specs/emails-redesign.md,
- * Q4), never with the code or a tenant's name or number.
+ * Q4), never with the code; the emails list the tenants themselves under it (Connor, Nov 23).
  */
 export function gettingInWords(a: { permitted: boolean; hasLockbox: boolean; needsNotice: boolean; vacant: boolean; tenants: number }): { value: string; note: string } | null {
   const one = a.tenants === 1;
