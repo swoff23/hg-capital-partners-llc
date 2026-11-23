@@ -81,10 +81,10 @@ Status: **built Nov 22, 2026 on branch claude/emails-redesign (not committed yet
 - **Today**: 7 am on their day.
 - **Still open**: 7 am the morning after their day, only if they never started ("Your day was Thu, Nov 26. Start the job or pick a new day."). In-progress work isn't nagged.
 - **No day yet**: once, the second morning after New, or the morning before Due if that comes first.
-- **Due today** and **Due yesterday**: only while no day is set. Once a day is set, their day leads.
+- **Due today** and **Due yesterday**: only while no day is set. Once a day is set, their day leads. (Replaced on Nov 23 by section 8: Due today and Past due follow whether the job is done.)
 - Mockup: `_private/mockups/email-q8-morning-timing.svg`.
 
-**Q9. The details: all taken as drawn (Nov 22).**
+**Q9. The details: all taken as drawn (Nov 22).** Subject and preview words revised on Nov 23, see section 8.
 - **Letterhead:** job emails open with a one-line mark (the 24px tile and "HG Capital Partners" at 13px semibold, no gold rule), then the headline. Invite, sign-in and password emails keep the full letterhead with its gold-deep rule (brand-guidelines.md section 6).
 - **Subject words:** "Word: title, street · unit". The street's last word is shortened in the subject only ("933 Lafayette Ave · Floor 1"; Avenue, Street, Road, Drive, Boulevard, Place, Parkway, Court, Lane, Terrace; Connor, Nov 23). The word and the title land in the first 38 characters. The due date leaves New's subject (today "New, due Friday:"); the preview carries it. Absolute dates only.
   - Contractor words, highest first when a bundle mixes kinds: Removed, Sent back, Done (a partner's note after the job closed), New, Scheduled (a partner set the first day), Day removed, Moved (a new day, or Due moved before it), On hold, Update, then the morning words Tell the tenant, Today, Still open, No day yet, Due today, Due yesterday (Connor, Nov 23: "Moved" no longer covers a first day or a removed one). No day yet's subject names the Due date instead when the job has one ("Due Thu, Nov 26: …", or "Due tomorrow" the morning before; Connor, Nov 23); its preview then reads "No day yet. Pick a day to go." When Tell the tenant applies in the same email, it picks the word and the move goes in the headline. Whenever a partner's words are in an email, the preview is their words.
@@ -153,3 +153,47 @@ Partner (to Connor and Pieter, From "Zack Miller via HG Capital" when a contract
 From the two audits' critics: a resident's cancel and a deleted job email the contractor nothing; a job on hold gets Due today and Due yesterday emails; Removed says "No need to go" on a job already in review; "Change day" shows with no day set; any iCloud or Drive link in a reply gets "Your video was too big"; a send-back note loses its line breaks; Add to calendar in an old email opens a bare Not found; a partner's reply can reach the wrong contractor after a reassignment; a scheduling bundle's headline can name a day the job no longer has; Remove day never names the day; files dropped from a closed-job reply go unmentioned; move-in reports email no partner; replies that can't post vanish.
 
 From the debate, shipped with the build: the Removed email gets a reply address; a reply that can't post (taken off, access removed, login off) goes to both partners through the closed-job forward, with the job named; a fresh email to the jobs address from a known contractor's login (DMARC pass) also reaches both partners; a partner's reply link stores the contractor it was about, and posts Internal if that contractor has left the job; the reply-problem email's "Error:" subject becomes "Some files didn't post: <title>"; the stale "Done:" email after an Approve inside the bundle drops; a partner day-move line gets its period after ")" and keeps the was-day.
+
+## 8. Subject and preview revisions (Connor, Nov 23)
+
+Connor reviewed every subject and preview in the doc "HG email subject lines" (https://claude.ai/artifact/4KzXomAAjh8YG4sQ1Hshm1). Already on the branch: Scheduled and Day removed instead of Moved, Due tomorrow, Done on a finished job, the street's last word shortened in subjects, Scheduled, Moved and Day removed for a contractor's own day in the partners' email.
+
+**Rule change: due-date emails follow whether the job is done, not whether it was scheduled.** "We don't care if the due date passed and they didn't schedule it. We care that the due date passed and it's not yet done."
+- **Due today** and **Past due** go to any job that's To do, Scheduled or In progress (In progress joins `REMINDER_STATUSES` for these two only). Not in review, on hold, done or canceled. A job scheduled for its due date gets Today instead of Due today.
+- **Past due** replaces Due yesterday. It goes once, the morning after the due date (the existing once-per-kind-and-date marker). A new due date can earn a new one.
+- On a morning when more than one applies, Past due leads, then Today, Tell the tenant, Not started, and the rest as before.
+- **The partners get Past due too**, once, the morning after the due date, on a job assigned to a contractor that isn't done, in review, on hold or canceled. Preview "Zack Miller hasn't finished. Was due Sun, Nov 22." Opening the task in the app doesn't hold it back, since it reports a state, not a change.
+
+**Words.** "Due date" replaces "Due" where it's a noun ("moved the due date", the body's Due label becomes "Due date"); "due" as a verb or adjective stays ("Due today", "Was due Sun, Nov 22", "Due Thu, Nov 26:"). "Scheduled for" replaces "your day".
+
+Contractor:
+
+| Case | Subject word | Preview |
+| --- | --- | --- |
+| New, no day | New | Due Thu, Nov 26 |
+| New, day set | New | Scheduled for Wed, Nov 25 |
+| Partner changed their day | Rescheduled | Connor rescheduled it for Fri, Nov 27 (was Wed, Nov 25). |
+| Partner set the first day | Scheduled | Connor scheduled it for Wed, Nov 25. |
+| Partner removed the day | Day removed | Connor removed the scheduled day (was Wed, Nov 25). |
+| Due date moved before their day | Due date moved | Now due Wed, Nov 25, before your scheduled day (Sat, Nov 28). |
+| Due date moved | Due date moved | Connor moved the due date to Fri, Dec 4. |
+| Due date cleared | Due date removed | Connor cleared the due date. |
+| Taken off, canceled, deleted, a resident's cancel | Canceled | unchanged ("Connor took you off this job. No need to go.") |
+| Tell the tenant | Tell the tenant | Scheduled for Wed, Nov 25. They need 24 hours' notice. |
+| Today | Today | Tap Start job when you get there. |
+| Day passed, not started | Not started | Scheduled for Sun, Nov 22. Start the job or reschedule. |
+| No day, second morning after New | Due Thu, Nov 26 | Not yet scheduled. Schedule a day to go. |
+| No day, morning before due date | Due tomorrow | Not yet scheduled. Schedule a day to go. |
+| No day, no due date | Not yet scheduled | Schedule a day to go. |
+| Due today, no day / later day / started | Due today | Not yet scheduled. Schedule a day to go. / Scheduled for Mon, Nov 30, after the due date. / In progress. Send for review when it's done. |
+| Past due, no day / later day / day passed / started | Past due | Was due Sun, Nov 22. Not yet scheduled. / Was due Sun, Nov 22. Scheduled for Mon, Nov 30. / Was due Sun, Nov 22. Scheduled for Fri, Nov 20, not started. / Was due Sun, Nov 22. Send for review when it's done. |
+
+The getting-in line ("A tenant must be home") leaves every preview; Getting in and the tenants stay in the body. Each subject word also becomes the headline's event.
+
+Partners: Scheduled late ("Zack Miller scheduled it for Mon, Nov 30. Due date is Thu, Nov 26."), Rescheduled late ("Zack Miller rescheduled it for Mon, Nov 30. Due date is Thu, Nov 26."), Day removed ("… Due date is Tue, Nov 24."), and Past due above. The rest unchanged.
+
+**Reuse check.**
+- Reused: the 7 am run and its once-per-kind-and-date marker (`reminders.ts`, `core.ts` queueDueReminder), the one-email-per-job-per-morning rule, `liveReminders` and `reminderStillTrue` checking a line again as it sends, the partners' outbox rows and send run (`outbox.ts`), `jobSubject`.
+- Extended: `reminder-rules.ts` `reminderFor` (Due today and Past due for Scheduled and In progress, priority order) and `reminderStillTrue` (Past due true while not done); the OVERDUE kind keeps its stored name and reads as Past due; `content.ts` subject words, previews and headlines; `render.ts` the Due label; `reminders.ts` queues the partners' Past due.
+- New: a partners' Past due line (no new table or column; an outbox row per partner like any partner email).
+
