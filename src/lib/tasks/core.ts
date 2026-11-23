@@ -563,7 +563,7 @@ const REMINDER_SUMMARY: Record<ReminderKind | LegacyReminderKind, string> = {
   STILL_OPEN: "still open",
   NO_DAY: "no day yet",
   DUE_TODAY: "due today",
-  OVERDUE: "due yesterday",
+  OVERDUE: "past due",
   SCHEDULED_TOMORROW: "scheduled tomorrow",
   DUE_TOMORROW: "due tomorrow",
 };
@@ -625,6 +625,33 @@ export async function queueDueReminder(
   const summary = REMINDER_SUMMARY[kind];
   await enqueue(tx, { contactId }, task.id, { kind, actorLabel: "HG", summary, at: now.toISOString(), due }, now);
   return true;
+}
+
+/**
+ * Past due to the partners (docs/specs/emails-redesign.md section 8): once per due date, the morning after it, on a
+ * contractor's job that isn't done. A line in each partner's bundle, as notifyPartners queues a resident's; the send
+ * run drops it if the job was finished or put on hold since (content.ts liveReminders). Never for a draft. Says how
+ * many partners it was queued for.
+ */
+export async function queuePartnerPastDue(tx: Tx, taskId: string, due: Ymd, now: Date): Promise<number> {
+  const row = await tx.task.findUnique({ where: { id: taskId }, select: { status: true } });
+  if (!row || row.status === "DRAFT") return 0;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${REMINDER_LOCK}::int, hashtext(${`staff:${taskId}`}))`;
+  const marker = JSON.stringify([{ kind: "OVERDUE", due }]);
+  // In id order, as notify takes the partners' rows.
+  const staff = await tx.user.findMany({ where: { passwordHash: { not: null } }, select: { id: true }, orderBy: { id: "asc" } });
+  let queued = 0;
+  for (const s of staff) {
+    const seen = await tx.$queryRaw<{ one: number }[]>`
+      SELECT 1 AS one FROM "NotificationOutbox"
+      WHERE "recipientUserId" = ${s.id} AND "taskId" = ${taskId} AND "items" @> ${marker}::jsonb
+        AND ("lastError" IS NULL OR "lastError" NOT IN ('nothing to send', 'draft'))
+      LIMIT 1`;
+    if (seen.length > 0) continue;
+    await enqueue(tx, { userId: s.id }, taskId, { kind: "OVERDUE", actorLabel: "HG", summary: REMINDER_SUMMARY.OVERDUE, at: now.toISOString(), due }, now);
+    queued++;
+  }
+  return queued;
 }
 
 // ---------------------------------------------------------------------------

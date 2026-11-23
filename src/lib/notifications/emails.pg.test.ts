@@ -12,7 +12,8 @@ import { newEmailRowsWhere } from "./reminder-rules";
 /**
  * What core.ts queues for the redesigned emails (docs/specs/emails-redesign.md, Q2 and Q8), against a real database:
  * a partner's checklist edit and on hold, a status a partner sets that only rides along, nothing from a job in review,
- * a resident's cancel, a deleted job's Removed row, No day yet once, and the New rows the morning run reads.
+ * a resident's cancel, a deleted job's Removed row, No day yet once, the New rows the morning run reads, and the
+ * partners' Past due once per due date.
  *
  * `npm test` skips it unless HG_SCRATCH_DATABASE_URL names a local scratch database (its name must contain "scratch");
  * it deletes its rows when it finishes (scratch-rows.ts).
@@ -166,4 +167,18 @@ test("No day yet queues once whatever the day; the morning run finds the New row
   // Tell the tenant at once does nothing for a job with no day.
   const task = await prisma.task.findUniqueOrThrow({ where: { id } });
   assert.equal(await tx((t) => core.queueTellTenantNow(t, task, new Date())), false);
+});
+
+test("Past due reaches each partner once per due date, as a line in their bundle (section 8)", { skip, timeout }, async () => {
+  const id = await job("Rehang the gutter");
+  const partners = await prisma.user.count({ where: { passwordHash: { not: null } } });
+  assert.equal(await tx((t) => core.queuePartnerPastDue(t, id, "2026-11-22", new Date())), partners);
+  const row = await prisma.notificationOutbox.findFirstOrThrow({ where: { taskId: id, recipientUserId: staff.userId, items: { array_contains: [{ kind: "OVERDUE" }] } } });
+  assert.deepEqual(
+    parseItems(row.items).filter((i) => i.kind === "OVERDUE").map((i) => [i.due, i.actorLabel]),
+    [["2026-11-22", "HG"]],
+  );
+  assert.equal(await tx((t) => core.queuePartnerPastDue(t, id, "2026-11-22", new Date())), 0, "once per due date");
+  // A new due date that passes earns a new one.
+  assert.equal(await tx((t) => core.queuePartnerPastDue(t, id, "2026-11-29", new Date())), partners);
 });

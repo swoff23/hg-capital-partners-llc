@@ -15,8 +15,8 @@ export const maxDuration = 60;
 
 /**
  * Once-a-minute cron (vercel.json) that sends the bundled task emails
- * (src/lib/notifications/outbox.ts), and in the 8 o'clock hour queues the
- * day's "Due today" and "Due yesterday" emails (reminders.ts). Vercel injects
+ * (src/lib/notifications/outbox.ts), and in the 7 o'clock hour queues the
+ * morning emails, Past due among them (reminders.ts). Vercel injects
  * `Authorization: Bearer $CRON_SECRET`. Like /api/quickbooks/sync, it answers
  * 503 and sends nothing while CRON_SECRET is unset, and 401 to anyone else.
  * Neither body says why (cronRefusal); the unset secret goes to the logs.

@@ -6,20 +6,21 @@ import { addDaysYmd } from "@/lib/quick-dates";
 import type { TaskStatus } from "@prisma/client";
 import { readJobAccess } from "@/lib/portal/access-code";
 import { listedTask } from "@/lib/task-scope";
-import { queueDueReminder, queueTellTenantNow, type Tx } from "@/lib/tasks/core";
+import { queueDueReminder, queuePartnerPastDue, queueTellTenantNow, type Tx } from "@/lib/tasks/core";
 import { dueReminderWhere } from "@/lib/tasks/list-query";
 import { scheduledDay } from "@/lib/tasks/rules";
 import { easternDayStart } from "./content";
-import { TELL_TENANT_DAYS, inReminderHour, newEmailRowsWhere, reminderFor } from "./reminder-rules";
+import { TELL_TENANT_DAYS, inReminderHour, newEmailRowsWhere, pastDueToday, reminderFor } from "./reminder-rules";
 
 /**
  * The morning emails (docs/specs/emails-redesign.md, Q8): each minute of the
  * 7 o'clock hour in Buffalo, every job a contractor still has to plan or
  * start gets at most one line, the one reminder-rules.ts reminderFor picks:
- * Today on their day, Tell the tenant two mornings before it at a home that
- * needs notice, Still open the morning after a day they never started; with
- * no day set, Due today, Due yesterday, or No day yet once. Nothing for a job
- * on hold, in progress or in review. core.ts queueDueReminder keeps each to
+ * Past due the morning after the due date on any job not yet done (and the
+ * partners get it too), Today on their day, Tell the tenant two mornings
+ * before it at a home that needs notice, Not started the morning after a day
+ * they never started, Due today, or Not yet scheduled once. Nothing for a job
+ * on hold or in review (docs/specs/emails-redesign.md section 8). core.ts queueDueReminder keeps each to
  * once per kind and day (No day yet to once) and applies the email rules; the
  * outbox sends them as it sends everything (outbox.ts drainDue), checking each
  * line is still true. Run by /api/cron/notifications. Never throws: a failed
@@ -70,6 +71,11 @@ export async function queueDueReminders(now = new Date()): Promise<{ queued: num
       };
       // Who lives there is read only when Tell the tenant could be due: their day two mornings out.
       if (job.scheduled && job.scheduled === tellDay) job.needsNotice = (await readJobAccess(prisma, t, now)).needsNotice;
+      // Past due reaches the partners too, whether or not the contractor gets email (section 8).
+      if (pastDueToday(job, today) && job.due) {
+        const due = job.due;
+        queued += await prisma.$transaction((tx) => queuePartnerPastDue(tx, t.id, due, now));
+      }
       const pick = reminderFor(job, today);
       if (!pick) continue;
       const contactId = t.assigneeContactId;

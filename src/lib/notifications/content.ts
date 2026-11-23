@@ -649,12 +649,17 @@ export function claimedRowVerdict(input: {
           }),
           job.status,
         )
-      : partnerKept(input.items, { status: job.status, assigned: !!(job.assigneeContactId || job.assigneeUserId) });
+      : partnerKept(
+          // A partner's Past due line (section 8) goes only while it's still true, as a contractor's morning lines do.
+          liveReminders(input.items, { status: job.status, due, scheduled, planned: toYmd(job.scheduledFor), needsNotice: false, today: input.today }),
+          { status: job.status, assigned: !!(job.assigneeContactId || job.assigneeUserId) },
+        );
   // A date, the notes, the checklist or a status put back as they were before the bundle's first change says nothing.
   const items = undoneDropped(kept, { due, scheduled, notes: job.description, status: job.status, checklist: job.checklist });
   const now: JobNow = { status: job.status, due, scheduled, today: input.today };
   if (!items.some((i) => leadsEmail(i, input.audience, now))) return { send: false, reason: "nothing to send" };
-  if (input.audience === "staff" && input.seenAt) {
+  // Seen in the app holds back a change, never a Past due line: that reports where the job stands (section 8).
+  if (input.audience === "staff" && input.seenAt && !items.some(isMorning)) {
     const newest = Math.max(...items.map((i) => Date.parse(i.at)).filter((t) => !Number.isNaN(t)));
     if (Number.isFinite(newest) && input.seenAt.getTime() >= newest) return { send: false, reason: "seen in app" };
   }
@@ -710,7 +715,7 @@ function wasText(item: OutboxItem, today: Ymd): string | null {
 
 /**
  * One change, after the person's name, without the task's title (the subject
- * has it), in the reader's words: a contractor reads "moved your day to Thu,
+ * has it), in the reader's words: a contractor reads "rescheduled it for Thu,
  * Nov 27" and "sent this job back", a partner "moved the scheduled day to Fri,
  * Nov 27 (was Tue, Nov 24)" and "started this", as the task's Activity reads.
  * Dates arrive already written out (core.ts emailDay). The title patterns are
@@ -742,8 +747,8 @@ export function itemText(item: OutboxItem, title?: string, voice: Audience = "co
         const what = item.visit === undefined && item.from === undefined ? "date" : "due date";
         return to ? `moved the ${what} to ${to}` : `cleared the ${what}`;
       }
-      if (!to) return "cleared Due";
-      return item.from === "" ? `set Due to ${to}` : `moved Due to ${to}`;
+      if (!to) return "cleared the due date";
+      return item.from === "" ? `set the due date to ${to}` : `moved the due date to ${to}`;
     }
     case "DAY": {
       const m = /^moved ".*" to (.+?)(?: \(was [^)]*\))?$/.exec(s);
@@ -753,7 +758,7 @@ export function itemText(item: OutboxItem, title?: string, voice: Audience = "co
         if (!to) return `removed the scheduled day${was ? ` (was ${was})` : ""}`;
         return `moved the scheduled day to ${to}${was ? ` (was ${was})` : ""}`;
       }
-      return to ? `moved your day to ${to}` : "removed your day";
+      return to ? `rescheduled it for ${to}` : "removed the scheduled day";
     }
     case "HOLD":
       return "put this job on hold";
@@ -769,7 +774,7 @@ export function itemText(item: OutboxItem, title?: string, voice: Audience = "co
       return s;
     case "STATUS": {
       const scheduled = /^scheduled ".*" for (.+)$/.exec(s);
-      if (scheduled) return partner ? `scheduled this for ${scheduled[1]}` : `set your day: ${scheduled[1]}`;
+      if (scheduled) return partner ? `scheduled this for ${scheduled[1]}` : `scheduled it for ${scheduled[1]}`;
       if (/^approved ".*"$/.test(s)) return partner ? "approved this" : "approved this job";
       // A contractor's Remove day (core.ts unscheduleByContractor), naming the day it had (section 7).
       if (/^unscheduled ".*"$/.test(s)) {
@@ -787,7 +792,7 @@ export function itemText(item: OutboxItem, title?: string, voice: Audience = "co
       if (set) {
         const label = STATUS_BY_WORDS.get(set[1]) ?? set[1];
         // A partner taking their day away is a move, said as one.
-        if (!partner && set[1] === "open" && statusFrom(item) === "SCHEDULED") return "removed your day";
+        if (!partner && set[1] === "open" && statusFrom(item) === "SCHEDULED") return "removed the scheduled day";
         return partner ? `moved this to ${label}` : `moved this job to ${label}`;
       }
       return s.replace(/"[^"]*"/, partner ? "this" : "this job");
@@ -839,7 +844,7 @@ function sendBackNote(item: OutboxItem, title?: string): string {
   return keepBreaks(`${tail.replace(/^: /, "")}${rest}`);
 }
 
-/** "Connor moved Due to Fri, Dec 4", 'Zack Miller: "Doors arrive Thursday."' A morning line has no name. */
+/** "Connor moved the due date to Fri, Dec 4", 'Zack Miller: "Doors arrive Thursday."' A morning line has no name. */
 export function itemLine(item: OutboxItem, title?: string, voice: Audience = "contractor", today?: Ymd): string {
   const text = itemText(item, title, voice, today);
   if (isMorning(item)) return text;
@@ -1002,34 +1007,35 @@ export function statusWords(status: TaskStatus, opts: { scheduled: Ymd | null; w
 }
 
 /**
- * A morning line's headline (Q8, Q9), with nobody's name: "Your day is today.", "Your day was Tue, Nov 24." The day is
+ * A morning line's headline (Q8, Q9), with nobody's name: "Scheduled for today.", "This job was due Tue, Nov 24." The day is
  * the one the line was for.
  */
 function morningHeadline(kind: ReminderKind, day: Ymd | null, today: Ymd): string {
   switch (kind) {
     case "TELL_TENANT":
-      return day ? `Your day is ${dayText(day, today)}.` : "Your day is coming up.";
+      return day ? `Scheduled for ${dayText(day, today)}.` : "Scheduled soon.";
     case "SCHEDULED_TODAY":
-      return "Your day is today.";
+      return "Scheduled for today.";
     case "STILL_OPEN":
-      return day ? `Your day was ${dayText(day, today)}.` : "Your day has passed.";
+      return day ? `Scheduled for ${dayText(day, today)}, not started.` : "Not started.";
     case "NO_DAY":
-      return "This job has no day yet.";
+      return "Not yet scheduled.";
     case "DUE_TODAY":
       return "This job is due today.";
     case "OVERDUE":
-      return "This job was due yesterday.";
+      // Past due (docs/specs/emails-redesign.md section 8): the line's day is the due date that passed.
+      return day ? `This job was due ${dayText(day, today)}.` : "This job is past due.";
   }
 }
 
-/** The morning words as subject words (Q9). */
+/** The morning words as subject words (Q9; section 8: Not started, Not yet scheduled, Past due). */
 const MORNING_WORD: Record<ReminderKind, string> = {
   TELL_TENANT: "Tell the tenant",
   SCHEDULED_TODAY: "Today",
-  STILL_OPEN: "Still open",
-  NO_DAY: "No day yet",
+  STILL_OPEN: "Not started",
+  NO_DAY: "Not yet scheduled",
   DUE_TODAY: "Due today",
-  OVERDUE: "Due yesterday",
+  OVERDUE: "Past due",
 };
 
 /**
@@ -1042,8 +1048,8 @@ function morningWord(kind: ReminderKind, due: Ymd | null | undefined, today: Ymd
   return MORNING_WORD[kind];
 }
 
-/** Highest first when a bundle has more than one (Q9). */
-const MORNING_ORDER: readonly ReminderKind[] = ["TELL_TENANT", "SCHEDULED_TODAY", "STILL_OPEN", "NO_DAY", "DUE_TODAY", "OVERDUE"];
+/** Highest first when a bundle has more than one (section 8: Past due leads). */
+const MORNING_ORDER: readonly ReminderKind[] = ["OVERDUE", "SCHEDULED_TODAY", "TELL_TENANT", "STILL_OPEN", "NO_DAY", "DUE_TODAY"];
 
 // ---------------------------------------------------------------------------
 // One email
@@ -1140,7 +1146,7 @@ export function removedEmail(input: { off: OutboxItem; title: string; where: str
   // Two lines at most at 320 (Q9): work under way puts its ask on the next line.
   const headline = started ? what : `${what} ${next}`;
   return {
-    subject: jobSubject({ word: "Removed", title: input.title, where: input.where }),
+    subject: jobSubject({ word: "Canceled", title: input.title, where: input.where }),
     fromName: FROM_HG,
     preview: previewText(what, next),
     headline,
@@ -1187,8 +1193,11 @@ function contractorEmail(input: TaskEmailInput): TaskEmail {
 
   // The word (Q9), highest first; Tell the tenant picks the word when it applies, and the move goes in the headline.
   // A partner's day reads as what happened to it (Connor, Nov 23): a first day is Scheduled, a day taken off is Day
-  // removed, a new day or a Due before it is Moved. A note on a finished job says Done, as the partners' email does.
+  // removed, a new day is Rescheduled, and a due date moved or cleared says so. A note on a finished job says Done,
+  // as the partners' email does.
   const dayKind = dayMoved ? dayChange(dayLines, { status, scheduled }, today)!.kind : null;
+  // The due date leads only when nothing before it in the lead's order does (the notes, then the checklist, then it).
+  const targetLeads = !!target && !items.some((i) => i.kind === "NOTES" || i.kind === "CHECKLIST");
   const word = sentBack
     ? "Sent back"
     : status === "DONE"
@@ -1201,15 +1210,21 @@ function contractorEmail(input: TaskEmailInput): TaskEmail {
             ? "Scheduled"
             : dayKind === "removed"
               ? "Day removed"
-              : dayMoved || dueBeforeDay
-                ? "Moved"
-                : hold
-                  ? "On hold"
-                  : items.some((i) => !isMorning(i))
-                    ? "Update"
-                    : mornings.length
-                      ? morningWord(mornings[0].kind, due, today)
-                      : "Update";
+              : dayMoved
+                ? "Rescheduled"
+                : dueBeforeDay
+                  ? "Due date moved"
+                  : hold
+                    ? "On hold"
+                    : targetLeads
+                      ? due
+                        ? "Due date moved"
+                        : "Due date removed"
+                      : items.some((i) => !isMorning(i))
+                        ? "Update"
+                        : mornings.length
+                          ? morningWord(mornings[0].kind, due, today)
+                          : "Update";
 
   // The lead's headline, and the lines that came with it. A new job carries the whole job, so its other edits say
   // nothing of their own; the job below is already as they left it.
@@ -1219,22 +1234,26 @@ function contractorEmail(input: TaskEmailInput): TaskEmail {
       return { headline: `${partnerName(sentBack)} sent this job back.`, preview: `${partnerName(sentBack)} sent this job back.`, lines: [] };
     }
     if (assigned) {
-      const getIn = input.gettingIn?.value ?? null;
-      const when = scheduled ? `Your day is ${dayText(scheduled, today)}` : due ? `Due ${dayText(due, today)}` : null;
-      return { headline: `${partnerName(assigned)} sent you a new job.`, preview: [when, getIn].filter(Boolean).join(" · ") || `${partnerName(assigned)} sent you a new job.`, lines: [] };
+      // The day it matters by, and nothing else (section 8: Getting in stays in the body).
+      const when = scheduled ? `Scheduled for ${dayText(scheduled, today)}` : due ? `Due ${dayText(due, today)}` : null;
+      return { headline: `${partnerName(assigned)} sent you a new job.`, preview: when ?? `${partnerName(assigned)} sent you a new job.`, lines: [] };
     }
     if (dayMoved) {
       const who = partnerName(dayLines[dayLines.length - 1]);
       const change = dayChange(dayLines, { status, scheduled }, today)!;
-      if (change.kind === "set") return { headline: `${who} set your day: ${change.to}.`, preview: `${who} set your day: ${change.to}.`, lines: [] };
-      if (change.kind === "moved") return { headline: `${who} moved your day to ${change.to}.`, preview: `${who} moved your day to ${change.to} (was ${change.was}).`, lines: [`It was ${change.was}.`] };
-      return { headline: `${who} removed your day.`, preview: change.was ? `${who} removed your day (was ${change.was}).` : `${who} removed your day.`, lines: change.was ? [`It was ${change.was}.`] : [] };
+      if (change.kind === "set") return { headline: `${who} scheduled it for ${change.to}.`, preview: `${who} scheduled it for ${change.to}.`, lines: [] };
+      if (change.kind === "moved") return { headline: `${who} rescheduled it for ${change.to}.`, preview: `${who} rescheduled it for ${change.to} (was ${change.was}).`, lines: [`It was ${change.was}.`] };
+      return {
+        headline: `${who} removed the scheduled day.`,
+        preview: change.was ? `${who} removed the scheduled day (was ${change.was}).` : `${who} removed the scheduled day.`,
+        lines: change.was ? [`It was ${change.was}.`] : [],
+      };
     }
     if (dueBeforeDay && target && due && scheduled) {
       return {
-        headline: `${partnerName(target)} moved Due to ${dayText(due, today)}.`,
-        preview: `Due is now ${dayText(due, today)}, before your day (${dayText(scheduled, today)}).`,
-        lines: [`That's before your day, ${dayText(scheduled, today)}.`],
+        headline: `${partnerName(target)} moved the due date to ${dayText(due, today)}.`,
+        preview: `Now due ${dayText(due, today)}, before your scheduled day (${dayText(scheduled, today)}).`,
+        lines: [`That's before your scheduled day, ${dayText(scheduled, today)}.`],
       };
     }
     if (hold) {
@@ -1262,7 +1281,7 @@ function contractorEmail(input: TaskEmailInput): TaskEmail {
     if (quotes.length) return { headline: `${partnerName(quotes[0])} sent you a note.`, preview: "", lines: [] };
     if (mornings.length) {
       const m = mornings[0];
-      return { headline: morningHeadline(m.kind, m.item.due ?? null, today), preview: morningPreview(m.kind, input), lines: morningLines(m.kind) };
+      return { headline: morningHeadline(m.kind, m.item.due ?? null, today), preview: morningPreview(m.kind, input, (m.item.due as Ymd | undefined) ?? null), lines: morningLines(m.kind, input) };
     }
     return { headline: "", preview: "", lines: [] };
   })();
@@ -1316,8 +1335,8 @@ function contractorEmail(input: TaskEmailInput): TaskEmail {
   const closed = !isActiveStatus(status);
   const preview = firstWords
     ? quotePreview(sentBackNote && sentBack ? partnerName(sentBack) : partnerName(quotes[0]), firstWords)
-    : tell
-      ? "They need 24 hours' notice."
+    : tell && scheduled
+      ? `Scheduled for ${dayText(scheduled, today)}. They need 24 hours' notice.`
       : lead.preview || lead.headline;
 
   // On hold, in review and closed: the headline and one line, no button and no Share with crew (Q4).
@@ -1372,7 +1391,7 @@ function contractorEmail(input: TaskEmailInput): TaskEmail {
     addressLabel: true,
     dates: [
       { label: "Scheduled", value: shownDay ? dayText(shownDay, today) : "Not set", changed: dayMoved && !isNew },
-      { label: "Due", value: due ? dayText(due, today) : "Not set", changed: changed("TARGET") },
+      { label: "Due date", value: due ? dayText(due, today) : "Not set", changed: changed("TARGET") },
     ],
     dayLink,
     notes: notes ? { text: notes, changed: changed("NOTES") } : null,
@@ -1415,35 +1434,55 @@ function dayChange(
   return null;
 }
 
-/** A partner's Due change in the contractor's words, on the date it has now: "moved Due to Fri, Dec 4", "cleared Due". */
+/** A partner's due-date change in the contractor's words, on the date it has now: "moved the due date to Fri, Dec 4". */
 function dueText(item: OutboxItem, due: Ymd | null, today: Ymd): string {
-  if (!due) return "cleared Due";
-  return item.from === "" ? `set Due to ${dayText(due, today)}` : `moved Due to ${dayText(due, today)}`;
+  if (!due) return "cleared the due date";
+  return item.from === "" ? `set the due date to ${dayText(due, today)}` : `moved the due date to ${dayText(due, today)}`;
 }
 
 /** A morning email's preview (Q9): one fact the subject lacks. */
-function morningPreview(kind: ReminderKind, input: TaskEmailInput): string {
-  const street = addressLines(input.address, input.unitLabel)[0] ?? "";
-  const due = input.due ? dayText(input.due, input.today) : null;
+function morningPreview(kind: ReminderKind, input: TaskEmailInput, lineDay: Ymd | null): string {
+  const today = input.today;
+  const due = input.due ? dayText(input.due, today) : null;
   switch (kind) {
     case "TELL_TENANT":
-      return "They need 24 hours' notice.";
+      return input.scheduled ? `Scheduled for ${dayText(input.scheduled, today)}. They need 24 hours' notice.` : "They need 24 hours' notice.";
     case "SCHEDULED_TODAY":
-      return [street, input.gettingIn?.value].filter(Boolean).join(" · ");
+      return input.status === "IN_PROGRESS" ? "Send for review when it's done." : "Tap Start job when you get there.";
     case "STILL_OPEN":
-      return input.scheduled ? `Your day was ${dayText(input.scheduled, input.today)}. Start the job or pick a new day.` : "Start the job or pick a new day.";
+      return input.scheduled ? `Scheduled for ${dayText(input.scheduled, today)}. Start the job or reschedule.` : "Start the job or reschedule.";
     case "NO_DAY":
-      // The subject already says Due (morningWord), so the preview says what's missing.
-      return due ? "No day yet. Pick a day to go." : "Pick a day to go.";
+      // The subject already says when it's due (morningWord), so the preview says what's missing.
+      return due ? "Not yet scheduled. Schedule a day to go." : "Schedule a day to go.";
     case "DUE_TODAY":
-    case "OVERDUE":
-      return "No day is set yet.";
+      return jobState(input, "today");
+    case "OVERDUE": {
+      const was = lineDay ?? input.due ?? null;
+      return [was ? `Was due ${dayText(was, today)}.` : null, jobState(input, "past")].filter(Boolean).join(" ");
+    }
   }
 }
 
-/** The line under a morning headline (Q8): Still open says what to do. */
-function morningLines(kind: ReminderKind): string[] {
-  return kind === "STILL_OPEN" ? ["Start the job or pick a new day."] : [];
+/**
+ * Where an unfinished job stands, for Due today and Past due (section 8): not yet scheduled, scheduled (after the due
+ * date, or a day that passed without a start), or in progress, each with what to do next.
+ */
+function jobState(input: TaskEmailInput, when: "today" | "past"): string {
+  const today = input.today;
+  if (input.status === "IN_PROGRESS") return when === "today" ? "In progress. Send for review when it's done." : "Send for review when it's done.";
+  const day = input.status === "SCHEDULED" ? (input.scheduled ?? null) : null;
+  if (!day) return when === "today" ? "Not yet scheduled. Schedule a day to go." : "Not yet scheduled.";
+  if (day < today) return `Scheduled for ${dayText(day, today)}, not started.`;
+  const dayWords = day === today ? "today" : dayText(day, today);
+  return when === "today" ? `Scheduled for ${dayWords}, after the due date.` : `Scheduled for ${dayWords}.`;
+}
+
+/** The line under a morning headline (Q8): Not started says what to do; Due today and Past due where the job stands. */
+function morningLines(kind: ReminderKind, input: TaskEmailInput): string[] {
+  if (kind === "STILL_OPEN") return ["Start the job or reschedule."];
+  if (kind === "DUE_TODAY") return [jobState(input, "today")];
+  if (kind === "OVERDUE") return [jobState(input, "past")];
+  return [];
 }
 
 // ---------------------------------------------------------------------------
@@ -1481,10 +1520,14 @@ function partnerEmail(input: TaskEmailInput): TaskEmail {
   const contractor = contractorLead ? whoOf(contractorLead, "staff") : input.contractorName ? oneLine(input.contractorName) : null;
   const residentName = (created ?? residentLines[0]) ? whoOf((created ?? residentLines[0])!, "staff") : null;
 
-  // A contractor's own day leads as what happened to it (Connor, Nov 23), as in the contractor's email.
+  // A contractor's own day leads as what happened to it (section 8). It reaches the partners only when it lands after
+  // the due date, so the word says so: Scheduled late, Rescheduled late; or Day removed close to the due date.
   const dayLeads = !review && !created && !canceled && !words.length && dayLines.length > 0 && !!contractor;
-  const dayWord = dayLeads ? (scheduled ? (wasText(dayLines[0], today) ? "Moved" : "Scheduled") : "Day removed") : null;
-  const word = status === "DONE" ? "Done" : review ? "Review" : created ? "New request" : canceled ? "Canceled" : (dayWord ?? "Update");
+  const dayWord = dayLeads ? (scheduled ? (wasText(dayLines[0], today) ? "Rescheduled late" : "Scheduled late") : "Day removed") : null;
+  // Past due (section 8): the morning after the due date, on a job the contractor hasn't finished.
+  const pastDue = items.find((i) => isMorning(i) && canonicalReminder(i.kind as ReminderKind) === "OVERDUE") ?? null;
+  const pastDueLeads = !review && !created && !canceled && !words.length && !dayLeads && !!pastDue;
+  const word = status === "DONE" ? "Done" : review ? "Review" : created ? "New request" : canceled ? "Canceled" : (dayWord ?? (pastDueLeads ? "Past due" : "Update"));
 
   // The quotes: the review note, the request's words in full, a contractor's words, a resident's note.
   const reviewWords = reviewNotes.map(commentWords).filter(Boolean);
@@ -1512,10 +1555,10 @@ function partnerEmail(input: TaskEmailInput): TaskEmail {
     preview = quotePreview(contractor, commentWords(words[0]));
   } else if (dayLines.length && contractor) {
     const was = wasText(dayLines[0], today);
-    const dueWords = due ? `Due is ${dayText(due, today)}.` : "";
+    const dueWords = due ? `Due date is ${dayText(due, today)}.` : "";
     if (scheduled) {
       const firstPick = !was;
-      headline = firstPick ? `${contractor} picked ${dayText(scheduled, today)}.` : `${contractor} moved the day to ${dayText(scheduled, today)}.`;
+      headline = firstPick ? `${contractor} scheduled it for ${dayText(scheduled, today)}.` : `${contractor} rescheduled it for ${dayText(scheduled, today)}.`;
       if (!firstPick) lines.push(`It was ${was}.`);
       preview = previewText(headline, dueWords);
     } else {
@@ -1524,6 +1567,11 @@ function partnerEmail(input: TaskEmailInput): TaskEmail {
       preview = previewText(was ? `${contractor} removed the scheduled day (was ${was}).` : headline, dueWords);
     }
     if (dueWords) lines.push(dueWords);
+  } else if (pastDueLeads && pastDue) {
+    const was = pastDue.due ? dayText(pastDue.due as Ymd, today) : due ? dayText(due, today) : null;
+    headline = contractor ? `${contractor} hasn't finished.` : "This isn't finished.";
+    if (was) lines.push(`It was due ${was}.`);
+    preview = was ? `${headline} Was due ${was}.` : headline;
   } else if (legacyTarget && contractor) {
     headline = asSentence(itemLine(legacyTarget, input.title, "staff", today));
     preview = headline;
@@ -1536,7 +1584,16 @@ function partnerEmail(input: TaskEmailInput): TaskEmail {
   }
 
   // The other lines, in the task's Activity words. The lead's own lines are already said.
-  const consumed = new Set<OutboxItem>([...(review ? [review] : []), ...reviewNotes, ...(created ? [created] : []), ...words, ...dayLines, ...(legacyTarget && headline.includes("date") ? [legacyTarget] : [])]);
+  const consumed = new Set<OutboxItem>([
+    ...(review ? [review] : []),
+    ...reviewNotes,
+    ...(created ? [created] : []),
+    ...words,
+    ...dayLines,
+    ...(legacyTarget && headline.includes("date") ? [legacyTarget] : []),
+    // A Past due line says itself only as the lead; under another lead it adds the due date that passed.
+    ...(pastDue && pastDueLeads ? [pastDue] : []),
+  ]);
   if (canceled && word === "Canceled") consumed.add(canceled);
   if (!created && !canceled && !words.length && !dayLines.length && !review && residentLines.length) consumed.add(residentLines[0]);
   for (const i of items) {
@@ -1580,7 +1637,7 @@ function partnerEmail(input: TaskEmailInput): TaskEmail {
           address: addressLines(input.address, input.unitLabel).slice(0, 1),
           addressLabel: false,
           dates: [
-            { label: "Due", value: due ? dayText(due, today) : "Not set" },
+            { label: "Due date", value: due ? dayText(due, today) : "Not set" },
             { label: "Scheduled", value: scheduled ? dayText(scheduled, today) : "Not set" },
           ],
           dayLink: null,
