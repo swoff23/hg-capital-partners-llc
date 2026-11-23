@@ -133,9 +133,20 @@ test("the contractor's word, highest first when a bundle mixes kinds (Q9)", () =
   assert.equal(word([notes, item("SCHEDULED_TODAY", "scheduled today", "HG", { due: "2026-11-22" })], scheduledOn("2026-11-22")), "Update");
   // Rows queued before Nov 22 under the old names read as what they became.
   assert.equal(word([item("SCHEDULED_TOMORROW", "scheduled tomorrow", "HG", { due: "2026-11-23" })], scheduledOn("2026-11-23")), "Tell the tenant");
-  assert.equal(word([item("DUE_TOMORROW", "due tomorrow", "HG", { due: "2026-11-23" })], { due: "2026-11-23" }), "Due Mon, Nov 23");
+  assert.equal(word([item("DUE_TOMORROW", "due tomorrow", "HG", { due: "2026-11-23" })], { due: "2026-11-23" }), "Due tomorrow");
+  // A partner's day as what happened to it (Connor, Nov 23): a first day, a day taken off, a note on a finished job.
+  assert.equal(word([item("STATUS", `scheduled "${T}" for Wed, Nov 25`, "Connor Swofford", { from: "OPEN", to: "SCHEDULED" })], scheduledOn("2026-11-25")), "Scheduled");
+  assert.equal(word([item("STATUS", `unscheduled "${T}"`, "Connor Swofford", { from: "SCHEDULED", to: "OPEN", fromDay: "2026-11-25" })]), "Day removed");
+  assert.equal(word([item("COMMENT", '"Thanks, it looks great."')], { status: "DONE" }), "Done");
   // Removed is its own email.
   assert.equal(word([item("OFF", `canceled "${T}"`, "Connor Swofford", { from: "OPEN" })]), "Removed");
+});
+
+test("subjects shorten the street's last word; the unit and a street without a number stay as typed", () => {
+  assert.equal(jobSubject({ word: "New", title: T, where: "933 Lafayette Avenue · Floor 1" }), "New: Vanity swap, 933 Lafayette Ave · Floor 1");
+  assert.equal(jobSubject({ word: "New", title: T, where: "58 Mariner Street" }), "New: Vanity swap, 58 Mariner St");
+  assert.equal(jobSubject({ word: "New", title: T, where: "Rear Court" }), "New: Vanity swap, Rear Court");
+  assert.equal(jobSubject({ word: "New", title: T, where: "12 Avenue Rd" }), "New: Vanity swap, 12 Avenue Rd");
 });
 
 test("the partner's word: Review, New request, Update, Canceled, Done (Q9)", () => {
@@ -143,6 +154,11 @@ test("the partner's word: Review, New request, Update, Canceled, Done (Q9)", () 
   assert.equal(word([item("STATUS", `sent "${T}" for review`, "Zack Miller", { from: "IN_PROGRESS", to: "REVIEW" })], { status: "REVIEW" }), "Review");
   assert.equal(word([item("CREATED", "sent this request", "Dana Lee (resident)")]), "New request");
   assert.equal(word([item("COMMENT", '"Doors arrive Thursday."', "Zack Miller")], { status: "IN_PROGRESS" }), "Update");
+  // A contractor's own day (Connor, Nov 23): picked, moved, taken off.
+  // Partners hear of it only after Due, or taken off close to Due.
+  assert.equal(word([item("STATUS", `scheduled "${T}" for Mon, Nov 30`, "Zack Miller", { from: "OPEN", to: "SCHEDULED" })], scheduledOn("2026-11-30")), "Scheduled");
+  assert.equal(word([item("DAY", `moved "${T}" to Mon, Nov 30 (was Tue, Nov 24)`, "Zack Miller", { from: "2026-11-24" })], scheduledOn("2026-11-30")), "Moved");
+  assert.equal(word([item("STATUS", `unscheduled "${T}"`, "Zack Miller", { from: "SCHEDULED", to: "OPEN", fromDay: "2026-11-23" })], { due: "2026-11-24" }), "Day removed");
   assert.equal(word([item("COMMENT", "canceled the request", "Dana Lee (resident)")], { status: "CANCELED" }), "Canceled");
   assert.equal(word([item("COMMENT", '"Forgot the shutoff."', "Zack Miller")], { status: "DONE" }), "Done");
 });
@@ -321,6 +337,8 @@ test("the morning emails: Today, Still open, No day yet, Due today and Due yeste
   const noDay = taskEmail(zackJob({ items: [item("NO_DAY", "no day yet", "HG", { due: "2026-11-22" })] }));
   assert.deepEqual([noDay.headline, noDay.preview, noDay.primary?.label], ["This job has no day yet.", "No day yet. Pick a day to go.", "Schedule"]);
   assert.equal(noDay.subject, "Due Thu, Nov 26: Vanity swap, 118 Congress St · Rear");
+  // The morning before Due (Connor, Nov 23).
+  assert.equal(taskEmail(zackJob({ due: "2026-11-23", items: [item("NO_DAY", "no day yet", "HG", { due: "2026-11-22" })] })).subject.split(":")[0], "Due tomorrow");
   const dueToday = taskEmail(zackJob({ due: "2026-11-22", items: [item("DUE_TODAY", "due today", "HG", { due: "2026-11-22" })] }));
   assert.deepEqual([dueToday.headline, dueToday.primary?.label], ["This job is due today.", "Schedule"]);
   assert.equal(taskEmail(zackJob({ due: "2026-11-21", items: [item("OVERDUE", "due yesterday", "HG", { due: "2026-11-21" })] })).headline, "This job was due yesterday.");

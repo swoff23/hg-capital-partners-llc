@@ -922,8 +922,33 @@ export function addressLines(address: string | null, unitLabel?: string | null):
  * characters: "Update: Replace kitchen faucet, 118 Congress St · Rear".
  */
 export function jobSubject(input: { word: string; title: string; where: string }): string {
-  const what = [oneLine(input.title) || "A job", input.where].filter(Boolean).join(", ");
+  const what = [oneLine(input.title) || "A job", subjectWhere(input.where)].filter(Boolean).join(", ");
   return `${input.word}: ${what}`;
+}
+
+/** Street-type words as a subject shortens them (Connor, Nov 23); the body keeps the full address. */
+const STREET_SHORT: Record<string, string> = {
+  avenue: "Ave",
+  street: "St",
+  road: "Rd",
+  drive: "Dr",
+  boulevard: "Blvd",
+  place: "Pl",
+  parkway: "Pkwy",
+  court: "Ct",
+  lane: "Ln",
+  terrace: "Ter",
+};
+
+/**
+ * The street's last word shortened for the subject, so more of it fits an inbox row: "933 Lafayette Avenue · Floor 1"
+ * reads "933 Lafayette Ave · Floor 1". Only a street that starts with its number; a unit on its own stays as typed.
+ */
+function subjectWhere(where: string): string {
+  const [street, ...rest] = where.split(" · ");
+  if (!/^\d/.test(street)) return where;
+  const short = street.replace(/(\s)([A-Za-z]+)$/, (m, sp: string, w: string) => (STREET_SHORT[w.toLowerCase()] ? `${sp}${STREET_SHORT[w.toLowerCase()]}` : m));
+  return [short, ...rest].join(" · ");
 }
 
 /**
@@ -1009,10 +1034,11 @@ const MORNING_WORD: Record<ReminderKind, string> = {
 
 /**
  * A morning line's subject word. No day yet names the Due date instead when there is one (Connor, Nov 23): the
- * missing day is already the headline, and the subject should say when it has to be done: "Due Thu, Nov 26".
+ * missing day is already the headline, and the subject should say when it has to be done: "Due Thu, Nov 26", or
+ * "Due tomorrow" the morning before.
  */
 function morningWord(kind: ReminderKind, due: Ymd | null | undefined, today: Ymd): string {
-  if (kind === "NO_DAY" && due) return `Due ${dayText(due, today)}`;
+  if (kind === "NO_DAY" && due) return due === today ? "Due today" : due === addDaysYmd(today, 1) ? "Due tomorrow" : `Due ${dayText(due, today)}`;
   return MORNING_WORD[kind];
 }
 
@@ -1160,21 +1186,30 @@ function contractorEmail(input: TaskEmailInput): TaskEmail {
   const dayMoved = dayLines.length > 0 && dayChange(dayLines, { status, scheduled }, today) !== null;
 
   // The word (Q9), highest first; Tell the tenant picks the word when it applies, and the move goes in the headline.
+  // A partner's day reads as what happened to it (Connor, Nov 23): a first day is Scheduled, a day taken off is Day
+  // removed, a new day or a Due before it is Moved. A note on a finished job says Done, as the partners' email does.
+  const dayKind = dayMoved ? dayChange(dayLines, { status, scheduled }, today)!.kind : null;
   const word = sentBack
     ? "Sent back"
-    : tell
-      ? "Tell the tenant"
-      : assigned
-        ? "New"
-        : dayMoved || dueBeforeDay
-          ? "Moved"
-          : hold
-            ? "On hold"
-            : items.some((i) => !isMorning(i))
-              ? "Update"
-              : mornings.length
-                ? morningWord(mornings[0].kind, due, today)
-                : "Update";
+    : status === "DONE"
+      ? "Done"
+      : tell
+        ? "Tell the tenant"
+        : assigned
+          ? "New"
+          : dayKind === "set"
+            ? "Scheduled"
+            : dayKind === "removed"
+              ? "Day removed"
+              : dayMoved || dueBeforeDay
+                ? "Moved"
+                : hold
+                  ? "On hold"
+                  : items.some((i) => !isMorning(i))
+                    ? "Update"
+                    : mornings.length
+                      ? morningWord(mornings[0].kind, due, today)
+                      : "Update";
 
   // The lead's headline, and the lines that came with it. A new job carries the whole job, so its other edits say
   // nothing of their own; the job below is already as they left it.
@@ -1446,7 +1481,10 @@ function partnerEmail(input: TaskEmailInput): TaskEmail {
   const contractor = contractorLead ? whoOf(contractorLead, "staff") : input.contractorName ? oneLine(input.contractorName) : null;
   const residentName = (created ?? residentLines[0]) ? whoOf((created ?? residentLines[0])!, "staff") : null;
 
-  const word = status === "DONE" ? "Done" : review ? "Review" : created ? "New request" : canceled ? "Canceled" : "Update";
+  // A contractor's own day leads as what happened to it (Connor, Nov 23), as in the contractor's email.
+  const dayLeads = !review && !created && !canceled && !words.length && dayLines.length > 0 && !!contractor;
+  const dayWord = dayLeads ? (scheduled ? (wasText(dayLines[0], today) ? "Moved" : "Scheduled") : "Day removed") : null;
+  const word = status === "DONE" ? "Done" : review ? "Review" : created ? "New request" : canceled ? "Canceled" : (dayWord ?? "Update");
 
   // The quotes: the review note, the request's words in full, a contractor's words, a resident's note.
   const reviewWords = reviewNotes.map(commentWords).filter(Boolean);
