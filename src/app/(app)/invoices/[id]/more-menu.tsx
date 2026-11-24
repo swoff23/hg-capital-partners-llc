@@ -1,5 +1,6 @@
 "use client";
 import { Ban, RotateCcw, Undo2 } from "lucide-react";
+import { useLeaveGuard } from "@/components/leave-guard";
 import { RecordMoreMenu, type RecordMenuAction, type RecordMenuLast } from "@/components/record-archive";
 import { useRun } from "@/components/use-run";
 import type { InvoiceStage } from "@prisma/client";
@@ -8,10 +9,12 @@ import { approveInvoiceAction, backToReviewAction, markNotInvoiceAction, restore
 /**
  * The invoice page's ⋯ on the title line (docs/contractor-invoices-plan.md, 6.1 item 1; drawing 11), by stage: To
  * review is Copy link, then Not an invoice in red after a line. To pay adds Back to review first. Paid is Undo
- * paid first and Copy link, and nothing to clear. Not an invoice goes at once with a toast and Undo.
+ * paid first and Copy link, and nothing to clear. Not an invoice goes at once with a toast and Undo, after asking if the fields hold unsaved changes.
  */
 export function InvoiceMenu({ invoiceId, stage, paidAt }: { invoiceId: string; stage: InvoiceStage; paidAt: string | null }) {
   const { run } = useRun();
+  // Not an invoice puts the page behind it, so unsaved fields ask first, as a link would.
+  const guard = useLeaveGuard();
 
   const backToReview = () =>
     run(() => backToReviewAction(invoiceId), {
@@ -40,7 +43,7 @@ export function InvoiceMenu({ invoiceId, stage, paidAt }: { invoiceId: string; s
         : [];
   const last: RecordMenuLast | null =
     stage === "REVIEW" || stage === "TO_PAY"
-      ? { label: "Not an invoice", icon: <Ban />, destructive: true, onAction: () => notInvoice(stage) }
+      ? { label: "Not an invoice", icon: <Ban />, destructive: true, onAction: () => guard(() => notInvoice(stage)) }
       : null;
 
   return <RecordMoreMenu id={invoiceId} href={`/invoices/${invoiceId}`} archived={false} actions={actions} last={last} />;

@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useId, useRef, useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { CircleHelp, Copy, Plus, X } from "lucide-react";
+import { CircleHelp, Plus, TriangleAlert, X } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import { DatePicker } from "@/components/due-date-picker";
 import { OptionList, type OptionItem } from "@/components/option-list";
@@ -11,6 +11,7 @@ import { WarnMark } from "@/components/source-line";
 import { StatusMark } from "@/components/status-badge";
 import { Button, Input, SaveError, Textarea, addRowClass } from "@/components/ui";
 import { formatCents } from "@/lib/invoices/email-content";
+import type { FieldValues } from "@/lib/invoices/draft";
 import { readTotal } from "@/lib/invoices/fields";
 import { fmtDay, type Ymd } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -19,32 +20,24 @@ import type { ContractorChoice, JobChoice } from "./load";
 
 /**
  * An invoice's fields (docs/contractor-invoices-plan.md, section 6, item 2 and 6.1 item 4): contractor, invoice
- * number, date, total, jobs and the note only staff see. In To review each saves as you leave it, with no Save
- * button and no toast, and the line "Saved" says so; after Approve they read as text, and Back to review reopens
- * them. The page and New invoice share this: the parent decides what a save does (`save`), so New can make the
- * invoice on its first one.
+ * number, date, total, jobs and the note only staff see. In To review they are a draft the page holds until Save
+ * (drawing 17, option B): this draws `values` and `jobs` and reports each edit through `onChange`, `onAddJob` and
+ * `onRemoveJob`; after Approve they read as text, and Back to review reopens them. The page and New invoice share it.
  */
-
-/** What one save carries. A total is the text as typed; the server reads it strictly. */
-export type FieldPatch = {
-  contactId?: string | null;
-  invoiceNumber?: string | null;
-  invoiceDate?: Ymd;
-  total?: string | null;
-  note?: string | null;
-};
 
 export type FieldErrors = Record<string, string>;
 
-/** A save's answer: nothing wrong, or the line for the field it was about (or `form` for the rest). */
-export type SaveResult = { ok: true } | { ok: false; errors: FieldErrors };
+/** A refused save as the fields show it: a line on the field it names, or one under the fields for anything else. */
+export function failureToErrors(f: { error: string; fieldErrors?: FieldErrors }): FieldErrors {
+  const known = Object.fromEntries(Object.entries(f.fieldErrors ?? {}).filter(([k]) => FIELD_KEYS.includes(k)));
+  return Object.keys(known).length > 0 ? known : { form: f.error };
+}
 
 const FIELD_KEYS = ["contactId", "invoiceNumber", "invoiceDate", "total", "note"];
 
-/** A refused save as the fields show it: a line on the field it names, or one under the fields for anything else. */
-export function failureToResult(f: { error: string; fieldErrors?: FieldErrors }): SaveResult {
-  const known = Object.fromEntries(Object.entries(f.fieldErrors ?? {}).filter(([k]) => FIELD_KEYS.includes(k)));
-  return { ok: false, errors: Object.keys(known).length > 0 ? known : { form: f.error } };
+/** On the bar while the draft differs from what's saved; a phone's bar is the two buttons alone. */
+export function UnsavedMark() {
+  return <span className="hidden whitespace-nowrap text-body text-warn lg:inline">Unsaved changes</span>;
 }
 
 /** A job on the invoice. `linkId` is the link's own id, so a job since deleted still reads as its title. */
@@ -54,47 +47,6 @@ export interface JobRow {
   title: string;
   address: string | null;
   status: TaskStatus | null;
-}
-
-export interface FieldValues {
-  contactId: string | null;
-  invoiceNumber: string;
-  /** Null on New invoice, which dates itself today until someone changes it. */
-  invoiceDate: Ymd | null;
-  /** The total as it reads in the field: "850.00", "1,043.10", or "". */
-  total: string;
-  note: string;
-}
-
-/**
- * Makes Approve safe to press while a field still has the cursor: `track` notes each save as it starts, and `flush`
- * leaves the field (which saves it, a touch tap not having done so) and waits for every save to land.
- */
-export function useSaveFlush() {
-  const pending = useRef<Promise<unknown>>(Promise.resolve());
-  const track = useCallback(<T,>(p: Promise<T>): Promise<T> => {
-    pending.current = Promise.all([pending.current, p.catch(() => undefined)]);
-    return p;
-  }, []);
-  const flush = useCallback(async () => {
-    const a = document.activeElement;
-    if (a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement) a.blur();
-    await pending.current;
-  }, []);
-  return { track, flush };
-}
-
-export const totalText = (cents: number | null): string => (cents == null ? "" : formatCents(cents).slice(1));
-
-/** A value that follows its saved one: the text starts as the server's and starts over when that changes. */
-function useSavedText(saved: string): [string, (next: string) => void] {
-  const [text, setText] = useState(saved);
-  const [seen, setSeen] = useState(saved);
-  if (saved !== seen) {
-    setSeen(saved);
-    setText(saved);
-  }
-  return [text, setText];
 }
 
 /** The label row: the label at the start and, at the end, a flag that belongs to the field. */
@@ -132,11 +84,10 @@ export function InvoiceFields({
   today,
   duplicateOf,
   needsContractor,
-  save,
+  errors,
+  onChange,
   onAddJob,
   onRemoveJob,
-  saved,
-  onTotalDraft,
 }: {
   values: FieldValues;
   editable: boolean;
@@ -148,28 +99,16 @@ export function InvoiceFields({
   duplicateOf: { id: string; title: string } | null;
   /** "Who's this from?" (M11): an emailed invoice with no contractor yet. */
   needsContractor: boolean;
-  /** Saves one field. The parent answers with where it went wrong, if it did. */
-  save: (patch: FieldPatch) => Promise<SaveResult>;
+  /** The line each field shows, by field name; `form` is the one under the fields for a refusal no field owns. */
+  errors: FieldErrors;
+  /** One edit, as the draft's new value for that field. */
+  onChange: (patch: Partial<FieldValues>) => void;
   onAddJob: (job: JobChoice) => void;
   onRemoveJob: (job: JobRow) => void;
-  /** Shows "Saved" under the fields until the next edit. */
-  saved: boolean;
-  /** The total as it's typed, before it's saved, so Approve can follow the text and not the last save. */
-  onTotalDraft?: (text: string) => void;
 }) {
-  const [errors, setErrors] = useState<FieldErrors>({});
-  const [number, setNumber] = useSavedText(values.invoiceNumber);
-  const [total, setTotal] = useSavedText(values.total);
-  const [note, setNote] = useSavedText(values.note);
   const numberId = useId();
   const totalId = useId();
   const noteId = useId();
-
-  async function commit(patch: FieldPatch, field: string) {
-    setErrors((e) => ({ ...e, [field]: "", form: "" }));
-    const res = await save(patch);
-    if (!res.ok) setErrors((e) => ({ ...e, ...res.errors }));
-  }
 
   const picked = contractors.find((c) => c.id === values.contactId);
   const items: OptionItem[] = contractors.map((c) => ({
@@ -187,7 +126,7 @@ export function InvoiceFields({
     ) : null;
   const flagForNumber = duplicateOf ? (
     <Link href={`/invoices/${duplicateOf.id}`} aria-label={`Possible duplicate of ${duplicateOf.title}`} className="relative underline-offset-3 hover:underline pointer-coarse:after:absolute pointer-coarse:after:-inset-3">
-      <WarnMark icon={Copy} className="shrink-0 whitespace-nowrap text-meta">
+      <WarnMark icon={TriangleAlert} className="shrink-0 whitespace-nowrap text-meta">
         Possible duplicate
       </WarnMark>
     </Link>
@@ -235,24 +174,19 @@ export function InvoiceFields({
             placeholder="Pick a contractor"
             isInvalid={!!errors.contactId}
             errorMessage={errors.contactId || undefined}
-            onChange={(next) => {
-              void commit({ contactId: next }, "contactId");
-            }}
+            onChange={(next) => onChange({ contactId: next })}
           />
         </div>
         <div className="flex min-w-0 flex-col gap-1.5">
           <LabelRow htmlFor={numberId} label="Invoice #" optional flag={flagForNumber} />
           <Input
             id={numberId}
-            value={number}
+            value={values.invoiceNumber}
             maxLength={200}
             autoComplete="off"
             enterKeyHint="next"
             aria-invalid={errors.invoiceNumber ? true : undefined}
-            onChange={(e) => setNumber(e.target.value)}
-            onBlur={() => {
-              if (number.trim() !== values.invoiceNumber) void commit({ invoiceNumber: number.trim() || null }, "invoiceNumber");
-            }}
+            onChange={(e) => onChange({ invoiceNumber: e.target.value })}
           />
           {errors.invoiceNumber && <p className="truncate text-meta text-destructive">{errors.invoiceNumber}</p>}
         </div>
@@ -269,7 +203,7 @@ export function InvoiceFields({
               allowNone={false}
               value={values.invoiceDate}
               onChange={(next) => {
-                if (next && next !== values.invoiceDate) void commit({ invoiceDate: next }, "invoiceDate");
+                if (next) onChange({ invoiceDate: next });
               }}
             />
             {errors.invoiceDate && <p className="truncate text-meta text-destructive">{errors.invoiceDate}</p>}
@@ -280,25 +214,12 @@ export function InvoiceFields({
           <Input
             id={totalId}
             prefix="$"
-            value={total}
+            value={values.total}
             inputMode="decimal"
             autoComplete="off"
             enterKeyHint="next"
             aria-invalid={errors.total ? true : undefined}
-            onChange={(e) => {
-              setTotal(e.target.value);
-              onTotalDraft?.(e.target.value);
-            }}
-            onBlur={() => {
-              if (total.trim() === values.total) return;
-              // The server reads it strictly too; this is the same check, so a typo shows at once.
-              const read = readTotal(total);
-              if (!read.ok) {
-                setErrors((e) => ({ ...e, total: read.message }));
-                return;
-              }
-              void commit({ total: total.trim() || null }, "total");
-            }}
+            onChange={(e) => onChange({ total: e.target.value })}
           />
           {errors.total && <p className="truncate text-meta text-destructive">{errors.total}</p>}
         </div>
@@ -310,22 +231,16 @@ export function InvoiceFields({
         <LabelRow htmlFor={noteId} label="Internal note" optional />
         <Textarea
           id={noteId}
-          value={note}
+          value={values.note}
           rows={3}
           maxLength={2000}
           className="min-h-20 resize-y"
-          onChange={(e) => setNote(e.target.value)}
-          onBlur={() => {
-            if (note.trim() !== values.note) void commit({ note: note.trim() || null }, "note");
-          }}
+          onChange={(e) => onChange({ note: e.target.value })}
         />
         {errors.note && <p className="truncate text-meta text-destructive">{errors.note}</p>}
       </div>
 
       {errors.form && <SaveError>{errors.form}</SaveError>}
-      <p aria-live="polite" className="h-4 text-meta text-muted-foreground">
-        {saved && !errors.form ? "Saved" : ""}
-      </p>
     </div>
   );
 }

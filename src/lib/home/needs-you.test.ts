@@ -10,6 +10,7 @@ import {
   drawItems,
   draftsItem,
   invoicesItem,
+  invoicesToPayItem,
   withDraftsItem,
   keyDateItems,
   missingItem,
@@ -367,4 +368,18 @@ test("drafts row: first in the list, ahead of the key dates, so a phone's three 
   assert.deepEqual(withDraftsItem(base, 2).map((i) => i.kind), ["drafts", "loan", "missing"]);
   assert.deepEqual(withDraftsItem([missing], 1).map((i) => i.kind), ["drafts", "missing"]);
   assert.deepEqual(withDraftsItem([], 1).map((i) => i.kind), ["drafts"]);
+});
+
+test("invoicesToPayItem: count, names, total owed, and its place right after invoices to review", () => {
+  assert.equal(invoicesToPayItem(0, [], 0), null);
+  const one = invoicesToPayItem(1, ["Zack Reading"], 850)!;
+  assert.equal(one.title, "1 invoice to pay");
+  assert.equal(one.href, "/invoices?view=pay");
+  assert.equal(one.state, "Pay");
+  assert.equal(one.detail, "Zack Reading");
+  assert.equal(one.amount, 850);
+  assert.equal(invoicesToPayItem(4, ["A", "B", "C"], 10)!.detail, "A, B and 1 more");
+  const review = invoicesItem(2, 2, ["Dave Kim"])!;
+  const list = needsYouList({ keyDates: [], invoices: review, invoicesToPay: one, capex: null, quickbooks: null });
+  assert.deepEqual(list.map((i) => i.key), ["invoices", "invoices-pay"]);
 });

@@ -320,6 +320,20 @@ export async function invoicesToReview(): Promise<{ count: number; senders: stri
   return { count: rows.length, senders, contractors };
 }
 
+/** Home's To pay row: how many approved invoices wait, their contractors oldest first, and the total owed in cents. */
+export async function invoicesToPay(): Promise<{ count: number; contractors: string[]; totalCents: number }> {
+  const [rows, sum] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { stage: "TO_PAY" },
+      select: { contact: { select: { fullName: true } } },
+      orderBy: [{ approvedAt: "asc" }, { id: "asc" }],
+    }),
+    prisma.invoice.aggregate({ where: { stage: "TO_PAY" }, _sum: { total: true } }),
+  ]);
+  const contractors = [...new Set(rows.flatMap((r) => (r.contact ? [r.contact.fullName] : [])))];
+  return { count: rows.length, contractors, totalCents: decimalToCents(sum._sum.total) ?? 0 };
+}
+
 // ---------------------------------------------------------------------------
 // The portal (M14, M16)
 // ---------------------------------------------------------------------------

@@ -10,8 +10,8 @@ import { leaseEndRows, loadMissingInfo } from "@/lib/missing/queries";
 import { ofPriority, placesLine } from "@/lib/missing/checks";
 import { lineFigures, rehabFigures } from "@/lib/draws/figures";
 import { listRehabs } from "@/lib/draws/queries";
-import { invoicesToReview } from "@/lib/invoices/queries";
-import { baselaneItems, capexItem, drawItems, invoicesItem, keyDateItems, missingItem, needsYouList, quickbooksItem, signupItems, type NeedsYouItem } from "./needs-you";
+import { invoicesToPay, invoicesToReview } from "@/lib/invoices/queries";
+import { baselaneItems, capexItem, drawItems, invoicesItem, invoicesToPayItem, keyDateItems, missingItem, needsYouList, quickbooksItem, signupItems, type NeedsYouItem } from "./needs-you";
 
 /**
  * Everything Home's Needs you list reads, in one place: each property's key
@@ -21,7 +21,7 @@ import { baselaneItems, capexItem, drawItems, invoicesItem, keyDateItems, missin
  * in ./needs-you.
  */
 export async function needsYou(today: Ymd, now: Date = new Date()): Promise<NeedsYouItem[]> {
-  const [properties, rules, conn, signups, setups, leaseEnds, missing, rehabs, invoices] = await Promise.all([
+  const [properties, rules, conn, signups, setups, leaseEnds, missing, rehabs, invoices, toPay] = await Promise.all([
     // An archived property leaves Home (lib/archive.ts); its reminder tasks stay on Today.
     prisma.property.findMany({
       where: liveRecord,
@@ -56,6 +56,7 @@ export async function needsYou(today: Ymd, now: Date = new Date()): Promise<Need
     loadMissingInfo(today),
     listRehabs("open"),
     invoicesToReview(),
+    invoicesToPay(),
   ]);
   const required = ofPriority(missing.gaps, "required");
 
@@ -104,6 +105,7 @@ export async function needsYou(today: Ymd, now: Date = new Date()): Promise<Need
     leaseEnds,
     draws: drawItems(rehabs, today),
     invoices: invoicesItem(invoices.count, invoices.senders.length, invoices.contractors),
+    invoicesToPay: invoicesToPayItem(toPay.count, toPay.contractors, toPay.totalCents / 100),
     missing: missingItem(required.length, placesLine(required)),
     signups: signupItems(
       signups.map((s) => ({ id: s.id, fullName: s.fullName, phoneE164: s.phoneE164, email: s.email, trades: tradeLine(s.tradeLinks), createdAt: s.createdAt })),

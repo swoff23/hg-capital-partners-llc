@@ -133,7 +133,7 @@ function Row({ row, today }: { row: InvoiceRow; today: string }) {
       </RowCell>
       <RowCell href={href} numeric className="pr-0 max-sm:py-2">
         <span className="flex flex-col items-end">
-          <Money value={row.totalCents == null ? null : row.totalCents / 100} cents />
+          <Money value={row.totalCents == null ? null : Math.round(row.totalCents / 100)} />
           <span className="text-meta text-muted-foreground sm:hidden">{date}</span>
         </span>
       </RowCell>

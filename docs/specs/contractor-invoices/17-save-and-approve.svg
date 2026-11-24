@@ -1,0 +1,186 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1419" height="1178" viewBox="0 0 1419 1178">
+<title>Save beside Approve</title>
+<rect width="1419" height="1178" fill="#ffffff"/>
+<defs><clipPath id="c1"><rect x="0" y="0" width="1280" height="520"/></clipPath><clipPath id="c2"><rect x="0" y="0" width="768" height="640"/></clipPath><clipPath id="c3"><rect x="0" y="0" width="375" height="640"/></clipPath><clipPath id="c4"><rect x="0" y="0" width="1280" height="520"/></clipPath><clipPath id="c5"><rect x="0" y="0" width="375" height="640"/></clipPath></defs>
+<text x="32" y="40" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="18" font-weight="600" fill="#152133">Save beside Approve</text>
+<text x="32" y="62" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">You fill in what's missing and save it; Pieter opens it later and approves. Approve is never automatic.</text>
+<text x="32" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">A. Save button, and fields still save as you leave them</text>
+<rect x="445.38800000000015" y="71" width="104" height="18" rx="9" fill="#152133"/>
+<text x="497.38800000000015" y="84" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#ffffff" text-anchor="middle">Recommended</text>
+<text x="32" y="104" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Save confirms with a toast; nothing you typed is lost if you close the tab first.</text>
+<text x="32" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">To review, number not filled in yet</text>
+<g transform="translate(32.0,152.0) scale(0.55)"><g clip-path="url(#c1)"><rect x="0" y="0" width="1280" height="520" rx="0" fill="#ffffff"/>
+<text x="32" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="32" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice from Dave</text>
+<rect x="32" y="90" width="560" height="330" rx="8" fill="#f2f0ec"/>
+<rect x="88.0" y="106" width="448.0" height="298" rx="0" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="104.0" y="124" width="156.79999999999998" height="10" rx="0" fill="#d5d1ca"/>
+<rect x="104.0" y="158" width="249.6" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="176" width="374.40000000000003" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="194" width="374.40000000000003" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="212" width="249.6" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="230" width="374.40000000000003" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="248" width="374.40000000000003" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="266" width="249.6" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="284" width="374.40000000000003" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="302" width="374.40000000000003" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="385.6" y="370" width="134.4" height="10" rx="0" fill="#d5d1ca"/>
+<text x="44" y="412" font-size="11" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="624" y="102" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="624" y="108" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="128.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave Kim</text>
+<text x="624" y="164" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<rect x="624" y="170" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="624" y="226" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="624" y="232" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="252.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="624" y="288" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<rect x="624" y="294" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="314.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter: checked with Dave, parts were extra</text>
+<rect x="0" y="460" width="1280" height="60" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="460" x2="1280" y2="460" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="1173.3" y="474" width="74.7" height="32" rx="6" fill="#152133"/>
+<text x="1185.3" y="494.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text>
+<rect x="1110.3392" y="474" width="54.9608" height="32" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="1122.3392" y="494.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Save</text>
+<rect x="928" y="404" width="320" height="44" rx="8" fill="#152133"/>
+<text x="942" y="431" font-size="13" font-weight="400" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Saved</text></g><rect x="0" y="0" width="1280" height="520" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Tablet 768 (touch)</text>
+<text x="776.0" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">To review, number not filled in yet</text>
+<g transform="translate(776.0,152.0) scale(0.45)"><g clip-path="url(#c2)"><rect x="0" y="0" width="768" height="640" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="16" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice from Dave</text>
+<rect x="16" y="84" width="736" height="56" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="26" y="94" width="36" height="36" rx="6" fill="#f2f0ec"/>
+<g transform="translate(35.0,103.0) scale(0.7500)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></g>
+<text x="72" y="110.0" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice.pdf</text>
+<text x="72" y="126.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">PDF · 182 KB</text>
+<text x="738" y="116.5" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Open</text>
+<text x="16" y="168" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="16" y="174" width="736" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="200.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave Kim</text>
+<text x="16" y="242" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<rect x="16" y="248" width="736" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="16" y="316" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="16" y="322" width="736" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="348.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="16" y="390" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<rect x="16" y="396" width="736" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="422.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter: checked with Dave, parts were extra</text>
+<rect x="0" y="564" width="768" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="564" x2="768" y2="564" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="580" width="364.0" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="182.5196" y="606.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Save</text>
+<rect x="388.0" y="580" width="364.0" height="44" rx="6" fill="#152133"/>
+<text x="544.65" y="606.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text>
+<rect x="16" y="508" width="736" height="44" rx="8" fill="#152133"/>
+<text x="30" y="535" font-size="13" font-weight="400" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Saved</text></g><rect x="0" y="0" width="768" height="640" fill="none" stroke="#d5d1ca" stroke-width="2.22"/></g>
+<text x="1161.6" y="128" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="1161.6" y="143" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">To review, number not filled in yet</text>
+<g transform="translate(1161.6,152.0) scale(0.6)"><g clip-path="url(#c3)"><rect x="0" y="0" width="375" height="640" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="16" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice from Dave</text>
+<rect x="16" y="84" width="343" height="56" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="26" y="94" width="36" height="36" rx="6" fill="#f2f0ec"/>
+<g transform="translate(35.0,103.0) scale(0.7500)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></g>
+<text x="72" y="110.0" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice.pdf</text>
+<text x="72" y="126.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">PDF · 182 KB</text>
+<text x="345" y="116.5" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Open</text>
+<text x="16" y="168" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="16" y="174" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="200.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave Kim</text>
+<text x="16" y="242" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<rect x="16" y="248" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="16" y="316" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="16" y="322" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="348.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="16" y="390" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<rect x="16" y="396" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="422.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter: checked with Dave, parts were extra</text>
+<rect x="0" y="564" width="375" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="564" x2="375" y2="564" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="580" width="167.5" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="84.2696" y="606.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Save</text>
+<rect x="191.5" y="580" width="167.5" height="44" rx="6" fill="#152133"/>
+<text x="249.9" y="606.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text>
+<rect x="16" y="508" width="343" height="44" rx="8" fill="#152133"/>
+<text x="30" y="535" font-size="13" font-weight="400" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Saved</text></g><rect x="0" y="0" width="375" height="640" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="584.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" font-weight="600" fill="#152133">B. Nothing saves until you tap Save</text>
+<text x="32" y="604.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#5b6576">Leaving with unsaved changes asks first; the bar says Unsaved changes.</text>
+<text x="32" y="628.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Laptop 1280</text>
+<text x="32" y="643.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">To review, number not filled in yet</text>
+<g transform="translate(32.0,652.0) scale(0.55)"><g clip-path="url(#c4)"><rect x="0" y="0" width="1280" height="520" rx="0" fill="#ffffff"/>
+<text x="32" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="32" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice from Dave</text>
+<rect x="32" y="90" width="560" height="330" rx="8" fill="#f2f0ec"/>
+<rect x="88.0" y="106" width="448.0" height="298" rx="0" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="104.0" y="124" width="156.79999999999998" height="10" rx="0" fill="#d5d1ca"/>
+<rect x="104.0" y="158" width="249.6" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="176" width="374.40000000000003" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="194" width="374.40000000000003" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="212" width="249.6" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="230" width="374.40000000000003" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="248" width="374.40000000000003" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="266" width="249.6" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="284" width="374.40000000000003" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="104.0" y="302" width="374.40000000000003" height="5" rx="0" fill="#e7e5e0"/>
+<rect x="385.6" y="370" width="134.4" height="10" rx="0" fill="#d5d1ca"/>
+<text x="44" y="412" font-size="11" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice-1043.pdf</text>
+<text x="624" y="102" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="624" y="108" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="128.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave Kim</text>
+<text x="624" y="164" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<rect x="624" y="170" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="624" y="226" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="624" y="232" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="252.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="624" y="288" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<rect x="624" y="294" width="624" height="32" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="634" y="314.5" font-size="13" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter: checked with Dave, parts were extra</text>
+<rect x="0" y="460" width="1280" height="60" rx="0" fill="#f8f7f3"/>
+<line x1="0" y1="460" x2="1280" y2="460" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="1173.3" y="474" width="74.7" height="32" rx="6" fill="#152133"/>
+<text x="1185.3" y="494.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text>
+<rect x="1110.3392" y="474" width="54.9608" height="32" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="1122.3392" y="494.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Save</text>
+<text x="1083.3" y="496" font-size="12" font-weight="400" fill="#a54e09" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Unsaved changes</text></g><rect x="0" y="0" width="1280" height="520" fill="none" stroke="#d5d1ca" stroke-width="1.82"/></g>
+<text x="776.0" y="628.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#424e61">Phone 375</text>
+<text x="776.0" y="643.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="11" fill="#5b6576">To review, number not filled in yet</text>
+<g transform="translate(776.0,652.0) scale(0.6)"><g clip-path="url(#c5)"><rect x="0" y="0" width="375" height="640" rx="0" fill="#ffffff"/>
+<text x="16" y="30" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoices / To review</text>
+<text x="16" y="62" font-size="22" font-weight="600" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice from Dave</text>
+<rect x="16" y="84" width="343" height="56" rx="8" fill="#ffffff" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="26" y="94" width="36" height="36" rx="6" fill="#f2f0ec"/>
+<g transform="translate(35.0,103.0) scale(0.7500)" fill="none" stroke="#424e61" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></g>
+<text x="72" y="110.0" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">invoice.pdf</text>
+<text x="72" y="126.0" font-size="12" font-weight="400" fill="#5b6576" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">PDF · 182 KB</text>
+<text x="345" y="116.5" font-size="13" font-weight="500" fill="#152133" text-anchor="end" font-family="Geist, -apple-system, system-ui, sans-serif">Open</text>
+<text x="16" y="168" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Contractor</text>
+<rect x="16" y="174" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="200.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Dave Kim</text>
+<text x="16" y="242" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Invoice #</text>
+<rect x="16" y="248" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="16" y="316" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Total</text>
+<rect x="16" y="322" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="348.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">$850.00</text>
+<text x="16" y="390" font-size="12" font-weight="500" fill="#424e61" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Internal note</text>
+<rect x="16" y="396" width="343" height="44" rx="6" fill="#ffffff" stroke="#84817a" stroke-width="1"/>
+<text x="26" y="422.5" font-size="14" font-weight="400" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Pieter: checked with Dave, parts were extra</text>
+<rect x="0" y="564" width="375" height="76" rx="0" fill="#ffffff"/>
+<line x1="0" y1="564" x2="375" y2="564" stroke="#e7e5e0" stroke-width="1"/>
+<rect x="16" y="580" width="167.5" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca" stroke-width="1"/>
+<text x="84.2696" y="606.5" font-size="13" font-weight="500" fill="#152133" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Save</text>
+<rect x="191.5" y="580" width="167.5" height="44" rx="6" fill="#152133"/>
+<text x="249.9" y="606.5" font-size="13" font-weight="500" fill="#ffffff" text-anchor="start" font-family="Geist, -apple-system, system-ui, sans-serif">Approve</text></g><rect x="0" y="0" width="375" height="640" fill="none" stroke="#d5d1ca" stroke-width="1.67"/></g>
+<text x="32" y="1084.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#152133">Notes</text>
+<circle cx="40" cy="1102.0" r="8" fill="#c8a765"/>
+<text x="40" y="1106.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">1</text>
+<text x="56" y="1106.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">Both: Approve stays grayed out until there's a contractor and a total, with no line under it.</text>
+<circle cx="40" cy="1122.0" r="8" fill="#c8a765"/>
+<text x="40" y="1126.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">2</text>
+<text x="56" y="1126.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">A keeps today's save-as-you-leave, so the Save button only adds the confirmation you asked for.</text>
+<circle cx="40" cy="1142.0" r="8" fill="#c8a765"/>
+<text x="40" y="1146.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="10" font-weight="600" fill="#152133" text-anchor="middle">3</text>
+<text x="56" y="1146.0" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="12" fill="#424e61">B is how most forms work, but a tab closed mid-edit loses the typing unless the leave warning catches it.</text>
+</svg>

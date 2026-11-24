@@ -31,21 +31,38 @@ const patchSchema = z
   .partial()
   .strict();
 
-/** A saved field: the one the person just left. `changed` names what the save changed, empty for a save of the same value. */
-export async function saveInvoiceFieldsAction(invoiceId: string, patch: z.input<typeof patchSchema>): Promise<ActionResult<{ changed: string[] }>> {
-  return withResult("saveInvoiceFields", async () => {
+const jobRef = z.union([z.object({ linkId: id }).strict(), z.object({ taskId: id }).strict()]);
+
+const saveSchema = z
+  .object({
+    patch: patchSchema,
+    link: z.array(id).max(50),
+    unlink: z.array(jobRef).max(50),
+  })
+  .strict();
+
+/**
+ * Save (drawing 17, option B): the page's draft in one go, the changed fields and the jobs to put on and take off,
+ * written together or not at all. `changed` names what the save changed, empty for a save of what's already there.
+ */
+export async function saveInvoiceAction(invoiceId: string, input: z.input<typeof saveSchema>): Promise<ActionResult<{ changed: string[] }>> {
+  return withResult("saveInvoice", async () => {
     const user = await requireUser();
-    const p = patchSchema.parse(patch);
-    const { total, invoiceDate, ...rest } = p;
+    const p = saveSchema.parse(input);
+    const { total, invoiceDate, ...rest } = p.patch;
     let totalCents: number | null | undefined;
     if (total !== undefined) {
       const read = readTotal(total);
       if (!read.ok) throw new FieldError({ total: read.message });
       totalCents = read.cents;
     }
-    return invoices.editInvoice(
+    return invoices.saveInvoice(
       id.parse(invoiceId),
-      { ...rest, ...(invoiceDate !== undefined ? { invoiceDate: invoiceDate as Ymd } : {}), ...(totalCents !== undefined ? { totalCents } : {}) },
+      {
+        patch: { ...rest, ...(invoiceDate !== undefined ? { invoiceDate: invoiceDate as Ymd } : {}), ...(totalCents !== undefined ? { totalCents } : {}) },
+        link: p.link,
+        unlink: p.unlink,
+      },
       invoices.staffActor(user),
     );
   });
@@ -106,23 +123,6 @@ export async function restoreInvoiceAction(invoiceId: string): Promise<ActionRes
   return withResult("restoreInvoice", async () => {
     const user = await requireUser();
     return invoices.restoreInvoice(id.parse(invoiceId), invoices.staffActor(user));
-  });
-}
-
-export async function linkJobAction(invoiceId: string, taskId: string): Promise<ActionResult> {
-  return withResult("linkInvoiceJob", async () => {
-    const user = await requireUser();
-    await invoices.linkJob(id.parse(invoiceId), id.parse(taskId), invoices.staffActor(user));
-  });
-}
-
-const jobRef = z.union([z.object({ linkId: id }).strict(), z.object({ taskId: id }).strict()]);
-
-/** Takes a job off, by its link (which still names a job that has since been deleted) or by the job itself. */
-export async function unlinkJobAction(invoiceId: string, ref: z.input<typeof jobRef>): Promise<ActionResult> {
-  return withResult("unlinkInvoiceJob", async () => {
-    const user = await requireUser();
-    await invoices.unlinkJob(id.parse(invoiceId), jobRef.parse(ref), invoices.staffActor(user));
   });
 }
 

@@ -110,7 +110,7 @@ export function FilePane({
                 <img src={fileUrl(selected.id, selected.hasThumb ? "thumb" : undefined)} alt={selected.filename} className="max-h-full max-w-full object-contain" />
               </button>
             ) : (
-              <iframe src={fileUrl(selected.id)} title={selected.filename} className="size-full bg-background" />
+              <iframe src={`${fileUrl(selected.id)}#view=FitH&navpanes=0`} title={selected.filename} className="size-full bg-background" />
             )}
           </div>
           {/* Touch, and below lg: a card per file. */}

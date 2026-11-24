@@ -30,6 +30,7 @@ import {
   markNotInvoice,
   markPaid,
   matchContractor,
+  saveInvoice,
   restoreInvoice,
   staffActor,
   systemActor,
@@ -430,6 +431,27 @@ test("jobs: any but a canceled one, once each, and a deleted job leaves its titl
     inv.events.filter((e) => e.kind === "EDITED").map((e) => (e.data as { added?: string; removed?: string }).added ?? `-${(e.data as { removed?: string }).removed}`),
     [`Replace gutter ${run}`, `-Replace gutter ${run}`, `-Fix leak ${run}`],
   );
+});
+
+test("Save writes fields and jobs together, or nothing when one part is refused", { skip }, async () => {
+  const open = await job("Fix leak");
+  const old = await job("Paint porch");
+  const canceled = await job("Replace gutter", "CANCELED");
+  const { id } = await createStaffInvoice(prisma, { taskIds: [old] }, connor, today);
+  const r = await saveInvoice(prisma, id, { patch: { contactId: zackId, totalCents: 85050 }, link: [open], unlink: [{ taskId: old }] }, connor);
+  assert.deepEqual(r, { changed: ["contractor", "total", "jobs"] });
+  let inv = await read(id);
+  assert.deepEqual(inv.tasks.map((t) => t.taskId), [open]);
+  assert.equal(inv.total?.toString(), "850.5");
+
+  assert.deepEqual(await refusal(saveInvoice(prisma, id, { patch: { note: "Never" }, link: [canceled], unlink: [{ taskId: open }] }, connor)), { taskId: JOB_CANCELED });
+  inv = await read(id);
+  assert.equal(inv.note, null);
+  assert.deepEqual(inv.tasks.map((t) => t.taskId), [open]);
+
+  assert.deepEqual(await saveInvoice(prisma, id, { patch: {}, link: [], unlink: [] }, connor), { changed: [] });
+  await approveInvoice(prisma, id, connor);
+  assert.deepEqual(await refusal(saveInvoice(prisma, id, { patch: { note: "Late" }, link: [], unlink: [] }, pieter)), { [STAGE_FIELD]: `${first(connor)} already approved this.` });
 });
 
 test("Send invoice: signed in, with live access to a job in review or done, and a file", { skip }, async () => {

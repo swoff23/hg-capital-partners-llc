@@ -420,7 +420,32 @@ export function invoicesItem(count: number, senders: number, contractors: readon
 }
 
 /**
- * The list in order: key dates and lease ends (late first, then soonest), draws that need us, invoices to review, new sign-ups,
+ * The To pay row: approved invoices waiting to be paid, opening that view, with what's owed (every To pay invoice has
+ * a total, since Approve needs one). Names the contractors oldest first, two then "and N more". Null with none.
+ */
+export function invoicesToPayItem(count: number, contractors: readonly string[], totalDollars: number): NeedsYouItem | null {
+  if (count <= 0) return null;
+  const names = contractors.slice(0, 2);
+  const more = Math.max(0, contractors.length - names.length);
+  const parts = [...names, ...(more > 0 ? [`${more} more`] : [])];
+  const detail = parts.length <= 1 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  return {
+    key: "invoices-pay",
+    kind: "invoice",
+    href: "/invoices?view=pay",
+    title: `${count.toLocaleString("en-US")} ${count === 1 ? "invoice" : "invoices"} to pay`,
+    state: "Pay",
+    detail,
+    amount: totalDollars,
+    pastDue: null,
+    dateLabel: null,
+    late: false,
+    date: null,
+  };
+}
+
+/**
+ * The list in order: key dates and lease ends (late first, then soonest), draws that need us, invoices to review, invoices to pay, new sign-ups,
  * Baselane links to send, the Missing info row, this year's CapEx, then QuickBooks.
  */
 export function needsYouList(parts: {
@@ -428,6 +453,7 @@ export function needsYouList(parts: {
   leaseEnds?: NeedsYouItem[];
   draws?: NeedsYouItem[];
   invoices?: NeedsYouItem | null;
+  invoicesToPay?: NeedsYouItem | null;
   signups?: NeedsYouItem[];
   baselane?: NeedsYouItem[];
   missing?: NeedsYouItem | null;
@@ -441,6 +467,7 @@ export function needsYouList(parts: {
     ...dated,
     ...(parts.draws ?? []),
     ...(parts.invoices ? [parts.invoices] : []),
+    ...(parts.invoicesToPay ? [parts.invoicesToPay] : []),
     ...(parts.signups ?? []),
     ...(parts.baselane ?? []),
     ...(parts.missing ? [parts.missing] : []),

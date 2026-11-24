@@ -69,8 +69,13 @@ export async function isPartnerForward(db: Db, fromLine: string | null | undefin
  * them, in id order so two writes queueing at once take their rows the same way round. The caller decides who is
  * skipped (a staff entry, a job reply, a partner's own forward). Returns how many rows it wrote to.
  */
-export async function queueInvoiceReview(tx: Db, invoiceId: string, now: Date = new Date()): Promise<number> {
-  const staff = await tx.user.findMany({ where: { passwordHash: { not: null } }, select: { id: true }, orderBy: { id: "asc" } });
+export async function queueInvoiceReview(tx: Db, invoiceId: string, now: Date = new Date(), exceptUserId?: string | null): Promise<number> {
+  // A partner's own entry tells only the other partners: the one who entered it already knows (picked Nov 24).
+  const staff = await tx.user.findMany({
+    where: { passwordHash: { not: null }, ...(exceptUserId ? { id: { not: exceptUserId } } : {}) },
+    select: { id: true },
+    orderBy: { id: "asc" },
+  });
   const item = JSON.stringify({ kind: INVOICE_REVIEW_KIND, actorLabel: "", summary: "", at: now.toISOString(), invoiceId });
   for (const s of staff) {
     await tx.$executeRaw`
