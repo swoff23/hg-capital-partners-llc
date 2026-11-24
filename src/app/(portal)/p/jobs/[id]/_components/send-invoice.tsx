@@ -44,7 +44,7 @@ type Props = {
   contactId: string;
   firstName: string;
   staffNames: string[];
-  /** HG's changes email this contractor, so the payoff promises one when it's paid. */
+  /** Their Job emails are on, so the payoff promises the Paid email (invoices/notify.ts sends it only then). */
   getsEmail: boolean;
   /** The building, for the payoff's photo and the upload's name. */
   property: Property;
@@ -341,7 +341,7 @@ function Sent({
       <div className="mt-3 w-full rounded-md border border-border px-3 text-left">
         <InvoiceLine invoice={{ ...invoice, jobs: [] }} today={today} showJob={false} />
       </div>
-      <p className="mt-3 max-w-xs text-pretty text-body text-fg-2">{payoffLine(to, getsEmail, "invoice")}</p>
+      <p className="mt-3 max-w-xs text-pretty text-body text-fg-2">{payoffLine(to, { getsEmail })}</p>
       <LinkButton
         href="/p"
         variant="primary"

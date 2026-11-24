@@ -25,6 +25,39 @@ test("a token, an OAuth code or a secret in a query value is redacted; other val
   assert.equal(scrubText("/tasks?status=open"), "/tasks?status=open");
 });
 
+test("the key in a partner's Claude connector address never leaves, wherever the address appears", () => {
+  const key = "Zq3vX0aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0uV1wX2y";
+  assert.equal(scrubText(`https://hgcapitalpartners.com/api/mcp/${key}`), "https://hgcapitalpartners.com/api/mcp/[key]");
+  assert.equal(scrubText(`POST /api/mcp/${key}`), "POST /api/mcp/[key]");
+  assert.equal(
+    scrubText(`https://hgcapitalpartners.com/.well-known/oauth-protected-resource/api/mcp/${key}`),
+    "https://hgcapitalpartners.com/.well-known/oauth-protected-resource/api/mcp/[key]",
+    "its discovery document ends the same way",
+  );
+  assert.equal(scrubText(`Failed for /api/mcp/${key}?x=1 and /api/mcp/${key}#top`), "Failed for /api/mcp/[key]?x=1 and /api/mcp/[key]#top");
+  assert.equal(scrubText("/api/mcp/mistyped-half-a-key"), "/api/mcp/[key]", "a mistyped key is still most of a key");
+  assert.equal(scrubText("GET /api/mcp/[key]"), "GET /api/mcp/[key]", "an already scrubbed path stays as it is");
+  assert.equal(scrubText("/api/mcp"), "/api/mcp", "the path without a key says where and holds nothing");
+});
+
+test("an OAuth resource value is that address, so it is redacted, plain or percent-encoded", () => {
+  const key = "Zq3vX0aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0uV1wX2y";
+  const address = `https://hgcapitalpartners.com/api/mcp/${key}`;
+  assert.equal(scrubText(`/api/oauth/authorize?response_type=code&resource=${encodeURIComponent(address)}&scope=drafts`), "/api/oauth/authorize?response_type=code&resource=[redacted]&scope=drafts");
+  assert.equal(scrubText(`/api/oauth/authorize?resource=${address}`), "/api/oauth/authorize?resource=[redacted]");
+  // The same address percent-encoded inside another one, as the login's ?next= or a log line can carry it.
+  const nested = scrubText(`/login?next=${encodeURIComponent(`/x?to=${address}`)}`);
+  assert.ok(!nested.includes(key), nested);
+  assert.match(nested, /%2Fapi%2Fmcp%2F%5Bkey%5D/);
+});
+
+test("Claude's own return address is not a key and stays readable", () => {
+  assert.equal(scrubText("https://claude.ai/api/mcp/auth_callback?code=AB12&state=xyz"), "https://claude.ai/api/mcp/auth_callback?code=[redacted]&state=[redacted]");
+  assert.equal(scrubText("https://claude.ai/api/mcp/auth_callback"), "https://claude.ai/api/mcp/auth_callback");
+  assert.equal(scrubText("redirect_uri=https%3A%2F%2Fclaude.ai%2Fapi%2Fmcp%2Fauth_callback&x=1"), "redirect_uri=https%3A%2F%2Fclaude.ai%2Fapi%2Fmcp%2Fauth_callback&x=1");
+  assert.equal(scrubText("/api/mcp/auth_callbackXYZ"), "/api/mcp/[key]", "only that exact word is kept");
+});
+
 test("extra fields pass only through the allowlist: IDs, counts and kinds", () => {
   assert.deepEqual(
     scrubExtra({

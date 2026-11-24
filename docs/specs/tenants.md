@@ -238,7 +238,7 @@ A new `TenantsSection` in `src/app/(app)/properties/[id]/`, right under `UnitsSe
 - **Any assignee** (T10). The task page's Tenants row and the Permission to enter switch show on every active task at an occupied unit, whoever it's assigned to. The job page's rules don't change: only the assigned contractor sees the tenants or the code, and only while the job is open.
 - **A switch, not a menu** (T12, T13). In Details, the Access row's chip and menu become a stock `Switch` labeled "Permission to enter", with nothing under it, between Tenant and Lockbox. At lg it's a rail row, the label on the left and the switch on the right, saving on toggle through `InlineSwitch` and `patchTask({ entryPermitted })`. Below lg it's a line under the chip row, as on New task. A vacant unit has no switch. Drawn in [tenants/04-permission-to-enter.svg](tenants/04-permission-to-enter.svg).
 - **The Lockbox row** stays as built ("2374 · Shown to Brandon", Nov 14) and keeps showing the code to staff. Its tag shows only while the contractor sees the code (call 8). The status lines are dropped.
-- **The job page** keeps the line under the code (call 9, as Connor kept it).
+- **The job page** keeps the line under the code (call 9, as Connor kept it). Since Nov 22 it is Getting in's entry line, "Let yourself in" over "The tenant said it's OK", above the code (docs/specs/contractor-scheduled-date.md section 12).
 
 The write, the ACCESS events (with the lines in call 10) and the `#access` anchor in job emails are otherwise unchanged. The five calls in T8 hold.
 
@@ -340,7 +340,7 @@ Section 14's step 3, with section 8's Nov 17 changes, is built. Connor said "bui
 - **One rule, two readers.** `src/lib/tasks/lockbox.ts` gains `tenantUnit` (whose home a job is in: its unit by label, or a property's one rentable unit) and `accessState` (occupied, permitted, and whether the lockbox shows). The portal reads through `access-code.ts` `readJobAccess`; staff read through a new `src/lib/tenants/living.ts` `readTaskHome`, which the auth guard keeps out of portal code. Both decide through `accessState`.
 - **The lockbox photo** (`/api/files/lockbox/<job>`) follows the code: a contractor gets it only while their job shows the code.
 - **Show access** in a job email shows when the job page would show the tenants or the lockbox, and opens at `#access`, which lands on Tenants, or on Lockbox with nobody living there. Emails already sent with `#lockbox` still land on Lockbox.
-- **Text to my crew** says "Lockbox, photos, updates" only when the contractor's job shows the code.
+- **Share with crew** (it was Text to my crew) says "Details, photos and updates" whatever the job shows; the link shows the lockbox only when the contractor's job does (changed Nov 22).
 - **The task page's Tenants row** links each name to the lease (T7) rather than adding an Open lease line in the rail; the chip's menu below lg ends in Open lease. It shows on any task whose home has a household on file, open or closed.
 - **The Lockbox row** still shows only with a contractor assigned, as built Nov 14. Staff see the code there whether or not the contractor does.
 - **The switch** writes through `patchTask({ entryPermitted })`, which compares with whether permission holds for the household there now. So after a new household moves in it reads off, and turning it on stamps the day again. A unit or property change clears it; the line names the change only when the permission still held.

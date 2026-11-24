@@ -66,7 +66,7 @@ export async function downloadAttachment(a: ReceivedAttachment): Promise<Buffer>
 }
 
 /** What a file is, and whether it may post: photos, videos and documents, within each kind's size cap. */
-export function sortFile(a: ReceivedAttachment): { kind: FileKind; type: string } | { tooBig: true } | null {
+export function sortFile(a: ReceivedAttachment): { kind: FileKind; type: string } | { tooBig: FileKind } | null {
   // The name's extension when the mail app sent a generic type (application/octet-stream, image/jpg), as uploads do.
   const type = uploadContentType(a.filename ?? "", a.content_type) ?? "";
   const kind = fileKindForType(type);
@@ -74,7 +74,7 @@ export function sortFile(a: ReceivedAttachment): { kind: FileKind; type: string 
   const rule = UPLOAD_RULES[kind];
   if (!rule.contentTypes.includes(type)) return null;
   if (a.content_disposition === "inline" && a.content_id && kind === "image" && a.size < SIGNATURE_IMAGE_MAX) return null;
-  if (a.size > rule.maxBytes) return { tooBig: true };
+  if (a.size > rule.maxBytes) return { tooBig: kind };
   return { kind, type };
 }
 

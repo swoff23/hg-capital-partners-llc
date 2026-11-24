@@ -11,6 +11,8 @@ import { activeTask } from "@/lib/task-scope";
 import { asEditorConflict } from "./conflicts";
 import * as core from "./core";
 import { contactsWhoSaw, deleteEmailNote, emailStatesIn } from "./delivery";
+import type { DraftContractor } from "./drafts";
+import { attachForm } from "./new-task-files";
 
 /**
  * Task domain for the app: every staff, system and public-form task write
@@ -21,8 +23,10 @@ import { contactsWhoSaw, deleteEmailNote, emailStatesIn } from "./delivery";
  * revalidates every page that shows the task once it commits.
  */
 
-export type { ChecklistSnapshot, Principal, NewTaskInput, TaskPatch, StatusOptions } from "./core";
-export { AssigneeChangedError, NotesChangedError, TaskChangedError, TaskRuleError, bucketFor } from "./core";
+export type { ChecklistSnapshot, DraftInput, Principal, NewTaskInput, SaveDraftsResult, TaskPatch, StatusOptions } from "./core";
+export { AssigneeChangedError, DraftRefusedError, NotesChangedError, TaskChangedError, TaskRuleError, bucketFor } from "./core";
+export type { DraftContractor } from "./drafts";
+export { MAX_WAITING_DRAFTS } from "./drafts";
 export { TEMPLATE_BUCKET };
 
 /** The signed-in staff user as the actor on a write. */
@@ -44,10 +48,180 @@ function revalidateTask(t: { id: string; propertyId?: string | null; dealId?: st
   if (t.dealId) revalidatePath(`/deals/${t.dealId}`);
 }
 
-export async function createTask(input: core.NewTaskInput, p: core.Principal): Promise<Task> {
-  const task = await prisma.$transaction((tx) => core.createTask(tx, input, p));
+/**
+ * `formId` is New task's form (docs/specs/new-task-checklist-photos.md): its files, held since they were picked,
+ * become the task's in the same transaction, and any still going join it as they land (new-task-files.ts attachForm).
+ */
+export async function createTask(input: core.NewTaskInput, p: core.Principal, opts: { formId?: string | null } = {}): Promise<Task> {
+  const task = await prisma.$transaction(async (tx) => {
+    const made = await core.createTask(tx, input, p);
+    if (opts.formId && p.kind === "staff") await attachForm(tx, opts.formId, p.userId, made.id);
+    return made;
+  });
   revalidateTask(task);
   return task;
+}
+
+/* ---------------- Drafts from Claude (docs/specs/tasks-from-claude.md, section 6) ----------------
+ *
+ * Each of these is core.ts's rule in one transaction, then a refresh of the
+ * pages that show what it changed. The rules, and their tests on Postgres,
+ * are core's (drafts.pg.test.ts): this file loads Next, which a test can't.
+ */
+
+/** A batch makes several round trips per draft; give Add all and a full save room (as bulk.ts). */
+const DRAFTS_TX = { timeout: 20_000, maxWait: 10_000 };
+
+/** The lists, Home's drafts row, and each of these tasks' own page and property page. */
+function revalidateTaskRows(rows: readonly { id: string; propertyId?: string | null; dealId?: string | null }[], propertyIds: readonly string[] = []): void {
+  revalidatePath("/tasks");
+  revalidatePath("/");
+  for (const r of rows) revalidatePath(`/tasks/${r.id}`);
+  for (const id of new Set([...rows.map((r) => r.propertyId), ...propertyIds])) if (id) revalidatePath(`/properties/${id}`);
+  for (const id of new Set(rows.map((r) => r.dealId))) if (id) revalidatePath(`/deals/${id}`);
+}
+
+/**
+ * One save from a partner's Claude: every draft, or none (core.saveDrafts).
+ * `saved` wrote them; `replay` is the same save sent again, answered with the
+ * tasks the first one made; `key-reused` is other drafts under a batchKey
+ * that was already used; `too-many` would put more than MAX_WAITING_DRAFTS in
+ * the partner's My drafts. Only `saved` writes anything. `check` runs inside
+ * the transaction, only for a save that is new and fits, and throws to refuse
+ * it.
+ */
+export async function saveDrafts(
+  batchKey: string,
+  drafts: readonly core.DraftInput[],
+  p: core.Principal,
+  check?: (tx: core.Tx) => Promise<void>,
+): Promise<core.SaveDraftsResult> {
+  const result = await prisma.$transaction((tx) => core.saveDrafts(tx, batchKey, drafts, p, check), DRAFTS_TX);
+  if (result.kind === "saved") revalidateTaskRows(result.tasks);
+  return result;
+}
+
+/** What Add did to one draft: the task's id, the line its Undo names, and who hears (drafts.ts draftsAddedNames). */
+export interface AddedDraft {
+  taskId: string;
+  addEventId: string;
+  contractor: DraftContractor | null;
+}
+
+const addedOf = (a: core.AddedDraft): AddedDraft => ({ taskId: a.task.id, addEventId: a.addEventId, contractor: a.contractor });
+
+/**
+ * Add on a draft's row or page: it becomes a To do task, its contractor can
+ * open the job and their email is queued, as New task does. A refused one
+ * (already added, discarded, its contractor archived, its unit gone) still
+ * refreshes the pages, so the screen that sent it shows where it is.
+ */
+export async function addDraft(taskId: string, p: core.Principal): Promise<AddedDraft> {
+  try {
+    const added = await prisma.$transaction((tx) => core.addDraft(tx, taskId, p));
+    revalidateTaskRows([added.task]);
+    return addedOf(added);
+  } catch (err) {
+    if (err instanceof core.TaskRuleError) revalidateTask({ id: taskId });
+    throw err;
+  }
+}
+
+/**
+ * Add all: every one of these drafts in one transaction, or none
+ * (core.DraftRefusedError says which one stopped it). `mine` keeps it to the
+ * partner's own drafts, whatever ids arrive, so My drafts' button never adds
+ * from the other partner's group.
+ */
+export async function addDrafts(taskIds: readonly string[], p: core.Principal, opts: { mine?: boolean } = {}): Promise<AddedDraft[]> {
+  try {
+    const added = await prisma.$transaction((tx) => core.addDrafts(tx, taskIds, p, new Date(), opts), DRAFTS_TX);
+    revalidateTaskRows(added.map((a) => a.task));
+    return added.map(addedOf);
+  } catch (err) {
+    if (err instanceof core.TaskRuleError) revalidateTaskRows(taskIds.map((id) => ({ id })));
+    throw err;
+  }
+}
+
+/**
+ * Add's Undo, for one task or for every task one Add all added, each on its
+ * own: `undone` are drafts again, with the access and the waiting emails
+ * their Add made taken back; `kept` stayed tasks, each with its title and the
+ * line why ("Zack already opened it."). Every page is refreshed either way.
+ */
+export async function undoAddDrafts(
+  adds: readonly { taskId: string; addEventId: string }[],
+  p: core.Principal,
+): Promise<{ undone: string[]; kept: { taskId: string; title: string; message: string }[] }> {
+  try {
+    const out = await prisma.$transaction((tx) => core.undoAddDrafts(tx, adds, p), DRAFTS_TX);
+    revalidateTaskRows([...out.undone, ...out.kept.map((k) => ({ id: k.taskId }))]);
+    return { undone: out.undone.map((t) => t.id), kept: out.kept };
+  } catch (err) {
+    if (err instanceof core.TaskRuleError) revalidateTaskRows(adds.map((a) => ({ id: a.taskId })));
+    throw err;
+  }
+}
+
+/**
+ * Discard on a draft's row or page: gone from every screen at once, and
+ * nothing deleted. Returns its id, which the Undo toast hands to
+ * `restoreDrafts`. Refused, with who added it, when it is a task by now.
+ */
+export async function discardDraft(taskId: string, p: core.Principal): Promise<{ ids: string[] }> {
+  try {
+    const gone = await prisma.$transaction((tx) => core.discardDraft(tx, taskId, p));
+    revalidateTaskRows([{ id: taskId }], gone.propertyIds);
+    return { ids: gone.ids };
+  } catch (err) {
+    if (err instanceof core.TaskRuleError) revalidateTask({ id: taskId });
+    throw err;
+  }
+}
+
+/**
+ * Discard all: each of these that is still a waiting draft, in one
+ * transaction. With `mine`, only the partner's own. Returns the ids
+ * discarded, for the one Undo.
+ */
+export async function discardDrafts(taskIds: readonly string[], p: core.Principal, opts: { mine?: boolean } = {}): Promise<{ ids: string[] }> {
+  const gone = await prisma.$transaction((tx) => core.discardDrafts(tx, taskIds, p, new Date(), opts), DRAFTS_TX);
+  revalidateTaskRows(
+    gone.ids.map((id) => ({ id })),
+    gone.propertyIds,
+  );
+  return { ids: gone.ids };
+}
+
+/**
+ * Discard's Undo, by id: `restored` wait in their draft groups again, whole
+ * (nothing was deleted); `gone` can't come back (the sweep deleted them, about
+ * ten minutes after the Discard). Nothing but ids comes from the browser.
+ */
+export async function restoreDrafts(taskIds: readonly string[], p: core.Principal): Promise<{ restored: string[]; gone: string[] }> {
+  const out = await prisma.$transaction((tx) => core.restoreDrafts(tx, taskIds, p), DRAFTS_TX);
+  revalidateTaskRows([...out.restored, ...out.gone.map((id) => ({ id }))]);
+  return { restored: out.restored.map((t) => t.id), gone: out.gone };
+}
+
+/** The blobs of files that went with deleted drafts, removed once the delete has committed (as deleteTask does). */
+async function removeDraftBlobs(blobs: readonly string[]): Promise<void> {
+  const token = getEnv().BLOB_READ_WRITE_TOKEN;
+  if (blobs.length === 0 || !token) return;
+  await del([...blobs], { token }).catch((err) => logError("tasks:discard:blobs", err, { count: blobs.length }, { level: "warning" }));
+}
+
+/**
+ * The every-minute run's sweep (/api/cron/notifications): drafts discarded
+ * more than ten minutes ago are deleted, then their files. Returns how many
+ * drafts went. No page is refreshed: they left every screen when they were
+ * discarded.
+ */
+export async function sweepDiscardedDrafts(now: Date = new Date()): Promise<number> {
+  const swept = await prisma.$transaction((tx) => core.sweepDiscardedDrafts(tx, now), DRAFTS_TX);
+  await removeDraftBlobs(swept.blobs);
+  return swept.ids.length;
 }
 
 /**
@@ -99,40 +273,27 @@ export function revalidateTasks(ids: readonly string[]): void {
  * Staff only: removes the task for good, with its timeline, checklist,
  * files, access rows and queued emails (all cascade), then its blobs once
  * the delete has committed. A task on a deal leaves a line on the deal's
- * timeline. No-op when the task doesn't exist.
+ * timeline. No-op when the task doesn't exist. A draft is refused
+ * (core.deleteTask): it goes by Discard.
  */
 export async function deleteTask(id: string, p: core.Principal): Promise<void> {
-  if (p.kind !== "staff") throw new core.TaskRuleError("Only staff can delete a task.");
-  const removed = await prisma.$transaction(async (tx) => {
-    const task = await tx.task.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        title: true,
-        propertyId: true,
-        dealId: true,
-        attachments: { select: { url: true, thumbPathname: true, posterPathname: true } },
-      },
-    });
-    if (!task) return null;
-    await tx.task.delete({ where: { id } });
-    if (task.dealId) {
-      await tx.dealNote.create({ data: { dealId: task.dealId, body: `Task deleted: ${task.title}  ·  ${p.label}`, noteDate: new Date(), source: "change" } });
-    }
-    return task;
-  });
+  const removed = await prisma.$transaction((tx) => core.deleteTask(tx, id, p));
   if (!removed) return;
-  // A LINK has no blob. Older rows may still point at a public blob; del() takes either URL.
-  const blobs = removed.attachments.flatMap((a) => [a.url, a.thumbPathname, a.posterPathname]).filter((x): x is string => !!x);
   const token = getEnv().BLOB_READ_WRITE_TOKEN;
-  if (blobs.length && token) {
-    await del(blobs, { token }).catch((err) => logError("tasks:delete:blobs", err, { taskId: id, count: blobs.length }, { level: "warning" }));
+  if (removed.blobs.length && token) {
+    await del(removed.blobs, { token }).catch((err) => logError("tasks:delete:blobs", err, { taskId: id, count: removed.blobs.length }, { level: "warning" }));
   }
   revalidateTask(removed);
 }
 
 export async function addTaskComment(taskId: string, input: core.CommentInput, p: core.Principal): Promise<void> {
-  await prisma.$transaction((tx) => core.addComment(tx, taskId, input, p));
+  try {
+    await prisma.$transaction((tx) => core.addComment(tx, taskId, input, p));
+  } catch (err) {
+    // A refusal means the page is out of date (a draft discarded from another tab): redraw it, as patchTask does.
+    if (err instanceof core.TaskRuleError) revalidatePath(`/tasks/${taskId}`);
+    throw err;
+  }
   revalidatePath(`/tasks/${taskId}`);
 }
 
@@ -191,8 +352,27 @@ export async function setChecklistItem(itemId: string, done: boolean, p: core.Pr
   revalidatePath(`/tasks/${item.taskId}`);
 }
 
+/** A pasted list on the task page's Add item: one item per line, in order, in one save. */
+export async function addChecklistItems(taskId: string, titles: readonly string[], p: core.Principal): Promise<void> {
+  try {
+    await prisma.$transaction(async (tx) => {
+      for (const title of titles) await core.addChecklistItem(tx, taskId, title, p);
+    });
+  } catch (err) {
+    if (err instanceof core.TaskRuleError) revalidatePath(`/tasks/${taskId}`);
+    throw err;
+  }
+  revalidatePath(`/tasks/${taskId}`);
+}
+
 export async function addChecklistItem(taskId: string, title: string, p: core.Principal): Promise<void> {
-  await prisma.$transaction((tx) => core.addChecklistItem(tx, taskId, title, p));
+  try {
+    await prisma.$transaction((tx) => core.addChecklistItem(tx, taskId, title, p));
+  } catch (err) {
+    // As addTaskComment: a refused write redraws the page it came from.
+    if (err instanceof core.TaskRuleError) revalidatePath(`/tasks/${taskId}`);
+    throw err;
+  }
   revalidatePath(`/tasks/${taskId}`);
 }
 

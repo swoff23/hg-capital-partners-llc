@@ -11,11 +11,12 @@ import type { Prisma } from "@prisma/client";
  * The contacts the assignee list draws on, archived ones included (assignee-options.ts splits those off): active
  * contacts with a trade or any job. The imported names are matched against them (mergeLegacyNames), so Archive's
  * open-job count (archive.ts contractorArchiveBlockers) reads the same people and counts what the Tasks filter
- * files under a contractor.
+ * files under a contractor. A draft Claude saved is nobody's job until a partner adds it
+ * (docs/specs/tasks-from-claude.md 6.2), so a draft alone never puts someone on the list.
  */
 export const listedContactsWhere = {
   active: true,
-  OR: [{ tradeLinks: { some: {} } }, { assignedTasks: { some: {} } }],
+  OR: [{ tradeLinks: { some: {} } }, { assignedTasks: { some: { NOT: { status: "DRAFT" } } } }],
 } satisfies Prisma.ContactWhereInput;
 
 /** The picker's key for a stored assignee: `{ userId }` is "u:…", `{ contactId }` is "c:…". */

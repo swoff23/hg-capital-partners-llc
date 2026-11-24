@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Camera, ImagePlus, Play } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 import { ActionBar, actionBarButton } from "@/components/action-bar";
-import { AudienceText, Composer, type ComposerMessage } from "@/components/composer";
+import { Composer, type ComposerMessage } from "@/components/composer";
 import { useLeaveGuard } from "@/components/leave-guard";
 import {
   MediaUploadTray,
@@ -18,10 +18,11 @@ import {
 import { PhotoThumb } from "@/components/photo-thumb";
 import { Sheet } from "@/components/sheet";
 import { SpotArt } from "@/components/spot-art";
+import { warmDatePanel } from "@/components/due-date-picker";
 import { useToast } from "@/components/toast";
 import { Button, LinkButton, Textarea } from "@/components/ui";
 import { useUploadScope, type UploadTarget } from "@/components/upload-queue";
-import { useCoarsePointer } from "@/components/use-coarse-pointer";
+import { pickContainer, useCoarsePointer } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { callAction, type ActionResult } from "@/lib/action-result";
 import { personalDraftKey } from "@/lib/composer-draft";
@@ -57,6 +58,8 @@ import { cn } from "@/lib/utils";
 import { markJobDoneAction, postJobUpdateAction, startJobAction } from "../actions";
 import { SendInvoice } from "./send-invoice";
 import { postJobBatchAction } from "../upload-actions";
+import { useScheduleOpen } from "./schedule-open";
+import { useSharedLink } from "../../../_components/shared-link";
 import { postKept, postOrKeepBatch, postRecordedBatch, recordJobFile } from "./record-and-post";
 
 /**
@@ -68,8 +71,8 @@ import { postKept, postOrKeepBatch, postRecordedBatch, recordJobFile } from "./r
  * The composer is the shared one (activity 2.7, 3.4 A), inline at the end of
  * Updates and never pinned, since the bar owns the bottom edge: it grows with
  * the text, keeps a draft per job in this browser (its own key, so a staff
- * draft never opens here), sends with the mod key and Enter, and says who
- * reads the update ("Connor and Pieter get this by email"). Each send carries
+ * draft never opens here) and sends with the mod key and Enter. No line on who
+ * reads it (Connor, Nov 21); the payoff after Mark done still names them. Each send carries
  * a `clientId`, so a Retry that did post never posts twice. The bar's photos
  * stay this page's (`held`): their tray and "2 uploads ready to send" draw
  * inside the box, and they go with the next Send.
@@ -146,13 +149,13 @@ export function JobActions({
   status,
   firstName,
   staffNames,
-  getsEmail,
   finishPhotosRequired,
   markedDoneAt,
   property,
   sentClientIds,
   openMarkDoneOnLoad = false,
-  sendInvoice,
+  scheduleFirst = false,
+  sendInvoice = null,
 }: {
   taskId: string;
   /** The signed-in contractor, whose draft the composer keeps. */
@@ -160,8 +163,6 @@ export function JobActions({
   status: TaskStatus;
   firstName: string;
   staffNames: string[];
-  /** HG's changes email this contractor, so the payoff promises one (docs/specs/contractor-email-switch.md). */
-  getsEmail: boolean;
   /** Photos Mark done asks for, from the job's playbook (TaskTemplate.finishPhotosRequired). Null or 0: optional, as every job starts. */
   finishPhotosRequired?: number | null;
   /** When this contractor marked the job done (ISO), while it's in Review: "Add photo/video" hides an hour later. Without it, it stays. */
@@ -176,16 +177,34 @@ export function JobActions({
    */
   openMarkDoneOnLoad?: boolean;
   /**
-   * What the Send invoice sheet needs, for a job in Review: Send invoice takes the place of the disabled "In review"
-   * button (docs/contractor-invoices-plan.md, 4.1; drawing 09, B1).
+   * They may set a day and none is set: the bar asks for one, Schedule as its main button with Start job light
+   * beside it, and opens the job card's picker (Connor, Nov 22). Start job is the main button again once the day lands.
    */
-  sendInvoice: { signedIn: boolean; openOnLoad: boolean; today: Ymd };
+  scheduleFirst?: boolean;
+  /**
+   * What the Send invoice sheet needs, for a job in Review that its contractor may invoice: Send invoice takes the
+   * place of the disabled "Waiting for review" button (docs/contractor-invoices-plan.md, 4.1; drawing 09, B1). Null
+   * for someone the job was shared with, who keeps the waiting button.
+   */
+  sendInvoice?: { signedIn: boolean; openOnLoad: boolean; today: Ymd; getsEmail: boolean } | null;
 }) {
   const { toast } = useToast();
   const owner = useUploadScope();
   // What this tab recorded and kept, for this queue's owner only.
   const tab = recordedUploadsOf(owner);
   const step = nextStep(status);
+  const [, setScheduleOpen] = useScheduleOpen();
+  // On a phone the picker is a sheet from the bottom, so it just opens where they are (Connor, Nov 22). A popover (a
+  // mouse, a tablet) anchors to the card's Schedule link, so that comes into view first.
+  function openSchedule() {
+    if (pickContainer() === "sheet") {
+      setScheduleOpen(true);
+      return;
+    }
+    // An instant jump, so the popover measures the link where it lands (and no motion to cut for reduced motion).
+    document.getElementById("schedule")?.scrollIntoView({ block: "center" });
+    requestAnimationFrame(() => setScheduleOpen(true));
+  }
   const coarse = useCoarsePointer();
   const required = finishPhotosNeeded(finishPhotosRequired);
 
@@ -577,7 +596,7 @@ export function JobActions({
   return (
     <>
       {/* Composer: scroll-mb keeps the tiles clear of the sticky bar when they're scrolled into view. */}
-      <div ref={trayRef} className="mt-4 scroll-mb-28">
+      <div ref={trayRef} className="mt-4 scroll-mb-28 first:mt-0">
         <Composer
           // The portal's own key, per job and per contractor: a staff draft on the same origin never opens here, and
           // neither does another contractor's who signed in on this phone before.
@@ -587,7 +606,6 @@ export function JobActions({
           // The fixed bar covers the foot of the page: focus and a send bring the box clear above it.
           clearance="7rem"
           sentClientIds={sentClientIds}
-          audience={{ shared: <AudienceText words={audienceWords(staffNames)} /> }}
           placeholders={{ shared: "Write an update…" }}
           onSend={sendUpdate}
           onTextChange={setBody}
@@ -626,27 +644,50 @@ export function JobActions({
       {showBar && (
         <ActionBar
           secondary={
-            // Photos can still go up while HG reviews, for the hour after Mark done; only the next step waits.
-            canAddMore ? (
-              <Button variant="secondary" className={cn(barButton, "max-[360px]:px-2")} onClick={uploader.chooseFiles}>
-                <Camera className="h-4 w-4 shrink-0 max-[360px]:hidden" aria-hidden="true" />
-                Add photo/video
-              </Button>
-            ) : undefined
+            <>
+              {/* Photos can still go up while HG reviews, for the hour after Mark done; only the next step waits. On a
+                  phone it's a square camera, so the bar has room for the steps (Connor, Nov 22); the name stays for
+                  screen readers, and from sm it's the labeled button. */}
+              {canAddMore && (
+                <Button variant="secondary" className={cn(barButton, "max-sm:w-12 max-sm:flex-none max-sm:px-0 max-sm:pointer-fine:w-9")} onClick={uploader.chooseFiles}>
+                  <Camera className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" aria-hidden="true" />
+                  <span className="max-sm:sr-only">Add photo/video</span>
+                </Button>
+              )}
+              {/* No day yet: Start job stays, light, beside the bar's ask for a day. */}
+              {step === "start" && scheduleFirst && (
+                <Button variant="secondary" className={barButton} disabled={starting} onClick={start}>
+                  {starting ? "Starting…" : "Start job"}
+                </Button>
+              )}
+            </>
           }
           primary={
             step === "review" ? (
-              <SendInvoice
-                taskId={taskId}
-                contactId={contactId}
-                firstName={firstName}
-                staffNames={staffNames}
-                getsEmail={getsEmail}
-                property={property ?? null}
-                signedIn={sendInvoice.signedIn}
-                openOnLoad={sendInvoice.openOnLoad}
-                today={sendInvoice.today}
-              />
+              sendInvoice ? (
+                <SendInvoice
+                  taskId={taskId}
+                  contactId={contactId}
+                  firstName={firstName}
+                  staffNames={staffNames}
+                  getsEmail={sendInvoice.getsEmail}
+                  property={property ?? null}
+                  signedIn={sendInvoice.signedIn}
+                  openOnLoad={sendInvoice.openOnLoad}
+                  today={sendInvoice.today}
+                />
+              ) : (
+                <Button variant="secondary" disabled className={cn(barButton, "text-muted-foreground disabled:opacity-100 max-[360px]:px-2")}>
+                  {/* Beside the square camera on a phone, so "Waiting for review" (166px) fits from 320 (240px left);
+                      the longer words from sm. */}
+                  <span className="truncate sm:hidden">Waiting for review</span>
+                  <span className="truncate max-sm:hidden">Waiting for HG Capital to review</span>
+                </Button>
+              )
+            ) : step === "start" && scheduleFirst ? (
+              <Button className={barButton} onPointerDown={warmDatePanel} onFocus={warmDatePanel} onClick={openSchedule}>
+                Schedule
+              </Button>
             ) : step === "start" ? (
               <Button className={barButton} disabled={starting} onClick={start}>
                 {starting ? "Starting…" : "Start job"}
@@ -744,21 +785,17 @@ export function JobActions({
             </div>
           </div>
         ) : (
-          <Payoff firstName={firstName} staffNames={staffNames} getsEmail={getsEmail} received={received} property={property ?? null} />
+          <Payoff
+            firstName={firstName}
+            staffNames={staffNames}
+            received={received}
+            property={property ?? null}
+            onClose={() => setSheetOpen(false)}
+          />
         )}
       </Sheet>
     </>
   );
-}
-
-/**
- * Who reads an update (activity 2.7): the partners its email goes to,
- * "Connor and Pieter get this by email", or "The HG Capital team" from three on.
- */
-function audienceWords(staff: readonly string[]): string {
-  if (staff.length === 1) return `${staff[0]} gets this by email`;
-  if (staff.length === 2) return `${joinNames([...staff])} get this by email`;
-  return "The HG Capital team gets this by email";
 }
 
 /** Where a recorded photo or video's picture is: its thumbnail, or the poster of a video, from the task file route. */
@@ -777,22 +814,28 @@ function readyUpload(item: Recorded): MediaUpload {
  * states): the building's photo (the job-done line art until it has one), a
  * warm heading, the strip of what HG received, who it went to and what
  * happens next, then the way back to the next job. The strip opens nothing,
- * so the payoff stays one layer and one Esc closes it.
+ * so the payoff stays one layer and one Esc closes it. Someone the job was
+ * shared with has no My jobs to go to, so their button closes the sheet and
+ * leaves them on the job (Connor, Nov 22); they may not be the contractor,
+ * so the heading names no one. The line is one sentence: who it went to,
+ * for review (Connor, Nov 22).
  */
 function Payoff({
   firstName,
   staffNames,
-  getsEmail,
   received,
   property,
+  onClose,
 }: {
   firstName: string;
   staffNames: string[];
-  getsEmail: boolean;
   received: Recorded[];
   property: { label: string; photoUrl: string | null } | null;
+  onClose: () => void;
 }) {
-  const to = joinNames(staffNames) || "HG Capital";
+  const shared = useSharedLink();
+  // Two names at most ("Connor and Pieter"); more, or none, is HG Capital (as the old audience line, activity 2.7).
+  const to = staffNames.length > 0 && staffNames.length <= 2 ? joinNames(staffNames) : "HG Capital";
   // The button that opened this view is gone: move focus here, so it's read
   // out and Esc still closes the sheet.
   const heading = useRef<HTMLHeadingElement>(null);
@@ -809,7 +852,7 @@ function Payoff({
         <SpotArt name="job-done" className="motion-safe:animate-pop-in" />
       )}
       <h2 ref={heading} tabIndex={-1} className="mt-4 text-title text-balance text-foreground outline-none">
-        Thanks, {firstName}!
+        {shared ? "Thanks!" : `Thanks, ${firstName}!`}
       </h2>
       {received.length > 0 && (
         <ul aria-label={`${received.length} ${received.length === 1 ? "photo" : "photos"} sent`} className="mt-3 flex items-center justify-center gap-2">
@@ -821,20 +864,26 @@ function Payoff({
           {more > 0 && <li className="text-meta tabular-nums text-muted-foreground">+{more}</li>}
         </ul>
       )}
-      <p className="mt-2 max-w-xs text-pretty text-body text-fg-2">{payoffLine(to, getsEmail)}</p>
-      <LinkButton
-        href="/p"
-        variant="primary"
-        className="mt-6 h-12 w-full"
-        onClick={(e) => {
-          // A new tab or window leaves nothing behind.
-          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-          e.preventDefault();
-          guard(() => router.push("/p"));
-        }}
-      >
-        Back to my jobs
-      </LinkButton>
+      <p className="mt-2 max-w-xs text-pretty text-body text-fg-2">{payoffLine(to)}</p>
+      {shared ? (
+        <Button className="mt-6 h-12 w-full" onClick={onClose}>
+          Back to the job
+        </Button>
+      ) : (
+        <LinkButton
+          href="/p"
+          variant="primary"
+          className="mt-6 h-12 w-full"
+          onClick={(e) => {
+            // A new tab or window leaves nothing behind.
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            guard(() => router.push("/p"));
+          }}
+        >
+          Back to my jobs
+        </LinkButton>
+      )}
     </div>
   );
 }

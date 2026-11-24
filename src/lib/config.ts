@@ -109,7 +109,7 @@ export const TASK_BUCKETS = ["Property", "General", "Template", "Unfiled"] as co
 /**
  * Imported Asana playbooks ("NEW TENANT [address]" etc.) live as Task rows in
  * this bucket with no property. They are templates, not work: every task list
- * and count must exclude them (see excludeTemplateTasks in @/lib/task-scope).
+ * and count must exclude them (see listedTask in @/lib/task-scope).
  */
 export const TEMPLATE_BUCKET = "Template";
 

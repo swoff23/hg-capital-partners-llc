@@ -22,7 +22,10 @@ test("the portal layout answers off and signed out before anything streams", () 
   const start = session.indexOf("export async function requirePortalSession");
   const gate = session.slice(start, session.indexOf("\n}\n", start));
   assert.match(gate, /if \(!\(await portalOnForRequest\(\)\)\) notFound\(\);/, "a real 404 while PORTAL_ENABLED is off");
-  assert.match(gate, /if \(!state\) redirect\(withNext\("\/login", await requestedPortalPath\(\)\)\);/, "a real redirect when signed out, keeping the page asked for");
+  assert.match(gate, /if \(!state\) return signedOut\(\);/, "a real redirect when signed out");
+  // Signed out goes to sign in, keeping the page asked for; only a crew session whose job is gone goes to /j/gone.
+  const out = session.slice(session.indexOf("async function signedOut"), session.indexOf("\n}\n", session.indexOf("async function signedOut")));
+  assert.match(out, /^async function signedOut\(\): Promise<never> \{\n\s*if \(await goneJobForCrewSession\(\)\) redirect\(GONE_SESSION_PATH\);\n\s*redirect\(withNext\("\/login", await requestedPortalPath\(\)\)\);$/);
 });
 
 test("every portal page still checks the session itself; the layout isn't the security boundary", () => {
@@ -33,4 +36,14 @@ test("every portal page still checks the session itself; the layout isn't the se
   ]) {
     assert.match(read(...page), /requirePortalPrincipal\(/, page.join("/"));
   }
+});
+
+test("a crew session ends once its contractor is off the job; the contractor's own email-link session doesn't", () => {
+  // docs/specs/emails-redesign.md, Q7: so the crew's reload, tap or /p goes to /j/gone (signedOut), not to a refusal toast.
+  const session = read("lib", "portal", "session.ts");
+  const start = session.indexOf("function linkSessionStillOpens");
+  const fn = session.slice(start, session.indexOf("\n}\n", start));
+  assert.match(fn, /\n\s*if \(linkKind === "CREW" && !contractorOnJob\) return false;\n/, "only a CREW session needs the contractor still on the job");
+  assert.match(session, /const contractorOnJob = !!row\.onlyTask\?\.access\.some\(\(a\) => a\.contactId === row\.account\.contact\.id\);/, "on the job: an unrevoked access row of the session's own contact");
+  assert.match(session, /access: \{ where: \{ revokedAt: null \}, select: \{ contactId: true \} \}/, "revoked rows don't count");
 });

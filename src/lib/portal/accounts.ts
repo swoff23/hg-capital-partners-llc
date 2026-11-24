@@ -13,6 +13,7 @@ import {
   createPortalAccountIn,
   enablePortalAccountIn,
   expireResetTokens,
+  expireSignInLinks,
   logSecurityEvent,
   revokePortalSessions,
   setJobEmailsIn,
@@ -187,8 +188,10 @@ export async function signOutEverywhere(accountId: string, byUser?: Staff): Prom
   return prisma.$transaction(async (tx) => {
     const account = await accountOrThrow(tx, accountId);
     const revoked = await revokePortalSessions(tx, accountId);
-    // Every device includes the links in their job emails, which would otherwise sign a device in again.
+    // Every device includes the links in their job emails, which would otherwise sign a device in again, and any
+    // sign-in link not yet used, which would start a full session.
     const links = await revokeJobLinksFor(tx, account.contactId);
+    await expireSignInLinks(tx, accountId);
     await logSecurityEvent(tx, {
       kind: "SESSIONS_REVOKED",
       userId: byUser?.id ?? null,

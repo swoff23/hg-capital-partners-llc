@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="646" viewBox="0 0 900 646" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Question 2: how residents get to the form. A, their own link (recommended), opens a home with their unit's requests. B, one public form, asks for address, unit, name and phone each time. C, a sign-in with an emailed code.</title>
+<rect width="900" height="646" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Question 2: how do residents get to the form?</text>
+<text x="32" y="56" font-size="11" fill="#424e61">The first screen each one opens on, on a phone.</text>
+
+<!-- A -->
+<g transform="translate(32 76)">
+<rect x="0" y="0" width="260" height="496" rx="10" fill="none" stroke="#c9a96a" stroke-width="1.5"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">A. Their own link</text>
+<rect x="134" y="16" width="92" height="20" rx="10" fill="#f6efe1"/>
+<text x="180" y="30" font-size="10" font-weight="500" fill="#8a6d2f" text-anchor="middle">Recommended</text>
+
+<rect x="20" y="48" width="220" height="282" rx="18" fill="#ffffff" stroke="#152133"/>
+<text x="36" y="78" font-size="14" font-weight="600" fill="#152133">Hi Dana</text>
+<text x="36" y="94" font-size="10" fill="#424e61">56 Tamarack St, Upper</text>
+<rect x="36" y="106" width="188" height="34" rx="8" fill="#152133"/>
+<text x="130" y="127" font-size="12" font-weight="500" fill="#ffffff" text-anchor="middle">Report a problem</text>
+<text x="36" y="164" font-size="10" font-weight="500" fill="#424e61">Open</text>
+<rect x="36" y="172" width="188" height="42" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<text x="48" y="190" font-size="11" font-weight="500" fill="#152133">Kitchen sink leaks</text>
+<text x="48" y="205" font-size="10" fill="#424e61">Scheduled · Tue, Nov 25</text>
+<text x="36" y="236" font-size="10" font-weight="500" fill="#424e61">Done</text>
+<rect x="36" y="244" width="188" height="42" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<text x="48" y="262" font-size="11" font-weight="500" fill="#152133">Smoke alarm chirping</text>
+<text x="48" y="277" font-size="10" fill="#424e61">Done · Oct 30</text>
+<text x="130" y="314" font-size="9" fill="#8f99a8" text-anchor="middle">They can save it to their home screen</text>
+
+<text x="20" y="360" font-size="10.5" fill="#152133">• You send each person their link once, by</text>
+<text x="28" y="374" font-size="10.5" fill="#152133">text or email, from the lease page.</text>
+<text x="20" y="394" font-size="10.5" fill="#152133">• It knows who they are and the unit. No</text>
+<text x="28" y="408" font-size="10.5" fill="#152133">address to type, no password.</text>
+<text x="20" y="428" font-size="10.5" fill="#152133">• Lost it? The Residents page emails it to</text>
+<text x="28" y="442" font-size="10.5" fill="#152133">the address we have on file.</text>
+<text x="20" y="462" font-size="10.5" fill="#152133">• Forwarded, it opens that unit's requests.</text>
+<text x="28" y="476" font-size="10.5" fill="#152133">It stops working after move-out.</text>
+</g>
+
+<!-- B -->
+<g transform="translate(320 76)">
+<rect x="0" y="0" width="260" height="496" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">B. One public form</text>
+
+<rect x="20" y="48" width="220" height="282" rx="18" fill="#ffffff" stroke="#152133"/>
+<text x="36" y="78" font-size="13" font-weight="600" fill="#152133">Request maintenance</text>
+<text x="36" y="102" font-size="10" fill="#424e61">Your home</text>
+<rect x="36" y="108" width="188" height="28" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="46" y="126" font-size="10" fill="#8f99a8">Choose your address</text>
+<text x="214" y="126" font-size="10" fill="#8f99a8" text-anchor="end">▾</text>
+<text x="36" y="152" font-size="10" fill="#424e61">Unit</text>
+<rect x="36" y="158" width="188" height="28" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="46" y="176" font-size="10" fill="#8f99a8">Upper</text>
+<text x="214" y="176" font-size="10" fill="#8f99a8" text-anchor="end">▾</text>
+<text x="36" y="202" font-size="10" fill="#424e61">Your name</text>
+<rect x="36" y="208" width="188" height="28" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="36" y="252" font-size="10" fill="#424e61">Phone</text>
+<rect x="36" y="258" width="188" height="28" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="130" y="314" font-size="9" fill="#8f99a8" text-anchor="middle">then what's wrong, below</text>
+
+<text x="20" y="360" font-size="10.5" fill="#152133">• One link for everyone: the Residents</text>
+<text x="28" y="374" font-size="10.5" fill="#152133">page, a QR code on the fridge.</text>
+<text x="20" y="394" font-size="10.5" fill="#152133">• Address and name typed every time.</text>
+<text x="28" y="408" font-size="10.5" fill="#152133">Anyone can send one.</text>
+<text x="20" y="428" font-size="10.5" fill="#152133">• Each request gets its own tracking link.</text>
+<text x="28" y="442" font-size="10.5" fill="#152133">Past ones aren't in one place.</text>
+<text x="20" y="462" font-size="10.5" fill="#152133">• You match it to the tenant by hand when</text>
+<text x="28" y="476" font-size="10.5" fill="#152133">the name or phone doesn't match.</text>
+</g>
+
+<!-- C -->
+<g transform="translate(608 76)">
+<rect x="0" y="0" width="260" height="496" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">C. A sign-in</text>
+
+<rect x="20" y="48" width="220" height="282" rx="18" fill="#ffffff" stroke="#152133"/>
+<text x="36" y="92" font-size="14" font-weight="600" fill="#152133">Sign in</text>
+<text x="36" y="122" font-size="10" fill="#424e61">Email</text>
+<rect x="36" y="128" width="188" height="30" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<rect x="36" y="172" width="188" height="34" rx="8" fill="#152133"/>
+<text x="130" y="193" font-size="12" font-weight="500" fill="#ffffff" text-anchor="middle">Email me a code</text>
+<text x="130" y="246" font-size="10" fill="#424e61" text-anchor="middle">then a 6-digit code,</text>
+<text x="130" y="260" font-size="10" fill="#424e61" text-anchor="middle">then the same home as A</text>
+
+<text x="20" y="360" font-size="10.5" fill="#152133">• Same home as A once they're in.</text>
+<text x="20" y="380" font-size="10.5" fill="#152133">• A code to fetch from email each time</text>
+<text x="28" y="394" font-size="10.5" fill="#152133">the sign-in runs out.</text>
+<text x="20" y="414" font-size="10.5" fill="#152133">• The most steps, and the most likely to</text>
+<text x="28" y="428" font-size="10.5" fill="#152133">send them back to the group chat.</text>
+</g>
+
+<text x="32" y="604" font-size="11" fill="#424e61">Sizes: resident pages are built for a 375 phone. Tablet and laptop show the same single column, centered, about 480 wide. Nothing drops.</text>
+<text x="32" y="622" font-size="11" fill="#424e61">On file today (local copy of the import): an email for 51 of 60 tenants, a phone for 52.</text>
+</svg>

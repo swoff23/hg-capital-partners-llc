@@ -2,7 +2,8 @@ import crypto from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { todayYmdEastern, ymdToDate } from "../../src/lib/dates";
 import { hashPassword } from "../../src/lib/password";
-import { generateStartingPassword, hashToken, newToken, signupLinkToken } from "../../src/lib/portal/tokens";
+import { goneJobStreet } from "../../src/lib/portal/gone-job-text";
+import { generateStartingPassword, hashToken, newToken, residentLinkToken, signupLinkToken } from "../../src/lib/portal/tokens";
 import { addDaysYmd } from "../../src/lib/quick-dates";
 import { signSessionToken } from "../../src/lib/session-token";
 import * as core from "../../src/lib/tasks/core";
@@ -13,7 +14,7 @@ import { forgetInvoiceEmails } from "../../src/lib/invoices/notify";
 import { rentableUnitLabels } from "../../src/lib/property-types";
 import * as waitlist from "../../src/lib/waitlist/core";
 import { readSignUp } from "../../src/lib/waitlist/fields";
-import { PORTAL_FIXTURE_EMAIL, ROUTE_SESSION_OVERRIDE, SAMPLE_PARAMS, listRoutes } from "./routes";
+import { PORTAL_FIXTURE_EMAIL, ROUTE_SESSION_OVERRIDE, SAMPLE_PARAMS, TODO_FIXTURE_MARK, listRoutes } from "./routes";
 
 /**
  * Runs once before any test: looks up a real row for every dynamic route,
@@ -131,6 +132,42 @@ async function seedSignupLink(db: PrismaClient): Promise<void> {
   await db.portalInvite.create({ data: { id, shared: true, tokenHash: hashToken(token) } });
 }
 
+/** The resident link the device check opens (docs/specs/maintenance-requests.md): a fixed row, its token rebuilt under the check's own secret. */
+export const DEVICE_RESIDENT_LINK_ID = "devicecheckresidentlink";
+
+/**
+ * A live request link and one open request on it, so /r/[token], its form and
+ * /r/[token]/[requestId] render with real parts: the first lease that isn't
+ * past, its first tenant, and a request with a note and the let-us-in and pets
+ * answers. The link's hash is set again every run, since each run has its own
+ * SESSION_SECRET. Rows only, through core.createTask, so nothing is emailed.
+ */
+async function seedResidentFixture(db: PrismaClient): Promise<void> {
+  assertLocalDb();
+  const today = new Date();
+  const lease = await db.lease.findFirst({
+    where: { OR: [{ movesOut: null }, { movesOut: { gt: today } }], tenants: { some: {} } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, propertyId: true, unitLabel: true, tenants: { select: { tenant: { select: { id: true, fullName: true } } }, orderBy: { position: "asc" }, take: 1 } },
+  });
+  const tenant = lease?.tenants[0]?.tenant;
+  if (!lease || !tenant) return;
+  const tokenHash = hashToken(residentLinkToken(DEVICE_RESIDENT_LINK_ID, process.env.DEVICE_SESSION_SECRET!));
+  await db.residentLink.upsert({
+    where: { id: DEVICE_RESIDENT_LINK_ID },
+    create: { id: DEVICE_RESIDENT_LINK_ID, tenantId: tenant.id, leaseId: lease.id, tokenHash },
+    update: { tenantId: tenant.id, leaseId: lease.id, tokenHash, revokedAt: null },
+  });
+  if (await db.residentRequest.findFirst({ where: { leaseId: lease.id, task: { status: "OPEN" } }, select: { id: true } })) return;
+  await db.$transaction(async (tx) => {
+    const p: core.Principal = { kind: "system", label: `${tenant.fullName} (resident)` };
+    const task = await core.createTask(tx, { title: "Kitchen sink leaks", description: "Water under the sink when the dishwasher runs.", propertyId: lease.propertyId, unitLabel: lease.unitLabel }, p);
+    await tx.residentRequest.create({
+      data: { taskId: task.id, leaseId: lease.id, tenantId: tenant.id, tenantName: tenant.fullName, whatsWrong: task.title, details: task.description, letUsIn: true, pets: true, petsNote: "A cat" },
+    });
+  });
+}
+
 /** The fixture job's actor: a system writer, so seeding it never queues an email. */
 const FIXTURE_WRITER: core.Principal = { kind: "system", label: "Device check" };
 
@@ -145,7 +182,8 @@ const FIXTURE_WRITER: core.Principal = { kind: "system", label: "Device check" }
 async function seedPortalJob(db: PrismaClient, contactId: string): Promise<void> {
   assertLocalDb();
   const existing = await db.task.findFirst({
-    where: { assigneeContactId: contactId },
+    // Never the To do fixture (seedPortalTodoJob), whichever was made first.
+    where: { assigneeContactId: contactId, OR: [{ description: null }, { description: { not: { endsWith: TODO_FIXTURE_MARK } } }] },
     select: { id: true, status: true },
     orderBy: { createdAt: "asc" },
   });
@@ -188,6 +226,109 @@ async function seedPortalJob(db: PrismaClient, contactId: string): Promise<void>
     await core.addComment(tx, task.id, { body: "Doors arrive Thursday.", visibility: "SHARED" }, FIXTURE_WRITER);
     await core.setStatus(tx, task.id, "IN_PROGRESS", FIXTURE_WRITER);
   });
+}
+
+/**
+ * A second job for the "portal" fixture contractor, kept at To do with no scheduled day on every run, so the job
+ * page's first state is swept too (docs/specs/contractor-scheduled-date.md sections 10 to 12): the Schedule step as
+ * the current one, the card's "Not set" with its Schedule link, and the bar of camera, Start job and Schedule; and
+ * My jobs shows a "Not scheduled" row. Found by the marker at the end of its notes, on the In progress job's
+ * property and unit so Getting in has the same parts. Written through src/lib/tasks/core.ts by the fixture writer,
+ * so nothing is emailed.
+ */
+async function seedPortalTodoJob(db: PrismaClient, contactId: string): Promise<void> {
+  assertLocalDb();
+  const existing = await db.task.findFirst({
+    where: { description: { endsWith: TODO_FIXTURE_MARK } },
+    select: { id: true, status: true, scheduledFor: true, assigneeContactId: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (existing) {
+    await db.$transaction(async (tx) => {
+      if (existing.status !== "OPEN") await core.setStatus(tx, existing.id, "OPEN", FIXTURE_WRITER, { scheduledFor: null });
+      // A day left on a To do row (a reopen keeps it) is cleared here, local only, since no status move clears it.
+      await tx.task.update({ where: { id: existing.id }, data: { scheduledFor: null } });
+      // A reopen from Done or Canceled starts a job unassigned: give it back.
+      const now = await tx.task.findUniqueOrThrow({ where: { id: existing.id }, select: { assigneeContactId: true } });
+      if (now.assigneeContactId !== contactId) await core.patchTask(tx, existing.id, { assignee: { contactId } }, FIXTURE_WRITER);
+      await core.grantAssigneeAccess(tx, existing.id, contactId, FIXTURE_WRITER, new Date());
+    });
+    return;
+  }
+  const first = await db.task.findFirst({
+    where: { assigneeContactId: contactId, description: { not: { endsWith: TODO_FIXTURE_MARK } } },
+    select: { propertyId: true, unitLabel: true },
+    orderBy: { createdAt: "asc" },
+  });
+  await db.$transaction(async (tx) => {
+    const task = await core.createTask(
+      tx,
+      {
+        title: "Paint the porch rail",
+        description: `Scrape, prime and two coats on the front rail. ${TODO_FIXTURE_MARK}`,
+        propertyId: first?.propertyId ?? null,
+        unitLabel: first?.unitLabel ?? null,
+        dueDate: addDaysYmd(todayYmdEastern(), 5),
+        assignee: { contactId },
+      },
+      FIXTURE_WRITER,
+    );
+    for (const title of ["Scrape", "Prime", "Two coats"]) await core.addChecklistItem(tx, task.id, title, FIXTURE_WRITER);
+  });
+}
+
+/**
+ * Two link sessions on the To do job, as a job email and a crew text start them (src/app/j/[token]/route.ts):
+ * one from the contractor's own email link, for /login's Welcome back, and one from a Share with crew link, for
+ * the job page a crew member sees (no way back to My jobs). Each run's links replace the last run's, and
+ * seedPortalFixture has already cleared the account's sessions. Rows only: no link is ever opened by URL here.
+ */
+async function seedLinkSessions(db: PrismaClient, contactId: string): Promise<{ email: string; crew: string } | null> {
+  assertLocalDb();
+  const job = await db.task.findFirst({ where: { description: { endsWith: TODO_FIXTURE_MARK } }, select: { id: true } });
+  const account = await db.portalAccount.findUnique({ where: { contactId }, select: { id: true } });
+  if (!job || !account) return null;
+  await db.jobLink.deleteMany({ where: { taskId: job.id, contactId, kind: { in: ["EMAIL", "CREW"] } } });
+  const tokens = { email: newToken(), crew: newToken() };
+  for (const kind of ["EMAIL", "CREW"] as const) {
+    const link = await db.jobLink.create({ data: { tokenHash: hashToken(newToken()), kind, taskId: job.id, contactId } });
+    await db.portalSession.create({
+      data: {
+        accountId: account.id,
+        tokenHash: hashToken(kind === "EMAIL" ? tokens.email : tokens.crew),
+        expiresAt: new Date(Date.now() + DAY_MS),
+        userAgent: "tests/devices",
+        onlyTaskId: job.id,
+        jobLinkId: link.id,
+      },
+    });
+  }
+  return tokens;
+}
+
+/**
+ * The crew's verdict screens for a deleted job (docs/specs/emails-redesign.md, Q7): one note under a crew link's token,
+ * for /j/[token]/gone, and one under a crew session's cookie, for /j/gone. Notes only, with the To do fixture job's
+ * title and street, as deleteTask keeps them (src/lib/portal/gone-crew-jobs.ts), so no job is deleted to make them and
+ * no job, link or session has to exist. Each run writes fresh tokens; an earlier run's notes run out a day later and
+ * go with the other expired ones here, as a delete purges them.
+ */
+export async function seedGoneCrewJobs(db: PrismaClient): Promise<{ link: string; session: string } | null> {
+  assertLocalDb();
+  const job = await db.task.findFirst({
+    where: { description: { endsWith: TODO_FIXTURE_MARK } },
+    select: { title: true, unitLabel: true, property: { select: { address: true } } },
+  });
+  if (!job) return null;
+  const now = new Date();
+  const note = { title: job.title, street: goneJobStreet(job.property?.address ?? null, job.unitLabel), deletedAt: now, expiresAt: new Date(now.getTime() + DAY_MS) };
+  const tokens = { link: newToken(), session: newToken() };
+  await db.$transaction([
+    db.goneCrewJob.deleteMany({ where: { expiresAt: { lte: now } } }),
+    db.goneCrewJob.create({ data: { ...note, tokenHash: hashToken(tokens.link), kind: "LINK" } }),
+    db.goneCrewJob.create({ data: { ...note, tokenHash: hashToken(tokens.session), kind: "SESSION" } }),
+  ]);
+  return tokens;
 }
 
 /**
@@ -334,6 +475,34 @@ async function seedComingSoonFixture(db: PrismaClient): Promise<void> {
   }
 }
 
+/**
+ * Two drafts from Claude for the signed-in partner, so /tasks shows My drafts
+ * with its heading buttons and row buttons at every size, and Home shows the
+ * "Drafts from Claude" row (docs/specs/tasks-from-claude.md 6.3). Saved the
+ * way the connector saves them; the same batch key again adds nothing, so
+ * every run after the first reuses them unless they were added or discarded.
+ * One goes to the fixture contractor, so its row and banner name who hears, and
+ * its page is the second sample for /tasks/[id] (routes.ts EXTRA_PAGES). A draft
+ * a person discarded doesn't count: it is gone from every screen.
+ */
+async function seedDraftFixture(db: PrismaClient, userEmail: string, contactId: string): Promise<void> {
+  assertLocalDb();
+  const user = await db.user.findUnique({ where: { email: userEmail }, select: { id: true, name: true } });
+  if (!user) return;
+  if ((await db.task.count({ where: { status: "DRAFT", discardedAt: null, createdByUserId: user.id } })) > 0) return;
+  const property = await db.property.findFirst({ where: { archivedAt: null }, select: { id: true }, orderBy: { createdAt: "asc" } });
+  const writer: core.Principal = { kind: "staff", userId: user.id, label: user.name ?? "Device check" };
+  const batchKey = `device-check-${Date.now()}`;
+  await db.$transaction(async (tx) => {
+    await core.createTask(
+      tx,
+      { title: "Fix gutters pulling off the back", description: "Gutters are pulling off the back. Get out there before the rain.", propertyId: property?.id ?? null, assignee: { contactId }, dueDate: addDaysYmd(todayYmdEastern(), 7), draft: { batchKey, index: 0 } },
+      writer,
+    );
+    await core.createTask(tx, { title: "Call the city about the permit", draft: { batchKey, index: 1 } }, writer);
+  });
+}
+
 export default async function setup() {
   // A renamed page would otherwise leave its override behind, and the page
   // would quietly load with the default session.
@@ -360,7 +529,15 @@ export default async function setup() {
     });
     const portal = await seedPortalFixture(db, PORTAL_FIXTURE);
     await seedPortalJob(db, portal.contactId);
+    await seedPortalTodoJob(db, portal.contactId);
     process.env.DEVICE_PORTAL_TOKEN = portal.token;
+    const links = await seedLinkSessions(db, portal.contactId);
+    process.env.DEVICE_PORTAL_EMAIL_LINK_TOKEN = links?.email ?? "";
+    process.env.DEVICE_PORTAL_CREW_LINK_TOKEN = links?.crew ?? "";
+    // Read by SAMPLE_PARAMS["j/[token]"] below and by the "portal-crew-gone" session.
+    const gone = await seedGoneCrewJobs(db);
+    process.env.DEVICE_GONE_LINK_TOKEN = gone?.link ?? "";
+    process.env.DEVICE_PORTAL_CREW_GONE_TOKEN = gone?.session ?? "";
     process.env.DEVICE_PORTAL_WELCOME_TOKEN = (await seedPortalFixture(db, PORTAL_WELCOME_FIXTURE)).token;
     const setup = await seedPortalFixture(db, PORTAL_SETUP_FIXTURE);
     // Back to the start of setup every run: came in by an invite, details checked, nothing after.
@@ -370,9 +547,11 @@ export default async function setup() {
     });
     process.env.DEVICE_PORTAL_SETUP_TOKEN = setup.token;
     await seedSignupLink(db);
+    await seedResidentFixture(db);
     await seedRehabFixture(db);
     await seedComingSoonFixture(db);
     await seedInvoiceFixtures(db, portal.contactId);
+    await seedDraftFixture(db, user.email, portal.contactId);
 
     const samples: Record<string, string> = {};
     for (const [key, find] of Object.entries(SAMPLE_PARAMS)) {

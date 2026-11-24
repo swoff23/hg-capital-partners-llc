@@ -13,17 +13,21 @@ import { propertyOptions } from "@/lib/picker-options";
 import { activityRecordIds, easternDay } from "@/lib/tasks/activity";
 import { activityRecordNames } from "@/lib/tasks/activity-names";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
+import { draftContractor } from "@/lib/tasks/drafts";
 import { asanaProfileGids, asanaTaskGids, taskIdsIn } from "@/lib/tasks/body-links";
 import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
-import { emailStatesIn } from "@/lib/tasks/delivery";
+import { EMAIL_PROBLEM_SELECT, emailProblemOf } from "@/lib/email/delivery-events";
+import { emailStatesIn, taskEmailState } from "@/lib/tasks/delivery";
 import { lockboxState } from "@/lib/tasks/lockbox";
 import { readTaskHome } from "@/lib/tenants/living";
 import { lastSeen, markTaskSeen, otherPartnersSeen, seenBaseline } from "@/lib/tasks/read-state";
 import { parseRepeatRule } from "@/lib/tasks/repeat";
 import { copySlot } from "@/lib/tasks/repeat-slot";
 import { isDraftUpload, markDoneComment, mediaItem, reviewPhotos, taskMedia, taskMediaInclude } from "@/lib/tasks/media";
-import { OVERDUE_ELIGIBLE, excludeTemplateTasks, isActiveStatus } from "@/lib/task-scope";
+import { linkedTasksWhere, taskPageWhere } from "@/lib/tasks/list-query";
+import { OVERDUE_ELIGIBLE, isActiveStatus } from "@/lib/task-scope";
 import { shapeActivity } from "./activity-rows";
+import { asked, assignedBy } from "./landing";
 import type { ReviewDecision, ReviewProof } from "./review-banner";
 import type { TaskLockbox, TaskTenants } from "./fields";
 import { TaskPageView } from "./view";
@@ -42,15 +46,16 @@ export async function generateMetadata({ params }: PageProps<"/tasks/[id]">): Pr
  */
 export default async function TaskPage({ params, searchParams }: PageProps<"/tasks/[id]">) {
   const { id } = await params;
-  // A partner's email asked for Send back (docs/specs/contractor-job-emails.md, section 8). Approve opens the page as
-  // is: it acts on one tap, so a link never presses it.
-  const openSendBack = (await searchParams).do === "send-back";
+  // What a partner's email button asked the page to have ready (docs/specs/emails-redesign.md, Q9): Send back's sheet,
+  // Approve in focus, or the assignee picker. It never acts: Approve and an assignment each take a tap on the page.
+  const ask = asked((await searchParams).do);
 
   // The first wave: the task, each of its lists, and what needs only its id and the viewer, all at once.
   // The session check runs beside them and is awaited with them, so nothing is shown without it.
   const userP = requireUser();
-  const rowP = prisma.task.findUnique({
-    where: { id },
+  // A discarded draft is gone to everyone at once, so it reads as no row and the page is a 404 like a deleted task's.
+  const rowP = prisma.task.findFirst({
+    where: taskPageWhere(id),
     select: {
       id: true,
       title: true,
@@ -69,7 +74,9 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
       assigneeContactId: true,
       assigneeName: true,
       createdBy: { select: { name: true, email: true } },
-      assigneeContact: { select: { id: true, fullName: true, active: true, portalAccount: { select: JOB_EMAIL_SELECT } } },
+      assigneeContact: { select: { id: true, fullName: true, active: true, portalAccount: { select: { ...JOB_EMAIL_SELECT, ...EMAIL_PROBLEM_SELECT } } } },
+      // A resident's request (docs/specs/maintenance-requests.md, section 4.1): who sent it and their pets answer.
+      resident: { select: { leaseId: true, tenantName: true, pets: true, petsNote: true } },
     },
   });
   const [user, row, access, checklist, attachments, events, staff, properties, previouslySeen, partnersSeen] = await Promise.all([
@@ -126,7 +133,8 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
   // every render, that refresh too: it shows everything that came in since the open, so a comment that arrived while
   // the page was up and showed with the refresh doesn't come back as unread. The previous open is read first (above):
   // it is the divider's baseline, which the page keeps from its first render (activity.tsx), so the divider stays put.
-  if (!(await isActionRender())) after(() => recordView(user.id, "TASK", task.id));
+  // A draft's page is no Recent row: drafts never show there, and each one opened would take a slot from a record that does.
+  if (task.status !== "DRAFT" && !(await isActionRender())) after(() => recordView(user.id, "TASK", task.id));
   after(() => markTaskSeen(user.id, task.id, now).catch((err) => logError("tasks:seen", err, { taskId: task.id }, { level: "warning" })));
 
   const live = task.events.filter((e) => !e.deletedAt);
@@ -154,7 +162,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
       // The tasks and Asana links the comments point at, by title and by import.
       pathIds.length || asanaGids.length
         ? prisma.task.findMany({
-            where: { ...excludeTemplateTasks, OR: [{ id: { in: pathIds } }, { asanaId: { in: asanaGids } }] },
+            where: linkedTasksWhere(pathIds, asanaGids),
             select: { id: true, title: true, asanaId: true },
           })
         : [],
@@ -173,7 +181,9 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
     ]);
 
   const today = todayYmdEastern(now);
-  const active = isActiveStatus(task.status);
+  const isDraft = task.status === "DRAFT";
+  // A draft is open work for the page: its title isn't struck through and its fields read as a live task's.
+  const active = isActiveStatus(task.status) || isDraft;
   const due = toYmd(task.dueDate);
   const overdue = (OVERDUE_ELIGIBLE as readonly TaskStatus[]).includes(task.status) && (daysUntil(due, today) ?? 0) < 0;
   const contractor = task.assigneeContact;
@@ -185,14 +195,15 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
   const contractorHasLogin = !!contractor?.active && contractors.some((c) => c.id === contractor.id && c.hasLogin);
   // Whether a change here emails them, or why not: no login, never signed in, or their Job emails switch is off
   // (docs/specs/contractor-email-switch.md). The same rule core.ts queues by.
-  const contractorEmails = contractor ? jobEmailState(contractor.portalAccount, contractor.active) : "no-login";
+  // And whether it gets there: a bounce, a suppression or a spam report on their address (docs/specs/emails-redesign.md, 5).
+  const contractorEmails = contractor ? taskEmailState(jobEmailState(contractor.portalAccount, contractor.active), emailProblemOf(contractor.portalAccount)) : "no-login";
   const lockbox = ((): TaskLockbox | null => {
     if (!contractorFirst || !home || !active) return null;
     const who = { contractor: contractorFirst, hasLogin: contractorHasLogin };
     // The code this job resolves to, shown to staff whatever the contractor gets; with none, a property with codes
     // asks for a unit. At an occupied home the contractor sees it only with Permission to enter (tenants.md 8).
     const { code, showsLockbox } = home.access;
-    if (code) return { state: "shown", code, contractorSees: showsLockbox, ...who };
+    if (code) return { state: "shown", code, contractorSees: showsLockbox && !isDraft, ...who };
     return lockboxState(home.units, task.unitLabel) === "pick-unit" ? { state: "pick-unit", ...who } : null;
   })();
 
@@ -244,6 +255,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
         ? {
             id: contractor.id,
             first: contractorFirst ?? contractor.fullName,
+            name: contractor.fullName,
             emails: contractorEmails,
             accessActive: task.access.some((a) => a.contactId === contactId),
             seenAt: contractorSeen?.lastSeenAt ?? null,
@@ -291,9 +303,18 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
   const createdBy = task.createdBy ? firstName(userName(task.createdBy)) || userName(task.createdBy) : null;
   const created = [createdBy, fmtDay(easternDay(task.createdAt), { year: "auto", now: today })].filter(Boolean).join(" · ");
 
+  // Assign: with nobody on the job the picker opens; with someone already on it (the other partner got there first)
+  // the page says who instead. Approve and Send back on a job already decided say what was decided (`decision`).
+  const assigned = !!(task.assigneeUserId || task.assigneeContactId);
+  const assignedLine = ask === "assign" && assigned ? assignedBy(live, task, contractor?.fullName ?? names.users[task.assigneeUserId ?? ""] ?? null) : null;
+
   return (
     <TaskPageView
-      openSendBack={openSendBack}
+      openSendBack={ask === "send-back"}
+      focusApprove={ask === "approve" && !!review}
+      landed={(ask === "approve" || ask === "send-back") && !review}
+      openAssignee={ask === "assign" && !assigned && active && !isDraft}
+      assignedLine={assignedLine}
       task={{
         id: task.id,
         title: task.title,
@@ -328,13 +349,15 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
       lockbox={lockbox}
       tenants={tenants}
       entryOffered={entryOffered}
+      resident={task.resident}
       created={created}
       contractorFirst={contractorFirst}
       contractorHasLogin={contractorHasLogin}
       contractor={
-        contractor ? { id: contractor.id, first: contractorFirst ?? contractor.fullName, hasLogin: contractorHasLogin, emails: contractorEmails } : null
+        contractor ? { id: contractor.id, first: contractorFirst ?? contractor.fullName, name: contractor.fullName, hasLogin: contractorHasLogin, emails: contractorEmails } : null
       }
       staffFirstNames={staffFirstNames}
+      draft={isDraft ? { contractor: draftContractor(task.assigneeContact) } : null}
       review={review}
       decision={decision}
       checklist={task.checklist}

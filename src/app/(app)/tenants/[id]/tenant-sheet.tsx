@@ -6,6 +6,7 @@ import { useRun } from "@/components/use-run";
 import { firstName } from "@/lib/names";
 import { TENANT_FIELDS, readTenant, type TenantField } from "@/lib/tenants/fields";
 import { addLeaseTenant, makeLeasePrimary, removeLeaseTenant, saveTenant } from "./actions";
+import { RequestLinkPart } from "./request-link";
 
 /** A person on the lease, as the sheet edits them. */
 export type TenantRow = {
@@ -36,11 +37,14 @@ const blank = (t: TenantRow | null): Form => ({
 export function TenantSheet({
   leaseId,
   tenant,
+  linkable = false,
   isOpen,
   onOpenChange,
 }: {
   leaseId: string;
   tenant: TenantRow | null;
+  /** The lease isn't past, so the person has a request link (docs/specs/maintenance-requests.md, section 4.4). */
+  linkable?: boolean;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -146,6 +150,7 @@ export function TenantSheet({
       <FormField label="Notes" optional error={errors.notes}>
         {(p) => <Textarea {...p} name="notes" rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} />}
       </FormField>
+      {tenant && linkable && <RequestLinkPart leaseId={leaseId} tenantId={tenant.id} first={first} hasEmail={!!tenant.email} />}
       {tenant && (
         <div className="flex flex-wrap gap-2">
           {!tenant.primary && (

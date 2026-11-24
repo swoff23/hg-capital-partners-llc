@@ -1,11 +1,11 @@
 import type { TaskStatus } from "@prisma/client";
 import type { AssigneeValue } from "@/components/assignee-picker";
-import { daysUntil, toYmd, ymdToDate, type Ymd } from "@/lib/dates";
+import { daysUntil, toYmd, type Ymd } from "@/lib/dates";
 import { shortAddress } from "@/lib/normalize";
 import { OVERDUE_ELIGIBLE, isActiveStatus, statusRank } from "@/lib/task-scope";
 import { mergeLegacyNames, type PersonRef } from "./assignee-people";
 import { parseRepeatRule, type RepeatRule } from "./repeat";
-import { targetDate } from "./rules";
+import { isAfterDue, scheduledDay } from "./rules";
 
 /**
  * The staff task lists: Today (Mine | Contractors) and All
@@ -35,7 +35,7 @@ export interface ListTask {
   /** The checkbox's state. Starts as status === DONE; flips at once when tapped. */
   checked: boolean;
   due: Ymd | null;
-  /** The booked visit date while Scheduled. */
+  /** The contractor's scheduled day, which counts only while Scheduled (scheduledOf). */
   scheduledFor: Ymd | null;
   waitingOn: string | null;
   unitLabel: string | null;
@@ -168,17 +168,18 @@ export function assigneeName(a: ListAssignee | null): string | null {
   return a.name;
 }
 
-/** Target (D7): the visit date while Scheduled, otherwise Due. Same rule as rules.ts targetDate. */
-export function targetOf(t: Pick<ListTask, "status" | "scheduledFor" | "due">): Ymd | null {
-  return toYmd(targetDate({ status: t.status, scheduledFor: ymdToDate(t.scheduledFor), dueDate: ymdToDate(t.due) }));
+/** The scheduled day a row shows: the contractor's day while Scheduled, else none (rules.ts scheduledDay). */
+export function scheduledOf(t: Pick<ListTask, "status" | "scheduledFor">): Ymd | null {
+  return scheduledDay(t);
 }
 
-/** Which column the row's date chip edits: the visit date for a Scheduled job, otherwise Due. */
+/** The scheduled day lands after Due: the warning after it (docs/specs/contractor-scheduled-date.md, Q4). */
+export function scheduledAfterDue(t: Pick<ListTask, "status" | "scheduledFor" | "due">): boolean {
+  return isAfterDue(scheduledOf(t), t.due);
+}
+
+/** A date a list can move: Due (the row's chip, bulk edit) or the scheduled day (the Scheduled column). */
 export type DateField = "dueDate" | "scheduledFor";
-
-export function targetField(t: Pick<ListTask, "status" | "scheduledFor">): DateField {
-  return t.status === "SCHEDULED" && t.scheduledFor ? "scheduledFor" : "dueDate";
-}
 
 const before = (v: Ymd | null, today: Ymd) => {
   const d = daysUntil(v, today);
@@ -190,10 +191,6 @@ export function isOverdue(t: Pick<ListTask, "status" | "due">, today: Ymd): bool
   return (OVERDUE_ELIGIBLE as readonly TaskStatus[]).includes(t.status) && before(t.due, today);
 }
 
-/** A contractor job whose Target has passed, by the same rule as Overdue. */
-export function isTargetLate(t: Pick<ListTask, "status" | "scheduledFor" | "due">, today: Ymd): boolean {
-  return (OVERDUE_ELIGIBLE as readonly TaskStatus[]).includes(t.status) && before(targetOf(t), today);
-}
 
 // ---------------------------------------------------------------------------
 // Sorting
@@ -227,10 +224,8 @@ export function byDateThenStatus<T extends SortableTask>(date: (t: T) => Ymd | n
   };
 }
 
-/** Staff rows: by Due. */
+/** Every row, contractor jobs included: by Due (docs/specs/contractor-scheduled-date.md, section 4). */
 export const compareByDue = byDateThenStatus<ListTask>((t) => t.due);
-/** Contractor jobs: by Target. */
-export const compareByTarget = byDateThenStatus<ListTask>(targetOf);
 
 // ---------------------------------------------------------------------------
 // Today: Mine
@@ -294,8 +289,8 @@ export interface ContractorColumn {
 /**
  * The Contractors column (D8: both partners see every contractor job).
  * Needs review on top, then one group per contractor with their other
- * active jobs by Target. Groups go in order of their soonest Target, so
- * whoever is due on site next comes first; undated groups last, by name.
+ * active jobs by Due. Groups go in order of their soonest Due, so whoever's
+ * work is due next comes first; undated groups last, by name.
  * A row whose imported name stands for a contractor (withLegacyPeople) sits
  * in their group under their own name. It is never in Needs review, which is
  * a contractor's Mark done: an imported name has no portal to mark it from.
@@ -316,12 +311,12 @@ export function groupContractors(tasks: ListTask[]): ContractorColumn {
     group.jobs.push(t);
     byContact.set(id, group);
   }
-  review.sort(compareByTarget);
+  review.sort(compareByDue);
   const groups = [...byContact.values()];
-  for (const g of groups) g.jobs.sort(compareByTarget);
+  for (const g of groups) g.jobs.sort(compareByDue);
   groups.sort((a, b) => {
-    const x = targetOf(a.jobs[0]);
-    const y = targetOf(b.jobs[0]);
+    const x = a.jobs[0].due;
+    const y = b.jobs[0].due;
     if (x !== y) {
       if (x === null) return 1;
       if (y === null) return -1;

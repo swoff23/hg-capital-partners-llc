@@ -19,8 +19,8 @@ export function jobLinkStep(value: string | null | undefined): JobLinkStep | nul
  *    the job can't take, and asks before acting; invoice is where a one-job
  *    link session's Send invoice comes back to after signing in, section 4.1
  *    of docs/contractor-invoices-plan.md);
- *  - access: `#access`, which the page takes to Tenants, or to Lockbox when
- *    nobody lives there (hash-scroll.tsx);
+ *  - access: `#access`, which the page takes to Getting in, or to Tenants
+ *    when there is none (hash-scroll.tsx);
  *  - photos: `#updates`, the Updates section with the composer;
  *  - no step: `#update-<id>` for the update the email opens at.
  * Ids are checked so nothing from the link's query reaches the path unescaped.
@@ -57,8 +57,11 @@ export function jobLinkUrl(appUrl: string, token: string, step: JobLinkStep | nu
   return q ? `${base}?${q}` : base;
 }
 
-/** The statuses a contractor may set the date in: waiting on them, not yet marked done (core.ts setDateByContractor). */
-export const CONTRACTOR_DATE_STATUSES = ["OPEN", "SCHEDULED", "WAITING", "IN_PROGRESS"] as const;
+/**
+ * The statuses a contractor may set or move their scheduled day in: before they start
+ * (docs/specs/contractor-scheduled-date.md, Q2; core.ts scheduleByContractor).
+ */
+export const CONTRACTOR_DATE_STATUSES = ["OPEN", "SCHEDULED", "WAITING"] as const;
 
 export function contractorMaySetDate(status: string): boolean {
   return (CONTRACTOR_DATE_STATUSES as readonly string[]).includes(status);

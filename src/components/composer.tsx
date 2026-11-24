@@ -818,9 +818,11 @@ function ComposerBody({
             }
           }}
           // Five lines on a phone, so the bar stays under half of what an iPhone SE shows above its keyboard; the old cap from md.
-          className="max-h-[6.875rem] min-h-9 flex-1 resize-none bg-transparent px-1.5 py-2 text-body text-foreground outline-none placeholder:text-muted-foreground md:max-h-48 md:min-h-12 md:px-1"
+          // On a touch phone the one-line field is Send's 44px, with its 22px line in the middle, so the words and Send
+          // share a center line (Connor, Nov 22); a longer message grows up from there and Send stays at the bottom.
+          className="max-h-[6.875rem] min-h-9 flex-1 resize-none bg-transparent px-1.5 py-2 text-body text-foreground outline-none placeholder:text-muted-foreground max-md:pointer-coarse:min-h-11 max-md:pointer-coarse:py-[11px] md:max-h-48 md:min-h-12 md:px-1"
         />
-        {sendButton(cn("mb-0.5", tools && "md:hidden"))}
+        {sendButton(cn("mb-0.5 max-md:pointer-coarse:mb-0", tools && "md:hidden"))}
       </div>
       {/* Pressing a tool keeps focus in the text box, so on a phone the row
           (shown while it has focus) doesn't vanish mid-tap. Keyboard focus

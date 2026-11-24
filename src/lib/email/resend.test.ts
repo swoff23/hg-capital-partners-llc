@@ -48,3 +48,11 @@ test("an email's own reply address wins over EMAIL_REPLY_TO, and files ride alon
   assert.deepEqual(body.attachments, [{ filename: "a.jpg", path: "https://files.example.com/a" }]);
   assert.equal(resendBody({ from: "a@b.c", replyTo: "office@hg.com" }, { to: "x@y.z", subject: "s", text: "t" }).reply_to, "office@hg.com");
 });
+
+test("an email's own From name replaces EMAIL_FROM's, quoted, on the same address", () => {
+  const body = resendBody(parseEnv(env).email!, { ...msg, fromName: "Zack Miller via HG Capital" });
+  assert.equal(body.from, '"Zack Miller via HG Capital" <jobs@mail.hg.com>');
+  const bare = resendBody({ from: "jobs@mail.hg.com", replyTo: null }, { ...msg, fromName: 'Ann "A" <x@y>\nCc: z' });
+  assert.equal(bare.from, '"Ann A x@y Cc: z" <jobs@mail.hg.com>');
+  assert.equal(resendBody(parseEnv(env).email!, { ...msg, fromName: "  " }).from, "HG <jobs@mail.hg.com>");
+});

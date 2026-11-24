@@ -6,8 +6,8 @@ import type { UploadTarget } from "@/components/upload-queue";
 import { taskFileUrl } from "@/lib/attachments/media";
 import { UPLOAD_KIND_ALLOWED, uploadTargetHref, uploadTargetKey } from "@/lib/attachments/upload-kinds";
 import { personalDraftKey } from "@/lib/composer-draft";
-import type { JobEmailState } from "@/lib/portal/job-emails";
 import { joinNames } from "@/lib/portal/job-view";
+import type { TaskEmailState } from "@/lib/tasks/delivery";
 import { recordTaskAttachment } from "../upload-actions";
 import { addTaskComment, deleteTaskFile } from "./actions";
 
@@ -23,9 +23,11 @@ export type { ComposerDraft } from "@/components/composer";
  *
  * The line over the field says who will see the message (activity 2.7), only
  * where that isn't the default: nothing for a contractor with a login unless
- * their Job emails are off (then a warning strip with MailX), "needs a login"
- * without one, nothing when nobody is assigned, and for an Internal note the
- * partners.
+ * their Job emails are off or their address isn't getting mail (then a warning
+ * strip with MailX: "Emails don't reach Zack Miller.", from a
+ * bounce, a suppression or a spam report, emails-redesign section 5), "needs a
+ * login" without one, nothing when nobody is assigned, and for an Internal
+ * note the partners.
  * The switch reads "Shared | Internal" on every task: Internal is the only
  * way to keep a note private before a contractor is assigned.
  */
@@ -43,11 +45,11 @@ export function Composer({
   /** The signed-in partner, whose draft this box keeps. */
   viewerId: string;
   /**
-   * The assigned contractor, if any: their first name, their contact id (for "Set up login"), whether they have a
-   * portal login, and whether a reply emails them (docs/specs/contractor-email-switch.md: not before their first
-   * sign-in, and not with their Job emails switch off).
+   * The assigned contractor, if any: their first name and full name, their contact id (for "Set up login"), whether
+   * they have a portal login, and whether a reply emails them (docs/specs/contractor-email-switch.md: not before their
+   * first sign-in, and not with their Job emails switch off) and gets there (tasks/delivery.ts taskEmailState).
    */
-  contractor: { id: string; first: string; hasLogin: boolean; emails: JobEmailState } | null;
+  contractor: { id: string; first: string; name?: string; hasLogin: boolean; emails: TaskEmailState } | null;
   /** The partners' first names: who sees an Internal note. */
   staff: readonly string[];
   /** My uploads on this task not yet sent with a message, oldest first. */
@@ -103,6 +105,17 @@ export function Composer({
                 />
               </span>
             </>
+          ) : reachable.emails === "not-getting-through" ? (
+            <>
+              {/* Their full name, which truncates before the line could wrap at 320; a box of 672px or more adds what
+                  to do, in the off line's words. */}
+              <span className="flex min-w-0 @2xl/composer:hidden">
+                <NotGettingThrough name={reachable.name || reachable.first} />
+              </span>
+              <span className="hidden min-w-0 @2xl/composer:flex">
+                <NotGettingThrough name={reachable.name || reachable.first} then=" Remember to call or text them any updates." />
+              </span>
+            </>
           ) : null
         ) : contractor ? (
           <span className="flex min-w-0 items-baseline gap-2">
@@ -114,7 +127,7 @@ export function Composer({
           </span>
         ) : null, // Nobody assigned: no line (Connor, Nov 16).
         internal: <AudienceText words={only} />,
-        warn: reachable?.emails === "off" ? MailX : undefined,
+        warn: reachable?.emails === "off" || reachable?.emails === "not-getting-through" ? MailX : undefined,
       }}
       placeholders={{
         // One placeholder whoever is assigned (Connor, Nov 14).
@@ -132,5 +145,19 @@ export function Composer({
       }}
       onSend={({ body, visibility, attachmentIds, clientId }) => addTaskComment(taskId, { body, visibility, attachmentIds, clientId })}
     />
+  );
+}
+
+/**
+ * "Emails don't reach Zack Miller." as AudienceText lays a line out: the name truncates, the fixed
+ * words around it stay whole. AudienceText puts the name first, and this sentence has it in the middle.
+ */
+function NotGettingThrough({ name, then = "" }: { name: string; then?: string }) {
+  return (
+    <span className="flex min-w-0">
+      <span className="shrink-0 whitespace-pre">{"Emails don't reach "}</span>
+      <span className="min-w-0 truncate">{name}</span>
+      <span className="shrink-0 whitespace-pre">{`.${then}`}</span>
+    </span>
   );
 }

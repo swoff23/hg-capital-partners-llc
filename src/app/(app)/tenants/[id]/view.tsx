@@ -83,7 +83,7 @@ export function LeasePageView(p: LeasePageViewProps) {
 
         <div className="min-w-0 space-y-8 pt-2 [grid-area:main] pointer-coarse:space-y-6 lg:pt-4">
           {p.notices && <div className="space-y-2">{p.notices}</div>}
-          <TenantsSection leaseId={p.leaseId} tenants={p.tenants} />
+          <TenantsSection leaseId={p.leaseId} tenants={p.tenants} linkable={p.status !== "past"} />
           <TermsSection leaseId={p.leaseId} terms={p.terms} />
           <Section title="Notes">
             <LeaseNotes leaseId={p.leaseId} value={p.notes} home={home} />

@@ -2,23 +2,26 @@
 import { useOptimistic, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PhotoThumb } from "@/components/photo-thumb";
 import { SearchInput } from "@/components/search-field";
 import { SegmentedControl } from "@/components/segmented-control";
 import { StatusBadge } from "@/components/status-badge";
+import { AfterDueMark } from "@/components/after-due-mark";
 import { LinkPending } from "@/components/link-pending";
 import { Button, EmptyState, Section, pendingRowFill } from "@/components/ui";
 import { useUploadQueue } from "@/components/upload-queue";
 import type { Ymd } from "@/lib/dates";
+import { contractorMaySetDate } from "@/lib/portal/job-link-paths";
 import {
   JOBS_GROUP_COOKIE,
   addressLine,
   groupJobs,
   rowUploadLine,
+  shownDay,
   type JobCard,
   type JobsGroup,
   type JobsTab,
 } from "@/lib/portal/job-view";
+import { isAfterDue } from "@/lib/tasks/rules";
 import { isActiveStatus } from "@/lib/task-scope";
 import { matchesSearch } from "@/lib/text-match";
 import { cn } from "@/lib/utils";
@@ -151,8 +154,7 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
 
 /**
  * One job, 72px (docs/brand-guidelines.md, section 5 Density), the whole row
- * opening it (§6): the property's front photo (the fallback tile until it has
- * one), the title, then the address and unit and the date ("Due date Today"),
+ * opening it (§6): the title, then the address and unit and the day ("Due date Today", or "Scheduled Mon, Nov 23" once they set one),
  * with the status as its mark and word in one fixed column. Below 480 the
  * column drops and the status leads the subline instead, in its tone. The
  * subline is status, date and place (section 5 Density): the date before the
@@ -162,16 +164,20 @@ export function MyJobs({ jobs, tab, initialGroup, today }: { jobs: JobCard[]; ta
  * rows leave it out, as the job page does.
  *
  * New updates are one dot hung in the row's leading gutter, centered 8px
- * before the photo, so the photo and title line up whether or not a row has
- * them (activity 3.5 A; 4px clear of the screen edge inside the 16px gutter).
+ * before the title, so titles line up whether or not a row has one (no photo
+ * tile: Connor, Nov 22) (activity 3.5 A; 4px clear of the screen edge inside the 16px gutter).
  * The row opens at #new, and screen readers hear the count. While the job has
  * files going up, the subline leads with it: "Uploading 3 photos", or "2
  * photos didn't upload" in danger (uploads 2.1).
  */
 function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProperty: boolean }) {
   const where = byProperty ? job.unitLabel?.trim() || null : addressLine(job.address, job.unitLabel, { short: true });
-  const target = job.target && isActiveStatus(job.status) ? job.target : null;
-  const street = job.address ? addressLine(job.address, null, { short: true }) : null;
+  // Their scheduled day while Scheduled, else Due (Q8); a finished job's old day stays off.
+  const day = isActiveStatus(job.status) ? shownDay(job) : null;
+  const kind = job.scheduled ? "scheduled" : "due";
+  const afterDue = isAfterDue(job.scheduled, job.due);
+  // A job they can still set a day on and haven't: said on the row, so what needs scheduling shows at a glance (Connor, Nov 22).
+  const unscheduled = contractorMaySetDate(job.status) && !job.scheduled;
   const uploading = rowUploadLine(useUploadQueue(`portal-task:${job.id}`));
 
   return (
@@ -183,10 +189,6 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
       {job.newCount > 0 && (
         <span aria-hidden="true" className="absolute -left-2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
       )}
-      {/* The row's text names the place, so the photo is decoration here. */}
-      <span aria-hidden="true" className="shrink-0">
-        <PhotoThumb size={48} src={job.photoUrl} alt={street ? `Front of ${street}` : "No property"} />
-      </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-body font-medium text-foreground">
           {job.newCount > 0 && <span className="sr-only">{job.newCount} new, </span>}
@@ -197,7 +199,7 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
             <>
               {/* The urgent state leads and keeps its words; the place and the date are what truncate (uploads 3.1). */}
               <span className={cn("shrink-0", uploading.tone === "danger" && "text-destructive")}>{uploading.text}</span>
-              {(target || where) && (
+              {(day || where) && (
                 <span aria-hidden="true" className="shrink-0">
                   ·
                 </span>
@@ -207,14 +209,29 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
           {/* Below 480 the status leads the subline, except while the job has files in flight: the upload line has the room then. */}
           <span className={cn("shrink-0 items-center gap-1 min-[480px]:hidden", uploading ? "hidden" : "flex")}>
             <StatusBadge status={job.status} />
-            {(target || where) && <span aria-hidden="true">·</span>}
+            {(unscheduled || day || where) && <span aria-hidden="true">·</span>}
           </span>
-          {target && (
-            <span className="min-w-0 truncate">
-              <DueDate target={target} isVisit={job.targetIsVisit} today={today} shortBelow480 />
+          {/* Gives way to an upload line, as the status does: both can't fit at 320 beside the date. */}
+          {unscheduled && !uploading && (
+            <span className="flex shrink-0 items-center gap-1 text-foreground">
+              Not scheduled
+              {(day || where) && (
+                <span aria-hidden="true" className="text-muted-foreground">
+                  ·
+                </span>
+              )}
+            </span>
+          )}
+          {day && (
+            <span className="flex min-w-0 items-center gap-1">
+              {/* The mark follows the day and never shrinks; the address drops before either. */}
+              <span className="min-w-0 truncate">
+                <DueDate day={day} kind={kind} today={today} shortBelow480 />
+              </span>
+              {afterDue && job.due && <AfterDueMark due={job.due} today={today} inLink />}
               {where && (
-                <span aria-hidden="true" className={cn(uploading && "max-[360px]:hidden")}>
-                  {" "}·
+                <span aria-hidden="true" className={cn("shrink-0", uploading && "max-[360px]:hidden")}>
+                  ·
                 </span>
               )}
             </span>
@@ -223,7 +240,7 @@ function JobRow({ job, today, byProperty }: { job: JobCard; today: Ymd; byProper
               place is gone. A shrink-999 place still left the date a fraction of a pixel short
               of its text, and that was enough to fire its ellipsis ("Due Toda…"). Under 360 it
               gives way to a date beside the upload line; with no date it is all that follows. */}
-          {where && <span className={cn("min-w-0 flex-1 truncate", uploading && target && "max-[360px]:hidden")}>{where}</span>}
+          {where && <span className={cn("min-w-0 flex-1 truncate", uploading && day && "max-[360px]:hidden")}>{where}</span>}
         </span>
       </span>
       <StatusBadge status={job.status} className="w-28 shrink-0 max-[479px]:hidden" />

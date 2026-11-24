@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Question 1: a resident's request either becomes a task directly (A, recommended) or lands in a Requests inbox you accept into a task (B). Either way the resident sees a status page, never comments.</title>
+<defs>
+<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8f99a8"/></marker>
+</defs>
+<rect width="900" height="600" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Question 1: what does a resident's request become?</text>
+<text x="32" y="56" font-size="11" fill="#424e61">Either way the resident follows it on a status page and never sees your comments. The difference is what lands on your side.</text>
+
+<!-- A -->
+<g transform="translate(32 80)">
+<rect x="0" y="0" width="404" height="460" rx="10" fill="none" stroke="#c9a96a" stroke-width="1.5"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">A. It becomes a task</text>
+<rect x="160" y="16" width="92" height="20" rx="10" fill="#f6efe1"/>
+<text x="206" y="30" font-size="10" font-weight="500" fill="#8a6d2f" text-anchor="middle">Recommended</text>
+
+<rect x="20" y="52" width="196" height="46" rx="8" fill="#f5f6f8" stroke="#d9dde3"/>
+<text x="34" y="72" font-size="12" font-weight="500" fill="#152133">Resident's form</text>
+<text x="34" y="88" font-size="10" fill="#424e61">on their phone, photos and video</text>
+<line x1="118" y1="98" x2="118" y2="120" stroke="#8f99a8" marker-end="url(#arr)"/>
+
+<rect x="20" y="122" width="196" height="52" rx="8" fill="#ffffff" stroke="#152133"/>
+<rect x="20" y="122" width="4" height="52" fill="#c9a96a"/>
+<text x="34" y="143" font-size="12" font-weight="500" fill="#152133">Task in Needs you</text>
+<text x="34" y="160" font-size="10" fill="#424e61">From resident, photos on it</text>
+<line x1="118" y1="174" x2="118" y2="196" stroke="#8f99a8" marker-end="url(#arr)"/>
+
+<rect x="20" y="198" width="196" height="52" rx="8" fill="#f5f6f8" stroke="#d9dde3"/>
+<text x="34" y="219" font-size="12" font-weight="500" fill="#152133">Same as any task today</text>
+<text x="34" y="236" font-size="10" fill="#424e61">assign, job email, review, Done</text>
+
+<line x1="216" y1="148" x2="230" y2="148" stroke="#8f99a8" stroke-dasharray="3 3" marker-end="url(#arr)"/>
+
+<text x="234" y="46" font-size="10" fill="#424e61">Resident's status page</text>
+<rect x="234" y="52" width="150" height="236" rx="16" fill="#ffffff" stroke="#152133"/>
+<text x="250" y="80" font-size="9" fill="#8f99a8">56 Tamarack St, Upper</text>
+<text x="250" y="98" font-size="12" font-weight="600" fill="#152133">Kitchen sink leaks</text>
+<circle cx="256" cy="124" r="5" fill="#152133"/>
+<text x="268" y="128" font-size="11" font-weight="500" fill="#152133">Received</text>
+<text x="268" y="142" font-size="10" fill="#424e61">Fri, Nov 21</text>
+<line x1="256" y1="130" x2="256" y2="156" stroke="#152133"/>
+<circle cx="256" cy="162" r="5" fill="#152133"/>
+<text x="268" y="166" font-size="11" font-weight="500" fill="#152133">Scheduled</text>
+<text x="268" y="180" font-size="10" fill="#424e61">Tue, Nov 25</text>
+<line x1="256" y1="168" x2="256" y2="194" stroke="#d9dde3"/>
+<circle cx="256" cy="200" r="5" fill="#ffffff" stroke="#8f99a8"/>
+<text x="268" y="204" font-size="11" fill="#8f99a8">Done</text>
+<text x="250" y="226" font-size="9" fill="#8f99a8">Your photos</text>
+<rect x="250" y="234" width="36" height="28" rx="4" fill="#e6e9ee"/>
+<rect x="292" y="234" width="36" height="28" rx="4" fill="#e6e9ee"/>
+<rect x="334" y="234" width="36" height="28" rx="4" fill="#e6e9ee"/>
+<text x="234" y="308" font-size="10" fill="#424e61">Reads only the task's status and</text>
+<text x="234" y="322" font-size="10" fill="#424e61">date. Never your comments, your</text>
+<text x="234" y="336" font-size="10" fill="#424e61">files or contractor notes.</text>
+
+<line x1="20" y1="360" x2="384" y2="360" stroke="#eceef1"/>
+<text x="20" y="384" font-size="11" fill="#152133">• One record. Nothing new for you to check.</text>
+<text x="20" y="406" font-size="11" fill="#152133">• Lands on the unit, so it shows on the property's Tasks.</text>
+<text x="20" y="428" font-size="11" fill="#152133">• Not ours to fix, or a repeat: Cancel it, with one</text>
+<text x="30" y="444" font-size="11" fill="#152133">short line the resident sees.</text>
+</g>
+
+<!-- B -->
+<g transform="translate(468 80)">
+<rect x="0" y="0" width="400" height="460" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">B. A request you accept into a task</text>
+
+<rect x="20" y="52" width="180" height="46" rx="8" fill="#f5f6f8" stroke="#d9dde3"/>
+<text x="34" y="72" font-size="12" font-weight="500" fill="#152133">Resident's form</text>
+<text x="34" y="88" font-size="10" fill="#424e61">on their phone, photos and video</text>
+<line x1="110" y1="98" x2="110" y2="120" stroke="#8f99a8" marker-end="url(#arr)"/>
+
+<rect x="20" y="122" width="180" height="52" rx="8" fill="#ffffff" stroke="#152133"/>
+<text x="34" y="143" font-size="12" font-weight="500" fill="#152133">Requests inbox</text>
+<text x="34" y="160" font-size="10" fill="#424e61">a new screen to check</text>
+
+<line x1="200" y1="148" x2="230" y2="148" stroke="#8f99a8" marker-end="url(#arr)"/>
+<rect x="232" y="122" width="148" height="52" rx="8" fill="#f5f6f8" stroke="#d9dde3"/>
+<text x="246" y="143" font-size="12" font-weight="500" fill="#152133">Decline or merge</text>
+<text x="246" y="160" font-size="10" fill="#424e61">resident gets a line</text>
+
+<line x1="110" y1="174" x2="110" y2="196" stroke="#8f99a8" marker-end="url(#arr)"/>
+<rect x="20" y="198" width="180" height="52" rx="8" fill="#ffffff" stroke="#152133"/>
+<text x="34" y="219" font-size="12" font-weight="500" fill="#152133">Accept: makes a task</text>
+<text x="34" y="236" font-size="10" fill="#424e61">linked back to the request</text>
+<line x1="110" y1="250" x2="110" y2="272" stroke="#8f99a8" marker-end="url(#arr)"/>
+
+<rect x="20" y="274" width="180" height="46" rx="8" fill="#f5f6f8" stroke="#d9dde3"/>
+<text x="34" y="302" font-size="12" font-weight="500" fill="#152133">Same as any task today</text>
+
+<text x="232" y="216" font-size="10" fill="#424e61">The resident's status page</text>
+<text x="232" y="230" font-size="10" fill="#424e61">follows the linked task,</text>
+<text x="232" y="244" font-size="10" fill="#424e61">same page as A.</text>
+
+<line x1="20" y1="360" x2="380" y2="360" stroke="#eceef1"/>
+<text x="20" y="384" font-size="11" fill="#152133">• Two records, linked. One more step on every request.</text>
+<text x="20" y="406" font-size="11" fill="#152133">• Worth it only if many requests are junk or repeats,</text>
+<text x="30" y="422" font-size="11" fill="#152133">or one request often turns into several jobs.</text>
+<text x="20" y="444" font-size="11" fill="#152133">• Jobber's way: a request, then Convert to job.</text>
+</g>
+
+<text x="32" y="568" font-size="11" fill="#424e61">Sizes: this pick changes no screen. The resident's pages are phone-first either way, and your side stays the task page you have now.</text>
+</svg>

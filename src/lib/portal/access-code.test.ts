@@ -171,9 +171,9 @@ const leaseRows = [
   { unitId: "f", movesIn: new Date("2027-02-01"), movesOut: null, tenants: [person("Next Person", "716-555-0001")] },
 ];
 
-function fakeDb(seen: unknown[] = []) {
+function fakeDb(seen: unknown[] = [], units: unknown[] = homes) {
   return {
-    property: { findUnique: async () => ({ units: homes }) },
+    property: { findUnique: async () => ({ units }) },
     lease: {
       findMany: async (args: { where: { unitId: string | null } }) => {
         seen.push(args.where);
@@ -193,6 +193,7 @@ test("readJobAccess: an occupied home shows the household living there today, an
     { name: "Sam Ortiz", phone: null, dial: null },
   ]);
   assert.equal(got.permitted, false);
+  assert.equal(got.vacant, false);
   assert.equal(got.lockbox, null);
   assert.deepEqual(seen, [{ propertyId: "p1", unitId: "f" }], "one unit's leases, by its id");
 });
@@ -206,13 +207,43 @@ test("readJobAccess: permission adds the lockbox, with its location", async () =
 test("readJobAccess: a vacant unit shows the lockbox and no tenants", async () => {
   const got = await readJobAccess(fakeDb(), { propertyId: "p1", unitLabel: "Rear", entryPermittedAt: null }, NOW);
   assert.deepEqual(got.tenants, []);
+  assert.equal(got.vacant, true);
   assert.equal(got.lockbox?.code, "4857");
+});
+
+test("readJobAccess: a job on the house-meter row is the building's, never an empty home", async () => {
+  const duplex = [
+    { id: "u", label: "Upper", lockboxCode: "1111" },
+    { id: "l", label: "Lower", lockboxCode: "2222" },
+    { id: "h", label: "HSE (house)", lockboxCode: "3333" },
+  ];
+  const got = await readJobAccess(fakeDb([], duplex), { propertyId: "p1", unitLabel: "HSE (house)", entryPermittedAt: null }, NOW);
+  assert.equal(got.lockbox?.code, "3333", "its own code still shows, as before");
+  assert.equal(got.vacant, false);
+});
+
+test("readJobAccess: a building-wide job behind a shared code shows the code but never calls the home empty", async () => {
+  const shared = [
+    { id: "f", label: "Front", lockboxCode: "4857" },
+    { id: "r", label: "Rear", lockboxCode: "4857" },
+  ];
+  const got = await readJobAccess(fakeDb([], shared), { propertyId: "p1", unitLabel: null, entryPermittedAt: null }, NOW);
+  assert.equal(got.lockbox?.code, "4857", "the units share one box, so the code shows");
+  assert.equal(got.vacant, false, "nobody's lease was read, so the page says nothing about who lives there");
+  assert.equal(got.needsNotice, false);
 });
 
 test("readJobAccess: no unit on a building names no household, and no property shows nothing", async () => {
   const seen: unknown[] = [];
   const got = await readJobAccess(fakeDb(seen), { propertyId: "p1", unitLabel: null, entryPermittedAt: null }, NOW);
   assert.deepEqual(got.tenants, []);
+  assert.equal(got.vacant, false);
   assert.deepEqual(seen, [], "no lease read at all");
-  assert.deepEqual(await readJobAccess(fakeDb(), { propertyId: null, unitLabel: "Front", entryPermittedAt: NOW }, NOW), { tenants: [], permitted: false, lockbox: null });
+  assert.deepEqual(await readJobAccess(fakeDb(), { propertyId: null, unitLabel: "Front", entryPermittedAt: NOW }, NOW), {
+    tenants: [],
+    permitted: false,
+    needsNotice: false,
+    vacant: false,
+    lockbox: null,
+  });
 });

@@ -10,9 +10,9 @@ import { recordView } from "@/lib/recent-views";
 import { TextLink } from "@/components/ui";
 import { toMoneyNumber } from "@/lib/utils";
 import { toYmd, todayYmdEastern } from "@/lib/dates";
-import { activeTask, excludeTemplateTasks } from "@/lib/task-scope";
-import { byDateThenStatus, isTargetLate } from "@/lib/tasks/list";
-import { targetDate } from "@/lib/tasks/rules";
+import { byDateThenStatus, isOverdue } from "@/lib/tasks/list";
+import { propertyOpenTasksWhere } from "@/lib/tasks/list-query";
+import { scheduledDay } from "@/lib/tasks/rules";
 import { buildingLine, loanPosition } from "@/lib/properties/figures";
 import { parseBuildingCapex, parseUnits, propertyUnitCount, withUnitIds } from "@/lib/property-types";
 import { getCapexRules } from "@/lib/capex-rules";
@@ -93,7 +93,7 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
     requireUser(),
     getPropertyById(id),
     prisma.task.findMany({
-      where: { propertyId: id, ...activeTask, ...excludeTemplateTasks },
+      where: propertyOpenTasksWhere(id),
       orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }],
       include: { assignee: { select: { name: true, email: true } }, assigneeContact: { select: { fullName: true } } },
     }),
@@ -143,9 +143,8 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
   const unitCount = propertyUnitCount(property) ?? 0;
   const unitLabels = [...new Set(units.map((u) => u.label?.trim()).filter((l): l is string => !!l))];
 
-  // Each task's Target (D7: the visit date while Scheduled, otherwise Due), soonest first, as on Today.
-  // A past Target reads red by Today's rule (isTargetLate: never Waiting or Review); it's
-  // the date this list shows, so it's the date judged.
+  // Each task's Due date, soonest first, as on Today. Past Due reads red by Today's rule (isOverdue: never
+  // Waiting or Review). A Scheduled job's day rides with its status, after Due or not.
   const tasks = openTasks
     .map((t) => ({
       id: t.id,
@@ -153,11 +152,12 @@ export default async function PropertyPage({ params }: PageProps<"/properties/[i
       status: t.status,
       waitingOn: t.status === "WAITING" ? t.waitingOn?.trim() || null : null,
       createdAt: t.createdAt,
-      target: ymd(targetDate(t)),
-      late: isTargetLate({ status: t.status, scheduledFor: ymd(t.scheduledFor), due: ymd(t.dueDate) }, today),
+      due: ymd(t.dueDate),
+      scheduled: scheduledDay({ status: t.status, scheduledFor: ymd(t.scheduledFor) }),
+      late: isOverdue({ status: t.status, due: ymd(t.dueDate) }, today),
       who: taskAssignee(t),
     }))
-    .sort(byDateThenStatus((t) => t.target));
+    .sort(byDateThenStatus((t) => t.due));
 
   const value = d(property.value);
   const balance = d(property.currentLoan);

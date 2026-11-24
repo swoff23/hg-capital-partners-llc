@@ -26,6 +26,12 @@ export interface EmailMessage {
    * headers keep them together, and Gmail does while the subject matches too.
    */
   threadKey?: string;
+  /**
+   * The name the inbox shows for this email, in place of EMAIL_FROM's (docs/specs/emails-redesign.md, Q5): "HG Capital"
+   * on a contractor's job email, "Zack Miller via HG Capital" on a partner's when a contractor's words lead. The
+   * address stays EMAIL_FROM's, so threading and replies don't change.
+   */
+  fromName?: string;
 }
 
 /**
@@ -35,6 +41,20 @@ export interface EmailMessage {
  */
 export function fromWithName(from: string): string {
   return from.includes("<") ? from : `${BRAND.company} <${from.trim()}>`;
+}
+
+/** EMAIL_FROM's bare address, without any name it carries. */
+function fromAddress(from: string): string {
+  return (/<([^>]+)>/.exec(from)?.[1] ?? from).trim();
+}
+
+/**
+ * A display name made safe for the From header: no quotes, angle brackets, backslashes or line breaks, spaces collapsed,
+ * then quoted, so a name with a comma or a period can't be read as a second address.
+ */
+export function fromHeader(name: string, from: string): string {
+  const clean = name.replace(/["<>\\\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+  return clean ? `"${clean}" <${fromAddress(from)}>` : fromWithName(from);
 }
 
 /** The sending domain, for the thread header's id: the From address after its @. */
@@ -47,7 +67,7 @@ function fromDomain(from: string): string {
 export function resendBody(config: Pick<EmailEnv, "from" | "replyTo">, msg: EmailMessage) {
   const parent = msg.threadKey ? `<${msg.threadKey}@${fromDomain(config.from)}>` : null;
   return {
-    from: fromWithName(config.from),
+    from: msg.fromName ? fromHeader(msg.fromName, config.from) : fromWithName(config.from),
     to: [msg.to],
     subject: msg.subject,
     text: msg.text,

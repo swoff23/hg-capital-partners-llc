@@ -8,9 +8,10 @@ import { shortAddress } from "@/lib/normalize";
 import { propertyOptions } from "@/lib/picker-options";
 import { assigneeOptions } from "@/lib/tasks/assignee-options";
 import { NONE, TASK_PAGE_MAX, parseAllFilters, personRefs, taskLimit, withKnownFilters, withMergedOwners, withoutAssigneeShortcut } from "@/lib/tasks/list-query";
-import { allTasks, legacyAssignees, taskFilterCounts, taskViewCounts } from "@/lib/tasks/queries";
+import { allTasks, draftTasks, legacyAssignees, taskFilterCounts, taskViewCounts } from "@/lib/tasks/queries";
 import { parseTaskSort } from "@/lib/tasks/list-sort";
 import { AllList } from "../all-list";
+import { DraftSections } from "../draft-sections";
 import { TaskFilters } from "../filters";
 import { BulkBar } from "../bulk-bar";
 import { TaskListProvider } from "../task-list-context";
@@ -71,11 +72,13 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   const searching = filters.q !== "";
   // Property by default, a heading per building; Due flat; Assignee a heading per person (docs/specs/task-list-sort.md).
   const sort = parseTaskSort(typeof sp.sort === "string" ? sp.sort : null);
-  const [{ tasks, total, groups }, counts, viewCounts] = await Promise.all([
+  const [{ tasks, total, groups }, counts, viewCounts, drafts] = await Promise.all([
     allTasks(filters, take, legacy.merged, { sort, people: personRefs(users, contractors, archived), viewerId: user.id }),
     taskFilterCounts(filters, legacy.merged),
     // While a query is typed, each view counts its hits, so one outside the current view shows.
     searching ? taskViewCounts(filters, legacy.merged) : Promise.resolve(null),
+    // Drafts from Claude: their own groups above the list, which no filter or sort touches (docs/specs/tasks-from-claude.md 6.3).
+    draftTasks(user.id),
   ]);
 
   const filtered =
@@ -90,7 +93,12 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   // header too, for bulk edit's Select all (docs/specs/bulk-edit.md); picked rows clear when the view, a filter or the
   // search changes. The bar comes last, after Show more and outside the results that dim while a change loads.
   return (
-    <TaskListProvider tasks={tasks} today={todayYmdEastern()} people={{ users, contractors, meId: user.id, recent }}>
+    <TaskListProvider
+      tasks={tasks}
+      today={todayYmdEastern()}
+      people={{ users, contractors, meId: user.id, recent }}
+      drafts={[...drafts.mine, ...drafts.others.flatMap((g) => g.tasks)]}
+    >
       <TaskPicksProvider scope={JSON.stringify([filters.status, filters.q, filters.owner, filters.property, filters.repeats])}>
         <TasksHeader />
         <TaskFilters
@@ -108,6 +116,10 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
             filtered,
           }}
         >
+          {/* Above the list and outside its filters and sort; a draft row can't be picked (task-row.tsx). Shown over the empty state too. */}
+          <div className="mt-4 empty:hidden">
+            <DraftSections mine={drafts.mine} others={drafts.others} />
+          </div>
           <TasksOrEmpty
             empty={
               <div className="mt-4">

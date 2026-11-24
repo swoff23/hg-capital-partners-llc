@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { TITLE_MAX, TOO_LONG } from "./limits";
-import { notesText, unitText, waitingOnText } from "./limits-schema";
+import { CHECKLIST_FULL, NEW_CHECKLIST_MAX, TITLE_MAX, TOO_LONG } from "./limits";
+import { checklistItemText, notesText, unitText, waitingOnText } from "./limits-schema";
 
 /**
  * What New task posts (new/actions.ts createTask), as form fields. The title,
@@ -31,4 +31,11 @@ export const newTaskSchema = z.object({
   missing: z.string().max(20_000).optional(),
   // Permission to enter (docs/specs/tenants.md section 8): "on" only while the switch shows and is on.
   entryPermitted: z.literal("on").optional(),
+  // The Checklist section's items, JSON (docs/specs/new-task-checklist-photos.md); read by newChecklistSchema.
+  checklist: z.string().max(64_000).optional(),
+  // The form whose held files become the task's (new-task-files.ts); set once a file was picked.
+  formId: z.string().max(64).optional(),
 });
+
+/** The Checklist section's items as posted: each held to the task page's own limit, at most NEW_CHECKLIST_MAX. */
+export const newChecklistSchema = z.array(checklistItemText).max(NEW_CHECKLIST_MAX, CHECKLIST_FULL);

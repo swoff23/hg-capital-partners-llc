@@ -7,8 +7,9 @@ import { useEffect } from "react";
  * in. A cold open from an email streams the loading screen first, where the
  * browser finds no such id and lets the scroll go; this mounts with the page
  * itself, so the place is there. The staff app's shell does the same for its
- * pages (app-shell.tsx). `#access` lands on Tenants, or on Lockbox when
- * nobody lives there (job-link-paths.ts).
+ * pages (app-shell.tsx). `#access` lands on Getting in (how they get in,
+ * then the code; Connor, Nov 22), or on Tenants when there is none
+ * (job-link-paths.ts).
  */
 export function HashScroll() {
   useEffect(() => {
@@ -22,7 +23,7 @@ export function HashScroll() {
     } catch {
       // A hand-edited link with a stray %: use it as written.
     }
-    const target = id === "access" ? (document.getElementById("tenants") ?? document.getElementById("lockbox")) : id ? document.getElementById(id) : null;
+    const target = id === "access" ? (document.getElementById("lockbox") ?? document.getElementById("tenants")) : id ? document.getElementById(id) : null;
     target?.scrollIntoView({ block: "start" });
   }, []);
   return null;

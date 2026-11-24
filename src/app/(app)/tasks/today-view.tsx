@@ -6,7 +6,7 @@ import { SegmentedControl, type SegmentOption } from "@/components/segmented-con
 import { SpotArt } from "@/components/spot-art";
 import { StatusMark } from "@/components/status-badge";
 import { Button, EmptyState } from "@/components/ui";
-import { groupContractors, groupMine } from "@/lib/tasks/list";
+import { groupContractors, groupMine, scheduledOf } from "@/lib/tasks/list";
 import { cn } from "@/lib/utils";
 import { ReviewActions } from "./review-actions";
 import { useTaskList } from "./task-list-context";
@@ -139,7 +139,7 @@ export function TodayView({ userId }: { userId: string }) {
               icon={<Avatar name={g.name} size={20} outline />}
             >
               {g.jobs.map((t) => (
-                <TaskRow key={t.id} task={t} checkbox={false} />
+                <TaskRow key={t.id} task={t} checkbox={false} wideStatus={g.jobs.some((j) => scheduledOf(j) != null)} />
               ))}
             </TaskSection>
           ))}

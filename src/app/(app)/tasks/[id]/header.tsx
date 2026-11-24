@@ -34,8 +34,11 @@ export function TitleField({ taskId, title, closed }: { taskId: string; title: s
   );
 }
 
-/** "…": New invoice (for this job), Copy link, Delete. */
-export function MoreMenu({ taskId, title, canceled = false }: { taskId: string; title: string; canceled?: boolean }) {
+/**
+ * "…": New invoice (for this job), Copy link, Delete. A draft from Claude has Copy link alone: its banner's Discard is
+ * the way out, with an Undo (a delete would take it, its photos and its comments for good, and the service refuses it).
+ */
+export function MoreMenu({ taskId, title, canceled = false, draft = false }: { taskId: string; title: string; canceled?: boolean; draft?: boolean }) {
   const { toast } = useToast();
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -72,8 +75,8 @@ export function MoreMenu({ taskId, title, canceled = false }: { taskId: string; 
         </AriaButton>
         <Menu>
           {/* Opens New invoice with this job ticked (docs/contractor-invoices-plan.md 6.1 item 6). */}
-          {/* A canceled job takes no invoice (M7), so the item isn't offered. */}
-          {!canceled && (
+          {/* A canceled job takes no invoice (M7), nor does a draft, so the item isn't offered. */}
+          {!canceled && !draft && (
             <MenuItem icon={<ReceiptText />} onAction={() => router.push(`/invoices/new?job=${encodeURIComponent(taskId)}`)}>
               New invoice
             </MenuItem>
@@ -81,10 +84,12 @@ export function MoreMenu({ taskId, title, canceled = false }: { taskId: string; 
           <MenuItem icon={<Link2 />} onAction={copyLink}>
             Copy link
           </MenuItem>
-          <MenuSeparator />
-          <MenuItem variant="destructive" icon={<Trash2 />} onAction={() => setConfirming(true)}>
-            Delete
-          </MenuItem>
+          {!draft && <MenuSeparator />}
+          {!draft && (
+            <MenuItem variant="destructive" icon={<Trash2 />} onAction={() => setConfirming(true)}>
+              Delete
+            </MenuItem>
+          )}
         </Menu>
       </MenuTrigger>
       {confirming && (

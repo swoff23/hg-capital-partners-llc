@@ -78,13 +78,14 @@ test("call 5: Create login and Change login email put every refusal that isn't a
 test("call 3: a job's page, loading screen and error screen draw one header, and the shared error screen is untouched", () => {
   const dir = "../app/(portal)/p/jobs/[id]/";
   for (const file of ["loading.tsx", "error.tsx"]) assert.match(read(dir + file), /<JobHeader \/>/, file);
-  // The loaded page adds Text to my crew, while the job is open, before Call HG.
-  assert.match(read(dir + "page.tsx"), /<JobHeader actions=\{active && <CrewText taskId=\{job\.id\} openOnLoad=\{ask === "share"\} \/>\} \/>/);
+  // The loaded page's header adds the address and Share with crew, while the job is open (Connor, Nov 22).
+  assert.match(read(dir + "page.tsx"), /<JobHeader place=\{[^}]*\}[^>]*share=\{crew && <CrewText \{\.\.\.crew\} \/>\} \/>/);
+  assert.match(read(dir + "page.tsx"), /<AddressRow address=\{job\.address\}/);
   assert.doesNotMatch(read(dir + "page.tsx"), /<header/);
   assert.doesNotMatch(read(dir + "loading.tsx"), /<header/);
   const header = read(dir + "_components/job-header.tsx");
-  assert.match(header, /<BackLink fallback="\/p" label="My jobs"/);
-  assert.match(header, /\{actions\}\s*\{tel && \(/);
+  assert.match(header, /<BackLink fallback="\/p" label="My jobs" iconOnly \/>/);
+  assert.match(header, /\{share\}\s*\{tel && \(/);
   assert.match(read(dir + "error.tsx"), /<ErrorScreen \{\.\.\.props\} \/>/);
   // My jobs keeps the shared boundary: a link to itself would clear nothing there.
   assert.doesNotMatch(read("../app/(portal)/p/error.tsx"), /JobHeader|Back to my jobs/);

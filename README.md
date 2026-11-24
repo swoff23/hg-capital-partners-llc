@@ -35,7 +35,8 @@ The working rules (planning, reuse, design references, copy, device check, landi
 ```
 src/app/(app)/*        signed-in pages; each area has a thin actions.ts
 src/app/(marketing)/*  public pages
-src/app/api/*          health, search, blob token minting, file delivery, QuickBooks OAuth + cron
+src/app/api/*          health, search, blob token minting, file delivery, QuickBooks OAuth + cron,
+                       Claude's connector (mcp) and its sign-in (oauth)
 src/lib/<domain>/      services that own every database write: tasks, deals, properties, contractors
 src/lib/quickbooks/    pure core (categorize, classify, compute, reconcile, report-parse, months) + sync/queries
 src/lib/*.ts           shared pure helpers: env, dates, money, normalize, secrets, session-token, …
@@ -127,5 +128,13 @@ npx prisma migrate deploy && npm run migrate`.
 **QuickBooks** — connect from Financials → Settings once the `QBO_*` vars are
 set. The nightly cron rebuilds the last 3 months plus a rotating slice of
 older history; "Refresh from QuickBooks" rebuilds everything.
+
+**Claude's connector** — off until `CLAUDE_CONNECTOR_ENABLED` is set in Vercel
+(docs/specs/tasks-from-claude.md, section 14). Each partner connects from
+Settings → Claude with an address of his own. To cut one off (a lost phone),
+tap Disconnect there on either partner's row; a password reset ends it too.
+Once a draft has been saved this only rolls forward: an older build can't read
+a draft, or a task that began as one. If a rollback is ever forced, first add
+or discard every draft and set `TaskEvent.source` from `CLAUDE` to `APP`.
 
 **Production debugging** — `DEBUG.md`.

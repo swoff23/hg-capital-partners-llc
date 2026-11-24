@@ -22,9 +22,9 @@ const STORED_NAME = /^[A-Za-z0-9._-]{1,160}$/;
 const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const MAX_NAME = 100;
 
-function roleIn(pathname: string, taskId: string, name: RegExp): UploadRole | null {
+function roleIn(pathname: string, taskId: string, name: RegExp, folder = "tasks"): UploadRole | null {
   if (!SAFE_ID.test(taskId)) return null;
-  const prefix = `tasks/${taskId}/`;
+  const prefix = `${folder}/${taskId}/`;
   if (!pathname.startsWith(prefix)) return null;
   const [role, file, ...rest] = pathname.slice(prefix.length).split("/");
   if (rest.length || !file || !(UPLOAD_ROLES as readonly string[]).includes(role)) return null;
@@ -72,6 +72,46 @@ export function safeUploadName(filename: string): string {
  */
 export function taskUploadPath(taskId: string, filename: string, role: UploadRole = "orig", contentType?: string): string {
   return `tasks/${taskId}/${role}/${safeUploadName(contentType ? filenameForType(filename, contentType) : filename)}`;
+}
+
+/**
+ * A resident's photos and videos (docs/specs/maintenance-requests.md, section 6), uploaded from their link before the
+ * request exists, so under the link's own folder rather than a task's; the task's file rows point at them as they are.
+ *
+ *   residents/<linkId>/(orig|thumb|poster)/<name>
+ */
+export function requestedResidentUploadRole(pathname: string, linkId: string): UploadRole | null {
+  return roleIn(pathname, linkId, REQUESTED_NAME, "residents");
+}
+
+/** The role of a stored blob's path in a link's folder, or null when it isn't that link's. */
+export function storedResidentUploadRole(pathname: string, linkId: string): UploadRole | null {
+  return roleIn(pathname, linkId, STORED_NAME, "residents");
+}
+
+/** The path a resident's uploader asks for. */
+export function residentUploadPath(linkId: string, filename: string, role: UploadRole = "orig", contentType?: string): string {
+  return `residents/${linkId}/${role}/${safeUploadName(contentType ? filenameForType(filename, contentType) : filename)}`;
+}
+
+/**
+ * New task's files (docs/specs/new-task-checklist-photos.md), uploaded from the form before the task exists, so under
+ * the form's own folder; the task's file rows point at them as they are, as a resident's do.
+ *
+ *   new-tasks/<formId>/(orig|thumb|poster)/<name>
+ */
+export function requestedNewTaskUploadRole(pathname: string, formId: string): UploadRole | null {
+  return roleIn(pathname, formId, REQUESTED_NAME, "new-tasks");
+}
+
+/** The role of a stored blob's path in a form's folder, or null when it isn't that form's. */
+export function storedNewTaskUploadRole(pathname: string, formId: string): UploadRole | null {
+  return roleIn(pathname, formId, STORED_NAME, "new-tasks");
+}
+
+/** The path New task's uploader asks for. */
+export function newTaskUploadPath(formId: string, filename: string, role: UploadRole = "orig", contentType?: string): string {
+  return `new-tasks/${formId}/${role}/${safeUploadName(contentType ? filenameForType(filename, contentType) : filename)}`;
 }
 
 /** The store id inside a read-write token, "vercel_blob_rw_<storeId>_<secret>". */

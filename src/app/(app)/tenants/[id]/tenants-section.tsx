@@ -18,7 +18,7 @@ const actionLink = cn(buttonClass({ variant: "ghost", size: "sm", icon: true }),
  * record; Text only where a tap opens Messages (touch). "Add tenant" under
  * the rows opens the same sheet empty.
  */
-export function TenantsSection({ leaseId, tenants }: { leaseId: string; tenants: TenantRow[] }) {
+export function TenantsSection({ leaseId, tenants, linkable = false }: { leaseId: string; tenants: TenantRow[]; linkable?: boolean }) {
   // One sheet, remounted per open (`n`) so it starts from the person as the page has them now.
   const [sheet, setSheet] = useState<{ n: number; open: boolean; tenant: TenantRow | null }>({ n: 0, open: false, tenant: null });
   const coarse = useCoarsePointer();
@@ -76,6 +76,7 @@ export function TenantsSection({ leaseId, tenants }: { leaseId: string; tenants:
           key={sheet.n}
           leaseId={leaseId}
           tenant={sheet.tenant}
+          linkable={linkable}
           isOpen={sheet.open}
           onOpenChange={(open) => setSheet((s) => ({ ...s, open }))}
         />

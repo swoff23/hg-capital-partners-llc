@@ -2,7 +2,7 @@ import "server-only";
 import type { TaskStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { shortAddress } from "@/lib/normalize";
-import { excludeTemplateTasks } from "@/lib/task-scope";
+import { listedTask } from "@/lib/task-scope";
 
 /**
  * What the invoice page's two pickers list, read once on the server (docs/contractor-invoices-plan.md, M11 and M7).
@@ -39,10 +39,10 @@ export interface JobChoice {
 
 const JOB_PICKER_MAX = 600;
 
-/** Any job that isn't canceled (M7), whoever it's assigned to. */
+/** Any job that isn't canceled (M7), whoever it's assigned to. Never a draft from Claude or a playbook row (listedTask). */
 export async function jobChoices(): Promise<JobChoice[]> {
   const rows = await prisma.task.findMany({
-    where: { ...excludeTemplateTasks, status: { not: "CANCELED" } },
+    where: { ...listedTask, status: { not: "CANCELED" } },
     select: { id: true, title: true, status: true, property: { select: { address: true } } },
     orderBy: { updatedAt: "desc" },
     take: JOB_PICKER_MAX,
@@ -57,10 +57,10 @@ export async function jobAddresses(taskIds: readonly string[]): Promise<Record<s
   return Object.fromEntries(rows.map((r) => [r.id, r.property ? shortAddress(r.property.address) : null]));
 }
 
-/** One job, for New invoice's `?job=`: null when it's gone, canceled or a playbook row. */
+/** One job, for New invoice's `?job=`: null when it's gone, canceled, a draft or a playbook row. */
 export async function jobById(id: string): Promise<JobChoice | null> {
   const r = await prisma.task.findFirst({
-    where: { id, ...excludeTemplateTasks, status: { not: "CANCELED" } },
+    where: { id, ...listedTask, status: { not: "CANCELED" } },
     select: { id: true, title: true, status: true, property: { select: { address: true } } },
   });
   return r ? { id: r.id, title: r.title, address: r.property ? shortAddress(r.property.address) : null, status: r.status } : null;

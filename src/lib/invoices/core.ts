@@ -222,10 +222,13 @@ async function checkContact(tx: Tx, contactId: string, current: string | null): 
   return { id: c.id, fullName: c.fullName };
 }
 
-/** A job an invoice can be for (M7): any job that isn't canceled, whoever it sits on. Never a playbook's template row. */
+/**
+ * A job an invoice can be for (M7): any job that isn't canceled, whoever it sits on. Never a playbook's template row,
+ * nor a draft from Claude, which isn't work anyone can see yet (task-scope.ts listedTask).
+ */
 async function jobToLink(tx: Tx, taskId: string): Promise<{ id: string; title: string; status: string }> {
   const t = await tx.task.findUnique({ where: { id: taskId }, select: { id: true, title: true, status: true, bucket: true } });
-  if (!t || t.bucket === TEMPLATE_BUCKET) throw new FieldError({ taskId: JOB_GONE });
+  if (!t || t.bucket === TEMPLATE_BUCKET || t.status === "DRAFT") throw new FieldError({ taskId: JOB_GONE });
   if (t.status === "CANCELED") throw new FieldError({ taskId: JOB_CANCELED });
   return t;
 }

@@ -14,11 +14,11 @@ const source = fs.readFileSync(path.join(import.meta.dirname, "outbox.ts"), "utf
 const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
 test("the drain re-reads each item's event after it claims the row, not before", () => {
-  const claimAt = code.indexOf("await claim(row.id, now)");
+  const claimAt = code.indexOf("const claimed = await claim(row.id, now)");
   const liveAt = code.indexOf("await liveItems(");
   assert.ok(claimAt > 0 && liveAt > claimAt, "read the events from the claimed items");
   // Claimed rows are the ones the claim returned: what is read is what is sent.
-  assert.match(code, /liveItems\(row\.taskId, parseItems\(claimed\.items\)/);
+  assert.match(code, /liveItems\(taskId, parseItems\(claimed\.items\)/);
 });
 
 test("it reads in one query per row, scoped to the row's task, only for items that name events", () => {
@@ -29,8 +29,28 @@ test("it reads in one query per row, scoped to the row's task, only for items th
   assert.match(code, /attachments: \{ where: \{ deletedAt: null \}/);
 });
 
-test("a row whose items all drop closes as 'nothing to send', never as an empty email", () => {
-  assert.match(code, /items\.length === 0[\s\S]{0,200}lastError: "nothing to send"/);
+test("a claimed row with nothing left to say closes with the second decision's reason, never as an empty email", () => {
+  // claimedRowVerdict (content.test.ts) answers "no task", "draft", "nothing to send" or "seen in app"; the run writes
+  // that and moves on. It also gets whether the home needs 24 hours' notice and when a partner last opened the task.
+  assert.match(code, /const second = claimedRowVerdict\(\{\s*audience: delivery\.audience,\s*items: live\.items,\s*job: fresh,\s*hasAccess: !!accessRow,\s*needsNotice: !!jobAccess\?\.needsNotice,\s*seenAt: seen\?\.lastSeenAt \?\? null,\s*today: todayYmdEastern\(now\),\s*\}\);\s*if \(!second\.send\) \{\s*await prisma\.notificationOutbox\.updateMany\(\{ where: \{ id: row\.id \}, data: \{ sentAt: now, lastError: second\.reason \} \}\);\s*result\.skipped\+\+;\s*continue;/);
+  // The job, the access and the read state it judges are read after the claim, so an Add undone in between is seen.
+  const drain = code.slice(code.indexOf("export async function drainDue"));
+  assert.ok(drain.indexOf("const claimed = await claim(row.id, now)") < drain.indexOf("prisma.task.findUnique({"));
+  assert.ok(drain.indexOf("const claimed = await claim(row.id, now)") < drain.indexOf("prisma.taskReadState.findUnique({ where: { taskId_userId: { taskId, userId: row.recipientUserId } }"));
+});
+
+// docs/specs/emails-redesign.md: who it's from, what a reply does, and a deleted job's Removed email.
+test("the drain sends From names, a reply address on Removed too, a partner's naming the contractor, none on an unassigned request", () => {
+  assert.match(code, /fromName: email\.fromName,/);
+  assert.doesNotMatch(code, /!off && replyWho/, "Removed gets its reply address");
+  assert.match(code, /\{ userId: row\.recipientUserId, contactId: aboutContactId\(items\) \?\? job\.assigneeContactId \?\? null \}/);
+  assert.match(code, /replyWho && !unassignedRequest \? await mintJobLink\(prisma, \{ taskId: taskId, kind: "REPLY", \.\.\.replyWho \}\)/);
+  // A row with no task is a deleted job's Removed email, decided by deletedRowVerdict before anything else, and claimed
+  // like any row before it sends.
+  const drain = code.slice(code.indexOf("for (const row of rows)"));
+  assert.ok(drain.indexOf("deletedRowVerdict(row)") < drain.indexOf("dueRowVerdict(row)"));
+  assert.match(drain, /if \(!row\.taskId\) \{\s*const gone = deletedRowVerdict\(row\);\s*if \(!gone\.send\) \{\s*await closeUnsent\(row\.id, now, gone\.reason\);/);
+  assert.match(drain, /const claimedGone = await claim\(row\.id, now\);\s*if \(!claimedGone\) continue;/);
 });
 
 test("the drain never deletes or rewrites a row to retract a line", () => {
@@ -56,10 +76,10 @@ test("every write to a claimed row is an updateMany by id, so a row deleteTask's
   assert.doesNotMatch(code, /notificationOutbox\.update\(/, "no update that needs the row to be there");
   const drain = code.slice(code.indexOf("export async function drainDue"));
   const writes = drain.match(/notificationOutbox\.updateMany\(\{\s*where: \{ [^}]*\}/g) ?? [];
-  // The task gone at the claim, nothing to send, an invoice row's wait and its read after the claim, and in the shared
-  // settle step sent, refused for Resend's limits and failed: each by the row's id alone (an unclaimed invoice row's
-  // wait also only while it's unsent).
-  assert.equal(writes.length, 7);
+  // Sent, refused for Resend's limits, failed (the send helper, by the row's id it was handed), closed by the second
+  // decision (the task gone, a draft, nothing to send, seen in the app), and an invoice row's wait and its read after
+  // the claim: each by the row's id alone (an unclaimed invoice row's wait also only while it's unsent).
+  assert.equal(writes.length, 6);
   for (const w of writes) assert.match(w, /where: \{ id: (row\.id|rowId)(, sentAt: null)? \}$/);
   // A count of 0 is not an error: nothing reads it, and the loop goes on to the next row.
   assert.doesNotMatch(drain, /const \{ count \} = await prisma\.notificationOutbox\.updateMany/);
@@ -70,8 +90,11 @@ test("every write to a claimed row is an updateMany by id, so a row deleteTask's
 // docs/specs/contractor-email-switch.md: a line still waiting when Job emails goes off is dropped by the run.
 test("the drain reads the contractor's Job emails switch with the row and closes a refused row unsent, with the reason", () => {
   assert.match(code, /portalAccount: \{ select: \{ email: true, status: true, jobEmails: true \} \}/);
-  // deliveryFor's refusal (content.test.ts: "emails off") is the row's lastError, so nothing reads it as emailed.
-  assert.match(code, /await closeUnsent\(row\.id, now, !row\.task \? "no task" : delivery\.ok \? "no recipient" : delivery\.reason\)/);
+  // The first decision's refusal (content.test.ts dueRowVerdict: "emails off", "draft", "no task") is the row's
+  // lastError, so nothing reads it as emailed, and the row is never claimed.
+  assert.match(code, /const first = dueRowVerdict\(row\);\s*if \(!first\.send\) \{\s*await closeUnsent\(row\.id, now, first\.reason\);\s*result\.skipped\+\+;\s*continue;\s*\}/);
+  const drain = code.slice(code.indexOf("export async function drainDue"));
+  assert.ok(drain.indexOf("dueRowVerdict(row)") < drain.indexOf("const claimed = await claim(row.id, now)"), "decided before the claim");
 });
 
 // docs/contractor-invoices-plan.md, 5.3: invoice rows carry no task, so they take their own branch before the task
@@ -79,11 +102,13 @@ test("the drain reads the contractor's Job emails switch with the row and closes
 test("an invoice row takes its own branch before the task checks, and is read again after its claim", () => {
   const drain = code.slice(code.indexOf("export async function drainDue"));
   const branch = drain.indexOf("if (isInvoiceRow(row))");
-  assert.ok(branch > 0 && branch < drain.indexOf("const contractorHasAccess"), "the invoice branch comes before the task checks");
-  const body = drain.slice(branch, drain.indexOf("const contractorHasAccess"));
+  // Before the deleted job's branch too, since an invoice row has no task either.
+  assert.ok(branch > 0 && branch < drain.indexOf("if (!row.taskId)"), "the invoice branch comes before the task checks");
+  assert.ok(branch < drain.indexOf("const first = dueRowVerdict(row)"), "the invoice branch comes before the first decision");
+  const body = drain.slice(branch, drain.indexOf("if (!row.taskId)"));
   assert.doesNotMatch(body, /task\.findUnique|taskAccess|deliveryFor/);
   const claimAt = body.indexOf("await claim(row.id, now)");
-  assert.ok(claimAt > 0 && body.indexOf("invoiceEmailFor(prisma, { ...row, items: claimed.items }") > claimAt, "re-read after the claim");
+  assert.ok(claimAt > 0 && body.indexOf("invoiceEmailFor(prisma, { ...row, items: claimedInvoice.items }") > claimAt, "re-read after the claim");
   // No reply token on a Paid email (M15).
   assert.doesNotMatch(body, /replyTo|mintJobLink/);
   // A skip planned before the claim closes only while the row holds the items it was planned from, so a bundle line

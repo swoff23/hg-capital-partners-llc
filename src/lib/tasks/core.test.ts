@@ -512,6 +512,9 @@ test("status email lines: Approve and the contractor's Start have their own word
   assert.equal(statusSummary({ ...base, from: "REVIEW", to: "DONE", actor: "staff" }, now), 'approved "Cabinet install"');
   assert.equal(statusSummary({ ...base, from: "OPEN", to: "DONE", actor: "staff" }, now), 'set "Cabinet install" to done');
   assert.equal(statusSummary({ ...base, from: "SCHEDULED", to: "IN_PROGRESS", actor: "contractor" }, now), 'started "Cabinet install"');
+  // A contractor's Remove day (unscheduleByContractor); staff putting it back to To do keeps the plain words.
+  assert.equal(statusSummary({ ...base, from: "SCHEDULED", to: "OPEN", actor: "contractor" }, now), 'unscheduled "Cabinet install"');
+  assert.equal(statusSummary({ ...base, from: "SCHEDULED", to: "OPEN", actor: "staff" }, now), 'set "Cabinet install" to open');
   assert.equal(statusSummary({ ...base, from: "SCHEDULED", to: "IN_PROGRESS", actor: "staff" }, now), 'set "Cabinet install" to in progress');
   assert.equal(statusSummary({ ...base, from: "REVIEW", to: "IN_PROGRESS", actor: "staff", note: "Level it" }, now), 'sent "Cabinet install" back: Level it');
   assert.equal(statusSummary({ ...base, from: "IN_PROGRESS", to: "REVIEW", actor: "contractor" }, now), 'sent "Cabinet install" for review');
@@ -878,7 +881,7 @@ test("setStatus: Send back writes the status, then the note tied to it, and the 
   // One email line: the status, with the note's id so an edit or a delete reaches it. No second comment line.
   const items = queued(calls);
   assert.equal(items.length, 1);
-  assert.deepEqual(items[0], { kind: "STATUS", actorLabel: "Pieter Louw", summary: 'sent "Cabinet install" back: Level the uppers', at: items[0].at, eventId: "s1", noteEventId: "n1", from: "REVIEW" });
+  assert.deepEqual(items[0], { kind: "STATUS", actorLabel: "Pieter Louw", summary: 'sent "Cabinet install" back: Level the uppers', at: items[0].at, eventId: "s1", noteEventId: "n1", from: "REVIEW", to: "IN_PROGRESS" });
 });
 
 test("setStatus: a move with no note writes no comment and no note id", async () => {
@@ -1234,20 +1237,20 @@ test("REPEAT is written only from patchTask, never as a task is made or its next
   assert.ok(!events(made.calls).some((e) => e.kind === "REPEAT"));
 });
 
-test("patchTask: the email for a moved date says whether it is the visit or the due date", async () => {
+test("patchTask: a moved Due date queues TARGET and a moved scheduled day queues DAY, each on its own", async () => {
   const hasLogin: Answer = (model, op) => (model === "portalAccount" && op === "findUnique" ? { status: "ACTIVE", lastSignInAt: new Date("2026-10-01T12:00:00Z"), jobEmails: true } : undefined);
-  // Scheduled: the date the contractor sees is the booked visit.
-  const visit = fakeTx({ status: "SCHEDULED", assigneeContactId: "c-zack", scheduledFor: day("2026-10-29"), dueDate: day("2026-11-10") }, hasLogin);
-  await patchTask(visit.tx, "t1", { scheduledFor: "2026-10-30" }, PIETER, new Date("2026-10-23T15:00:00Z"));
-  assert.deepEqual(queued(visit.calls).map((i) => [i.kind, i.summary, i.visit]), [["TARGET", 'moved "Hang drywall" to Fri, Oct 30', true]]);
-  // Otherwise it is the due date.
+  // Scheduled: the scheduled day moving is a DAY line.
+  const moved = fakeTx({ status: "SCHEDULED", assigneeContactId: "c-zack", scheduledFor: day("2026-10-29"), dueDate: day("2026-11-10") }, hasLogin);
+  await patchTask(moved.tx, "t1", { scheduledFor: "2026-10-30" }, PIETER, new Date("2026-10-23T15:00:00Z"));
+  assert.deepEqual(queued(moved.calls).map((i) => [i.kind, i.summary, i.visit]), [["DAY", 'moved "Hang drywall" to Fri, Oct 30', undefined]]);
+  // The Due date is TARGET, whatever the status.
   const due = fakeTx({ status: "IN_PROGRESS", assigneeContactId: "c-zack", dueDate: day("2026-10-29") }, hasLogin);
   await patchTask(due.tx, "t1", { dueDate: "2026-10-30" }, PIETER, new Date("2026-10-23T15:00:00Z"));
-  assert.deepEqual(queued(due.calls).map((i) => [i.kind, i.visit]), [["TARGET", false]]);
-  // Clearing the visit date is still about the visit.
+  assert.deepEqual(queued(due.calls).map((i) => [i.kind, i.visit]), [["TARGET", undefined]]);
+  // Clearing the scheduled day is still a DAY line.
   const cleared = fakeTx({ status: "SCHEDULED", assigneeContactId: "c-zack", scheduledFor: day("2026-10-29"), dueDate: null }, hasLogin);
   await patchTask(cleared.tx, "t1", { scheduledFor: null }, PIETER, new Date("2026-10-23T15:00:00Z"));
-  assert.deepEqual(queued(cleared.calls).map((i) => [i.summary, i.visit]), [['moved "Hang drywall" to no date', true]]);
+  assert.deepEqual(queued(cleared.calls).map((i) => [i.kind, i.summary, i.visit]), [["DAY", 'moved "Hang drywall" to no date', undefined]]);
 });
 
 // ---------------------------------------------------------------------------

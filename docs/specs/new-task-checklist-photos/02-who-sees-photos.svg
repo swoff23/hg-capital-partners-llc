@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Who sees the photos</title>
+<defs>
+  <symbol id="ic-cal" viewBox="0 0 12 12">
+    <rect x="1" y="2" width="10" height="9" rx="2" fill="none" stroke="#424e61" stroke-width="1.2"/>
+    <line x1="1" y1="5" x2="11" y2="5" stroke="#424e61" stroke-width="1.2"/>
+  </symbol>
+  <symbol id="ic-house" viewBox="0 0 12 12">
+    <path d="M1.5 6 L6 2 L10.5 6 V10.5 H1.5 Z" fill="none" stroke="#424e61" stroke-width="1.2" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="tile" viewBox="0 0 44 44">
+    <rect x="0" y="0" width="44" height="44" rx="6" fill="#f2f0ec"/>
+    <path d="M8 34 L18 22 L25 29 L30 24 L37 34 Z" fill="#e2ded7"/>
+    <circle cx="30" cy="13" r="3.5" fill="#e2ded7"/>
+    <rect x="32" y="1" width="11" height="11" rx="2" fill="#152133"/>
+    <path d="M35.3 4.3 L39.7 8.7 M39.7 4.3 L35.3 8.7" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="lock" viewBox="0 0 14 14">
+    <rect x="0" y="0" width="14" height="14" rx="3" fill="#152133" fill-opacity="0.72"/>
+    <rect x="3.5" y="6.2" width="7" height="5" rx="1" fill="#ffffff"/>
+    <path d="M5 6.2 V4.8 A2 2 0 0 1 9 4.8 V6.2" fill="none" stroke="#ffffff" stroke-width="1.2"/>
+  </symbol>
+  <symbol id="add-tile" viewBox="0 0 44 44">
+    <rect x="0.75" y="0.75" width="42.5" height="42.5" rx="6" fill="#ffffff" stroke="#c9c4bb" stroke-dasharray="3 2.5"/>
+    <path d="M22 15 V29 M15 22 H29" stroke="#5d6778" stroke-width="1.5" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="chips" viewBox="0 0 232 26">
+    <rect x="14.5" y="0.5" width="62" height="25" rx="6" fill="#ffffff" stroke="#c9c4bb"/>
+    <circle cx="27" cy="13" r="6" fill="#e7e5e0"/>
+    <text x="27" y="16" font-size="7.5" font-weight="600" fill="#424e61" text-anchor="middle">Z</text>
+    <text x="38" y="17" font-size="10.5" font-weight="500" fill="#152133">Zack</text>
+    <rect x="82.5" y="0.5" width="84" height="25" rx="6" fill="#ffffff" stroke="#c9c4bb"/>
+    <use href="#ic-cal" x="90" y="7" width="12" height="12"/>
+    <text x="106" y="17" font-size="10.5" font-weight="500" fill="#152133">Mon, Nov 30</text>
+    <rect x="172.5" y="0.5" width="58" height="25" rx="6" fill="#ffffff" stroke="#c9c4bb"/>
+    <circle cx="184" cy="13" r="4.5" fill="none" stroke="#424e61" stroke-width="1.2"/>
+    <text x="194" y="17" font-size="10.5" font-weight="500" fill="#152133">To do</text>
+  </symbol>
+  <!-- New task on a phone with B's sections, filled in. -->
+  <symbol id="phone" viewBox="0 0 232 440">
+    <rect x="0.75" y="0.75" width="230.5" height="438.5" rx="22" fill="#ffffff" stroke="#d5d1ca" stroke-width="1.5"/>
+    <path d="M15 33 L24 42 M24 33 L15 42" stroke="#424e61" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="116" y="41" font-size="12" font-weight="600" fill="#152133" text-anchor="middle">New task</text>
+    <line x1="1" y1="56" x2="231" y2="56" stroke="#e7e5e0"/>
+    <text x="14" y="78" font-size="10.5" font-weight="500" fill="#424e61">Title</text>
+    <rect x="14.5" y="84.5" width="203" height="30" rx="6" fill="#ffffff" stroke="#d5d1ca"/>
+    <text x="22" y="104" font-size="11" fill="#152133">Fix porch light</text>
+    <text x="14" y="132" font-size="10.5" font-weight="500" fill="#424e61">Notes</text>
+    <text x="47" y="132" font-size="10" fill="#5d6778">Optional</text>
+    <rect x="14.5" y="138.5" width="203" height="44" rx="6" fill="#ffffff" stroke="#d5d1ca"/>
+    <text x="22" y="157" font-size="10.5" fill="#152133">Light by the back door flickers.</text>
+    <text x="14" y="204" font-size="10.5" font-weight="500" fill="#424e61">Checklist</text>
+    <circle cx="21" cy="220" r="5.5" fill="none" stroke="#c9c4bb"/>
+    <text x="34" y="224" font-size="10.5" fill="#152133">Replace the bulb</text>
+    <circle cx="21" cy="240" r="5.5" fill="none" stroke="#c9c4bb"/>
+    <text x="34" y="244" font-size="10.5" fill="#152133">Check the switch</text>
+    <circle cx="21" cy="260" r="5.5" fill="none" stroke="#c9c4bb" stroke-dasharray="2 2"/>
+    <text x="34" y="264" font-size="10.5" fill="#5d6778">Add item</text>
+    <text x="14" y="292" font-size="10.5" font-weight="500" fill="#424e61">Photos and files</text>
+    <use href="#tile" x="14" y="300" width="44" height="44"/>
+    <use href="#tile" x="64" y="300" width="44" height="44"/>
+    <use href="#add-tile" x="114" y="300" width="44" height="44"/>
+    <use href="#chips" y="356" width="232" height="26"/>
+    <rect x="14" y="392" width="204" height="34" rx="8" fill="#152133"/>
+    <text x="116" y="413" font-size="11.5" font-weight="600" fill="#ffffff" text-anchor="middle">Create task</text>
+  </symbol>
+</defs>
+
+<rect width="1200" height="640" fill="#ffffff"/>
+<text x="32" y="40" font-size="17" font-weight="600" fill="#152133">Q2. Who sees the photos you add on New task?</text>
+<text x="32" y="62" font-size="12" fill="#5d6778">Your pick from Q1 (B, both sections always show), on a phone (375), assigned to a contractor.</text>
+
+<!-- ===== A ===== -->
+<rect x="24" y="84" width="568" height="532" rx="12" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<use href="#phone" x="48" y="152" width="232" height="440"/>
+<text x="304" y="114" font-size="14" font-weight="600" fill="#152133">A. Shared with the contractor</text>
+<text x="304" y="133" font-size="11.5" font-weight="500" fill="#152133">Recommended</text>
+<text x="304" y="166" font-size="11.5" fill="#424e61">No switch. Everything on New task is the</text>
+<text x="304" y="183" font-size="11.5" fill="#424e61">job as the contractor gets it: the notes,</text>
+<text x="304" y="200" font-size="11.5" fill="#424e61">the checklist and these photos. Their first</text>
+<text x="304" y="217" font-size="11.5" fill="#424e61">job email carries all three.</text>
+<text x="304" y="252" font-size="11.5" fill="#424e61">With nobody assigned yet, whoever gets</text>
+<text x="304" y="269" font-size="11.5" fill="#424e61">the job later sees them too, like a</text>
+<text x="304" y="286" font-size="11.5" fill="#424e61">resident's request photos.</text>
+<text x="304" y="321" font-size="11.5" fill="#424e61">Something private, like a quote with</text>
+<text x="304" y="338" font-size="11.5" fill="#424e61">prices, goes in an internal note on the</text>
+<text x="304" y="355" font-size="11.5" fill="#424e61">task once it's made.</text>
+<text x="304" y="398" font-size="11" fill="#424e61"><tspan font-weight="600">Laptop:</tspan> the same section, nothing to set.</text>
+<text x="304" y="416" font-size="11" fill="#424e61"><tspan font-weight="600">Tablet:</tspan> same.</text>
+<text x="304" y="434" font-size="11" fill="#424e61"><tspan font-weight="600">Phone:</tspan> same.</text>
+
+<!-- ===== B ===== -->
+<rect x="608" y="84" width="568" height="532" rx="12" fill="#ffffff" stroke="#d5d1ca" stroke-width="1.5"/>
+<g transform="translate(632 152)">
+  <use href="#phone" width="232" height="440"/>
+  <!-- The comment box's Shared | Internal switch, beside the label. Internal picked here to show the lock. -->
+  <rect x="122" y="279" width="96" height="20" rx="5" fill="#f2f0ec"/>
+  <text x="145" y="293" font-size="9.5" font-weight="500" fill="#5d6778" text-anchor="middle">Shared</text>
+  <rect x="169.5" y="280.5" width="47" height="17" rx="4" fill="#ffffff" stroke="#c9c4bb"/>
+  <text x="193" y="293" font-size="9.5" font-weight="500" fill="#152133" text-anchor="middle">Internal</text>
+  <use href="#lock" x="17" y="303" width="12" height="12"/>
+  <use href="#lock" x="67" y="303" width="12" height="12"/>
+</g>
+<text x="888" y="114" font-size="14" font-weight="600" fill="#152133">B. A Shared or Internal switch</text>
+<text x="888" y="166" font-size="11.5" fill="#424e61">The comment box's own switch, on the</text>
+<text x="888" y="183" font-size="11.5" fill="#424e61">section. Shared to start. Internal puts</text>
+<text x="888" y="200" font-size="11.5" fill="#424e61">the lock on each tile, and the contractor</text>
+<text x="888" y="217" font-size="11.5" fill="#424e61">never sees those.</text>
+<text x="888" y="252" font-size="11.5" fill="#424e61">One more control on every new task,</text>
+<text x="888" y="269" font-size="11.5" fill="#424e61">for a case that's rare when a task</text>
+<text x="888" y="286" font-size="11.5" fill="#424e61">is first made.</text>
+<text x="888" y="398" font-size="11" fill="#424e61"><tspan font-weight="600">Laptop:</tspan> the switch at the section's right.</text>
+<text x="888" y="416" font-size="11" fill="#424e61"><tspan font-weight="600">Tablet:</tspan> same, 44px tall for touch.</text>
+<text x="888" y="434" font-size="11" fill="#424e61"><tspan font-weight="600">Phone:</tspan> fits beside the label at 375. At</text>
+<text x="888" y="452" font-size="11" fill="#424e61">320 the label shortens to Photos.</text>
+</svg>

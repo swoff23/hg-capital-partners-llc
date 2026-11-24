@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="490" viewBox="0 0 900 490" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Question 4, again: emergencies stay in the group chat. A (recommended): one line under the address, Emergency? Text us right away. B: nothing on the form.</title>
+<rect width="900" height="490" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">Question 4, again: emergencies stay in the group chat. Does the form say so?</text>
+<text x="32" y="56" font-size="11" fill="#424e61">No office number, no urgent switch, no gas card. The top of the form on a phone.</text>
+
+<!-- A -->
+<g transform="translate(32 76)">
+<rect x="0" y="0" width="404" height="320" rx="10" fill="none" stroke="#c9a96a" stroke-width="1.5"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">A. One line: text us</text>
+<rect x="148" y="16" width="92" height="20" rx="10" fill="#f6efe1"/>
+<text x="194" y="30" font-size="10" font-weight="500" fill="#8a6d2f" text-anchor="middle">Recommended</text>
+
+<rect x="20" y="48" width="220" height="220" rx="18" fill="#ffffff" stroke="#152133"/>
+<text x="36" y="74" font-size="13" font-weight="600" fill="#152133">Report a problem</text>
+<text x="36" y="89" font-size="9.5" fill="#424e61">56 Tamarack St, Upper</text>
+<text x="36" y="110" font-size="10" fill="#152133">Emergency? Text us right away.</text>
+<text x="36" y="136" font-size="10" font-weight="500" fill="#424e61">What's wrong?</text>
+<rect x="36" y="142" width="188" height="28" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="36" y="188" font-size="10" font-weight="500" fill="#8f99a8">Tell us more (optional)</text>
+<rect x="36" y="194" width="188" height="44" rx="6" fill="#ffffff" stroke="#eceef1"/>
+
+<text x="260" y="84" font-size="10.5" fill="#152133">• Teaches the one rule:</text>
+<text x="268" y="98" font-size="10.5" fill="#152133">the link for repairs, a</text>
+<text x="268" y="112" font-size="10.5" fill="#152133">text for emergencies.</text>
+<text x="260" y="134" font-size="10.5" fill="#152133">• No number to keep up</text>
+<text x="268" y="148" font-size="10.5" fill="#152133">to date. They already</text>
+<text x="268" y="162" font-size="10.5" fill="#152133">have your cells.</text>
+<text x="260" y="184" font-size="10.5" fill="#152133">• One short line, plain</text>
+<text x="268" y="198" font-size="10.5" fill="#152133">text, no card.</text>
+
+<text x="20" y="296" font-size="10.5" fill="#152133">Keeps a flood from sitting in the form while you're not looking.</text>
+</g>
+
+<!-- B -->
+<g transform="translate(464 76)">
+<rect x="0" y="0" width="404" height="320" rx="10" fill="none" stroke="#d9dde3"/>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#152133">B. Nothing on the form</text>
+
+<rect x="20" y="48" width="220" height="220" rx="18" fill="#ffffff" stroke="#152133"/>
+<text x="36" y="74" font-size="13" font-weight="600" fill="#152133">Report a problem</text>
+<text x="36" y="89" font-size="9.5" fill="#424e61">56 Tamarack St, Upper</text>
+<text x="36" y="112" font-size="10" font-weight="500" fill="#424e61">What's wrong?</text>
+<rect x="36" y="118" width="188" height="28" rx="6" fill="#ffffff" stroke="#d9dde3"/>
+<text x="36" y="164" font-size="10" font-weight="500" fill="#8f99a8">Tell us more (optional)</text>
+<rect x="36" y="170" width="188" height="44" rx="6" fill="#ffffff" stroke="#eceef1"/>
+
+<text x="260" y="84" font-size="10.5" fill="#152133">• Nothing extra to read.</text>
+<text x="260" y="106" font-size="10.5" fill="#152133">• You tell them the rule</text>
+<text x="268" y="120" font-size="10.5" fill="#152133">when you send the link.</text>
+<text x="260" y="142" font-size="10.5" fill="#152133">• A flood sent through the</text>
+<text x="268" y="156" font-size="10.5" fill="#152133">form waits until one of</text>
+<text x="268" y="170" font-size="10.5" fill="#152133">you sees it.</text>
+</g>
+
+<text x="32" y="428" font-size="11" fill="#424e61">Gas, for the record: Buffalo's gas is National Fuel (National Grid is the electric). Its own advice is to leave first, then call 1-800-444-3130</text>
+<text x="32" y="444" font-size="11" fill="#424e61">or 911 from outside. Neither option puts that on the form.</text>
+<text x="32" y="466" font-size="11" fill="#424e61">Sizes: the line fits on one line at 320. Tablet and laptop keep the centered 480 column.</text>
+</svg>

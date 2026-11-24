@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import type { TaskStatus } from "@prisma/client";
 import { useSearchParams } from "next/navigation";
 import { ActivityTime } from "@/components/activity-time";
@@ -45,8 +45,10 @@ export interface ReviewDecision {
  * for the rest of the visit, led by the new status's mark: "Pieter approved
  * this · 9:14 AM", "Connor sent this back · now" (activity 2.8). Arriving on
  * a job already decided shows nothing: the decision pair in Activity keeps
- * the record, so the line is only for the visit that held the banner. A
- * stale banner (Pieter approved first) refreshes into the same line.
+ * the record, so the line is only for the visit that held the banner, and
+ * for an email's button that found the job already decided (`landed`: the
+ * line says what happened in place of the banner). A stale banner (Pieter
+ * approved first) refreshes into the same line.
  */
 export function ReviewSlot({
   taskId,
@@ -56,12 +58,18 @@ export function ReviewSlot({
   hasLogin,
   now,
   openSendBack = false,
+  focusApprove = false,
+  landed = false,
 }: {
   taskId: string;
   review: ReviewProof | null;
   decision: ReviewDecision | null;
   /** An email's Send back: the banner's sheet starts open, and the ?do= comes off the address. */
   openSendBack?: boolean;
+  /** An email's Approve (`?do=approve`): the banner scrolls into view with Approve focused, and the ?do= comes off the address. */
+  focusApprove?: boolean;
+  /** An email's button (`?do=` approve or send-back) opened a job already decided: show the outcome line even though this visit never held the banner. */
+  landed?: boolean;
   /** The contractor's first name when one is assigned: who Send back goes to, and who hears of Approve. */
   contractor: string | null;
   /** The contractor can sign in, so Approve and Send back reach them by email. */
@@ -73,20 +81,69 @@ export function ReviewSlot({
   if (review && !heldBanner) setHeldBanner(true);
   // The banner (and the button just pressed) is gone: the outcome line takes the keyboard's place, unless focus went somewhere else.
   const outcome = useRef<HTMLParagraphElement>(null);
-  const showsOutcome = !review && heldBanner && !!decision;
+  const showsOutcome = !review && (heldBanner || landed) && !!decision;
   useEffect(() => {
     const active = document.activeElement;
     if (showsOutcome && (!active || active === document.body)) outcome.current?.focus();
   }, [showsOutcome]);
-  if (review) return <ReviewBanner taskId={taskId} contractor={contractor} hasLogin={hasLogin} now={now} openSendBack={openSendBack} {...review} />;
-  if (!heldBanner || !decision) return null;
+  // The address asked for something (an email's button) that this render answers; take it off once, whichever it was.
+  useEffect(() => stripDo(), []);
+  if (review) {
+    return (
+      <ReviewBanner taskId={taskId} contractor={contractor} hasLogin={hasLogin} now={now} openSendBack={openSendBack} focusApprove={focusApprove} {...review} />
+    );
+  }
+  if (!(heldBanner || landed) || !decision) return null;
   return (
-    <p ref={outcome} tabIndex={-1} role="status" className="flex min-w-0 items-center gap-2 text-meta text-muted-foreground outline-none">
-      <StatusMark status={decision.status} />
-      <span className="min-w-0 truncate">
-        {decision.name} {decision.status === "DONE" ? "approved this" : "sent this back"}
-        <span aria-hidden="true">{" · "}</span>
-        <ActivityTime at={decision.at} now={now} />
+    <OutcomeLine
+      ref={outcome}
+      mark={<StatusMark status={decision.status} />}
+      text={`${decision.name} ${decision.status === "DONE" ? "approved this" : "sent this back"}`}
+      at={decision.at}
+      now={now}
+    />
+  );
+}
+
+/** Takes an email button's `?do=` off the address without a navigation. */
+export function stripDo() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("do")) return;
+  url.searchParams.delete("do");
+  window.history.replaceState(null, "", url);
+}
+
+/**
+ * One system line: an optional mark, what happened and when ("Pieter approved this · 9:14 AM"). One line at every
+ * width, the words truncating first. Where the Review banner sat after a decision, and above the assignee field when an
+ * email's Assign found the job already assigned.
+ */
+export function OutcomeLine({
+  mark,
+  text,
+  at,
+  now,
+  ref,
+}: {
+  mark?: ReactNode;
+  text: string;
+  /** When it happened (ISO), if known. */
+  at: string | null;
+  now: string;
+  ref?: Ref<HTMLParagraphElement>;
+}) {
+  return (
+    <p ref={ref} tabIndex={-1} role="status" className="flex min-w-0 items-center gap-2 text-meta text-muted-foreground outline-none">
+      {mark}
+      {/* The words give way first: the time stays whole. */}
+      <span className="flex min-w-0">
+        <span className="min-w-0 truncate">{text}</span>
+        {at && (
+          <span className="shrink-0 whitespace-pre">
+            <span aria-hidden="true">{" · "}</span>
+            <ActivityTime at={at} now={now} />
+          </span>
+        )}
       </span>
     </p>
   );
@@ -113,18 +170,21 @@ function ReviewBanner({
   hasLogin,
   now,
   openSendBack,
-}: ReviewProof & { taskId: string; contractor: string | null; hasLogin: boolean; now: string; openSendBack: boolean }) {
+  focusApprove,
+}: ReviewProof & { taskId: string; contractor: string | null; hasLogin: boolean; now: string; openSendBack: boolean; focusApprove: boolean }) {
   const { run, pending, toast } = useStatusRun();
   // Only while the address still asks, read from the router (current during a client-side move, unlike
   // window.location): Back to a page whose ?do= was taken off doesn't reopen it.
   const asked = useSearchParams().get("do") === "send-back";
   const [sendingBack, setSendingBack] = useState(() => openSendBack && asked);
+  // An email's Approve: the banner comes into view with Approve focused, one tap from approving (a link never presses it).
+  const approveButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (!openSendBack) return;
-    const url = new URL(window.location.href);
-    url.searchParams.delete("do");
-    window.history.replaceState(null, "", url);
-  }, [openSendBack]);
+    if (!focusApprove) return;
+    const button = approveButton.current;
+    button?.scrollIntoView({ block: "center" });
+    button?.focus({ preventScroll: true });
+  }, [focusApprove]);
   // A note that didn't go through (or a sheet closed on it): the sheet starts with it next time.
   const [draft, setDraft] = useState("");
 
@@ -167,7 +227,7 @@ function ReviewBanner({
         <Button size="sm" variant="secondary" disabled={pending} onClick={() => setSendingBack(true)}>
           Send back
         </Button>
-        <Button size="sm" disabled={pending} onClick={approve}>
+        <Button ref={approveButton} size="sm" disabled={pending} onClick={approve}>
           Approve
         </Button>
       </div>

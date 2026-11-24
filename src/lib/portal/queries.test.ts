@@ -41,8 +41,47 @@ test("no query reads an event's whole data, only named keys", () => {
   const keys = new Set([...source.matchAll(/e\."data"->>?'(\w+)'/g)].map((m) => m[1]));
   // from, to: a status or a date edit; edited: an imported comment marked edited; clientId: the viewer's own send;
   // statusEventId: the note written with a send back; seenBy: the contacts who could read a comment that came off
-  // (ids only, matched against the viewer's own).
-  assert.deepEqual([...keys].sort(), ["clientId", "edited", "from", "seenBy", "statusEventId", "to"]);
+  // (ids only, matched against the viewer's own); title, action, done: a checklist line of the job's story; request: a
+  // resident's request, whose sender the line never names (docs/specs/contractor-timeline.md); scheduledFor: the day a move to
+  // Scheduled set, for "You scheduled the job for Fri, Nov 27".
+  assert.deepEqual([...keys].sort(), ["action", "clientId", "done", "edited", "from", "request", "scheduledFor", "seenBy", "statusEventId", "title", "to"]);
+});
+
+// The job's story (docs/specs/contractor-timeline.md): its own module, read as source like this one.
+const story = readFileSync(join(__dirname, "story-events.ts"), "utf8");
+
+test("the job's story keeps the Updates' audience rule, drops deleted rows and Asana's history, and an assignment only to the viewer", () => {
+  assert.match(story, /e\."deletedAt" IS NULL/);
+  assert.match(story, /e\."source" <> 'ASANA'/);
+  assert.match(story, /e\."audienceContactId" IS NULL OR e\."audienceContactId" = \$\{contactId\}/, "staff and system lines addressed to them or to no one");
+  assert.match(story, /e\."actorContactId" = \$\{contactId\} OR \(e\."actorContactId" IS NULL/, "never another contractor's");
+  assert.match(story, /e\."kind" = 'ASSIGNED' AND e\."actorContactId" IS NULL AND e\."data"->'to'->>'contactId' = \$\{contactId\}/);
+  assert.match(story, /e\."data"->>'from' IS DISTINCT FROM 'DRAFT'/);
+  // The kinds on the list, and nothing about how HG runs the job.
+  assert.match(story, /e\."kind" = 'CREATED' AND e\."actorContactId" IS NULL\)/, "the job being added names nobody");
+  assert.match(story, /e\."createdAt" >= \(SELECT a\."createdAt" FROM "TaskAccess" a\s+WHERE a\."taskId" = e\."taskId" AND a\."contactId" = \$\{contactId\} AND a\."revokedAt" IS NULL\)/, "never before they first had it");
+  assert.match(
+    story,
+    /IS NOT DISTINCT FROM \$\{contactId\}\s+FROM "TaskEvent" x\s+WHERE x\."taskId" = e\."taskId" AND x\."deletedAt" IS NULL AND x\."source" <> 'ASANA' AND x\."createdAt" <= e\."createdAt"\s+AND \(x\."kind" = 'ASSIGNED' OR \(x\."kind" = 'CREATED' AND x\."data" \? 'to'\)\)\s+ORDER BY x\."createdAt" DESC, x\."id" DESC/,
+    "and never while it was someone else's: the latest assignment at the line's moment names them",
+  );
+  assert.match(story, /e\."kind" IN \('DUE', 'SCHEDULED', 'NOTES', 'CHECKLIST'\)/);
+  for (const kind of ["TITLE", "PROPERTY", "ACCESS", "REPEAT", "CONFLICT", "COMMENT", "ATTACHMENT"]) assert.doesNotMatch(story, new RegExp(`'${kind}'`), kind);
+});
+
+test("only the job page's Updates read the story: the counts and the notice keep portalEvents", () => {
+  assert.match(fn("jobUpdates"), /\(\$\{portalEvents\(p\.contactId\)\} OR \$\{storyEvents\(p\.contactId\)\}\)/);
+  assert.doesNotMatch(fn("newUpdateCounts"), /storyEvents/);
+  assert.equal(source.match(/storyEvents\(/g)?.length, 1, "one caller");
+});
+
+test("the story never reads an assignment's people or Waiting's reason", () => {
+  const updates = fn("jobUpdates");
+  // From and to only where a line uses them: never an assignment's or a creation's people, nor a notes edit's old text.
+  assert.match(updates, /CASE WHEN e\."kind" IN \('STATUS', 'DUE', 'SCHEDULED', 'CHECKLIST'\) THEN e\."data"->>'from' END/);
+  assert.match(updates, /CASE WHEN e\."kind" IN \('STATUS', 'DUE', 'SCHEDULED', 'CHECKLIST'\) THEN e\."data"->>'to' END/);
+  assert.match(updates, /actorLabel: r\.actorUserId \|\| r\.actorContactId \? actorLabel : "HG Capital"/, "a system or resident line sends no name");
+  assert.doesNotMatch(source + story, /waitingOn/);
 });
 
 test("the notice never reads a NOTES event's text or the notes it replaced", () => {
@@ -92,16 +131,6 @@ test("a comment left with no words and no file is skipped by the page and by the
   assert.equal(fileRule(declaration("emptyComment")), rule);
   assert.match(declaration("emptyComment"), /e\."kind" = 'COMMENT'/);
   assert.match(declaration("emptyComment"), /btrim\(COALESCE\(e\."body", ''\)\) = ''/);
-});
-
-test("the delivery line reads the outbox for state only, never its items", () => {
-  const delivery = fn("deliveryFor");
-  const select = delivery.slice(delivery.indexOf("select:"), delivery.indexOf("orderBy:"));
-  assert.match(select, /sentAt: true/);
-  assert.match(select, /lastError: true/);
-  assert.doesNotMatch(select, /items/);
-  assert.match(delivery, /recipientUserId: \{ not: null \}/, "the partners' rows, not another contractor's");
-  assert.match(delivery, /items: \{ array_contains: \[\{ eventId: mine\.id \}\] \}/, "matched on the event id the items carry");
 });
 
 test("a contractor sees their own clientId and no one else's", () => {

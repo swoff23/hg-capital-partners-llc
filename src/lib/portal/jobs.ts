@@ -7,10 +7,10 @@ import { fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
 import { isActiveStatus } from "@/lib/task-scope";
-import { targetDate } from "@/lib/tasks/rules";
+import { queueNoticeNow } from "@/lib/notifications/reminders";
+import { scheduledDay } from "@/lib/tasks/rules";
 import * as core from "@/lib/tasks/core";
 import { recordPortalAttachment } from "@/lib/tasks/service";
-import { CODE_MASK, lockboxMasker, readJobAccess } from "./access-code";
 import { logSecurityEvent } from "./accounts";
 import { crewText } from "./crew-text";
 import { jobLinkUrl } from "./job-link-paths";
@@ -154,52 +154,49 @@ export async function recordJobUpload(taskId: string, file: JobUpload): Promise<
 }
 
 /**
- * "Text to my crew" (docs/specs/contractor-job-emails.md, section 4): the text
- * for the job as it stands, with a CREW link of its own that opens the job as
- * this contractor, lockbox included. Each ask makes a new link. An open job
- * only: a closed one has nothing left to hand on.
+ * "Share with crew" (docs/specs/contractor-job-emails.md, section 4): the
+ * job, where and when, with a CREW link of its own that opens the job as this
+ * contractor, lockbox included when their job shows it. Each ask makes a new
+ * link. An open job only: a closed one has nothing left to hand on.
  */
 export async function crewTextFor(taskId: string): Promise<string> {
   const p = await requirePortalPrincipal();
   await core.assertContractorAccess(prisma, taskId, p);
   const task = await prisma.task.findUniqueOrThrow({
     where: { id: taskId },
-    select: {
-      title: true,
-      status: true,
-      description: true,
-      unitLabel: true,
-      dueDate: true,
-      scheduledFor: true,
-      propertyId: true,
-      entryPermittedAt: true,
-      property: { select: { address: true } },
-      checklist: { where: { done: false }, select: { title: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] },
-    },
+    select: { title: true, status: true, unitLabel: true, dueDate: true, scheduledFor: true, property: { select: { address: true } } },
   });
   if (!isActiveStatus(task.status)) throw new core.TaskRuleError("This job is closed.");
-  // The link opens the job as this contractor, so it offers the lockbox only when their job shows it.
-  const [mask, access] = await Promise.all([lockboxMasker(prisma, task.propertyId), readJobAccess(prisma, task)]);
-  const notes = task.description?.trim() ? mask(task.description).map((part) => ("text" in part ? part.text : CODE_MASK)).join("") : null;
-  const due = toYmd(targetDate(task));
+  const due = toYmd(task.dueDate);
+  const scheduled = toYmd(scheduledDay(task));
+  const day = (d: string) => fmtDay(d, { weekday: true, year: "auto", now: todayYmdEastern() });
   const token = await mintJobLink(prisma, { taskId, kind: "CREW", contactId: p.contactId });
   return crewText({
     title: task.title,
     where: addressLine(task.property?.address ?? null, task.unitLabel),
-    due: due ? fmtDay(due, { weekday: true, year: "auto", now: todayYmdEastern() }) : null,
-    notes,
-    todo: task.checklist.map((c) => c.title),
-    hasAccess: !!access.lockbox,
+    due: due ? day(due) : null,
+    scheduled: scheduled ? day(scheduled) : null,
     url: jobLinkUrl(getEnv().appUrl, token),
   });
 }
 
 /**
- * Change date (docs/specs/contractor-job-emails.md, section 7): the day the contractor agreed with the tenant becomes
- * the job's due date, and both partners hear of it (core.ts setDateByContractor has the rules).
+ * The contractor sets or moves their scheduled day (docs/specs/contractor-scheduled-date.md): never the due date,
+ * which is HG Capital's. Both partners hear of it (core.ts scheduleByContractor has the rules).
  */
-export async function setJobDate(taskId: string, date: string): Promise<void> {
+export async function setJobDate(taskId: string, date: string | null): Promise<void> {
   const p = await requirePortalPrincipal();
-  await refreshOnRefusal(taskId, () => prisma.$transaction((tx) => core.setDateByContractor(tx, taskId, date, taskPrincipal(p))));
+  await refreshOnRefusal(taskId, () =>
+    prisma.$transaction(async (tx) => {
+      // Null is Remove day, from Reschedule (Connor, Nov 22): the job asks for a day again, and no heads-up is due.
+      if (date === null) {
+        await core.unscheduleByContractor(tx, taskId, taskPrincipal(p));
+        return;
+      }
+      const task = await core.scheduleByContractor(tx, taskId, date, taskPrincipal(p));
+      // Today or tomorrow at a home that needs notice: the heads-up goes now (Q7).
+      await queueNoticeNow(tx, task);
+    }),
+  );
   revalidateJob(taskId);
 }

@@ -3,6 +3,8 @@ import type { InvoiceEventKind, InvoicePayMethod, InvoiceSource, InvoiceStage, P
 import { easternDayStart, toYmd, todayYmdEastern, type Ymd } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { shortAddress } from "@/lib/normalize";
+import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
+import { contractorCanOpen } from "@/lib/task-scope";
 import {
   INVOICE_INBOX,
   VIEW_STAGE,
@@ -367,7 +369,7 @@ function portalSelect(contactId: string) {
     files: { select: { id: true, filename: true, contentType: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
     // A job staff tacked on that the contractor can't open (one that sits on Connor, say) isn't named to them.
     tasks: {
-      where: { task: { access: { some: { contactId, revokedAt: null } } } },
+      where: { task: contractorCanOpen(contactId) },
       select: { taskId: true, task: { select: { title: true } } },
       orderBy: { createdAt: "asc" },
     },
@@ -414,4 +416,13 @@ export async function contractorInvoices(viewer: PortalViewer, now: Date = new D
  */
 export async function jobInvoicesForContractor(viewer: PortalViewer, taskId: string, now: Date = new Date()): Promise<PortalInvoiceRow[]> {
   return portalRows(viewer, { tasks: { some: { taskId } } }, now);
+}
+
+/**
+ * Whether Send invoice's payoff may promise the Paid email: the contractor's Job emails are on, the rule
+ * invoices/notify.ts sends that email by. The job page no longer reads this for its own payoff (emails redesign).
+ */
+export async function getsPaidEmail(accountId: string): Promise<boolean> {
+  const account = await prisma.portalAccount.findUnique({ where: { id: accountId }, select: JOB_EMAIL_SELECT });
+  return jobEmailState(account) === "on";
 }

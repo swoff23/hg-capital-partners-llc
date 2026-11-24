@@ -419,7 +419,7 @@ Internal turns the box `--muted` and the switch track `--accent`, as today. Tabl
 | Contractor assigned, no login | Zack needs a login to see this. Desktop adds a "Set up login" TextLink to the contractor record | same |
 | No contractor (a partner or nobody) | none (Connor, Nov 16) | same |
 | Three or more staff | | Lock, Only the HG team sees this |
-| Portal composer | Connor and Pieter get this by email (three or more staff: The HG team gets this by email) | |
+| Portal composer | Connor and Pieter get this by email (three or more staff: The HG team gets this by email). Removed Nov 22 (Connor): no audience line | |
 | Deal note box | none | |
 
 - The audience line is one line. Its fixed words stay under 35 characters; a long first name truncates rather than wrap ("Maximilian… sees this and gets an email"). At 320 the line has 288px, about 41 characters at touch size.
@@ -816,7 +816,7 @@ Every instance from the inventory, grouped by page.
 | Instance | Becomes | What changes for the user |
 |---|---|---|
 | Updates list | Choice 3.4 A: `ActivityTimeline` with `CommentCard`, day headings, the New divider, the shared time formatter, the delivery line, masked lockbox codes in imported comments. A notice at the top of the page for a send back with its reason (BPORTAL-007) and, per question 2, a moved date or updated notes (G1A-I09). Photos shown twice go to the uploads and photos spec | Zack sees which updates are new, when each happened, and that HG got his. A sent-back job says why at the top. The page agrees with his emails |
-| Update composer, bottom bar and Mark done note | The text box becomes the shared `Composer` inline at the end of Updates (not pinned; the action bar owns the bottom edge): autosize, a draft per job, ⌘↵, the audience line "Connor and Pieter get this by email", the update showing once the page refreshes (in place at once is a follow-up, 2.7). The upload tray, bar and Mark done payoff are unchanged (uploads and photos spec). Mark done passes its note through `setStatus`, so it lands as a decision pair | He knows who reads his update, and the update itself is the confirmation |
+| Update composer, bottom bar and Mark done note | The text box becomes the shared `Composer` inline at the end of Updates (not pinned; the action bar owns the bottom edge): autosize, a draft per job, ⌘↵, the audience line "Connor and Pieter get this by email" (removed Nov 22, Connor), the update showing once the page refreshes (in place at once is a follow-up, 2.7). The upload tray, bar and Mark done payoff are unchanged (uploads and photos spec). Mark done passes its note through `setStatus`, so it lands as a decision pair | He knows who reads his update, and the update itself is the confirmation |
 
 ### Contractor My jobs (`/p`)
 

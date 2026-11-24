@@ -17,6 +17,9 @@ export const COMMENT_MAX = 20_000;
 export const CHECKLIST_ITEM_MAX = 300;
 export const WAITING_ON_MAX = 300;
 export const UNIT_MAX = 100;
+/** The most items New task's checklist takes (docs/specs/new-task-checklist-photos.md), and a paste into Add item makes. */
+export const NEW_CHECKLIST_MAX = 100;
+export const CHECKLIST_FULL = `A checklist holds up to ${NEW_CHECKLIST_MAX} items.`;
 
 const n = (count: number) => count.toLocaleString("en-US");
 

@@ -3,7 +3,6 @@ import type { FileLink } from "@/components/files-list";
 import type { MediaItem } from "@/components/media-grid";
 import type { Ymd } from "@/lib/dates";
 import { firstName } from "@/lib/names";
-import type { JobEmailState } from "@/lib/portal/job-emails";
 import {
   anchorsStretch,
   buildActivity,
@@ -16,7 +15,7 @@ import {
   type LineEntry,
 } from "@/lib/tasks/activity";
 import { bodySegments, type BodyLinkContext, type BodySegment } from "@/lib/tasks/body-links";
-import { deliveryLine, type Delivery, type EmailState } from "@/lib/tasks/delivery";
+import { deliveryLine, type Delivery, type EmailState, type TaskEmailState } from "@/lib/tasks/delivery";
 import { fileLink, isMediaRow, mediaItem, type TaskMediaRow } from "@/lib/tasks/media";
 import { contractorSeesRow } from "@/lib/tasks/rules";
 
@@ -89,6 +88,8 @@ export interface LineFields {
   /** Who did it, a first name: "Notes before Connor's edit". */
   by: string;
   viaAsana: boolean;
+  /** The line came from a draft Claude saved: "Pieter created this task via Claude". */
+  viaClaude: boolean;
   media: MediaItem[];
   files: FileLink[];
 }
@@ -123,8 +124,10 @@ export interface ShapeInput {
   contractor: {
     id: string;
     first: string;
-    /** Whether task emails reach them, or why not (src/lib/portal/job-emails.ts). */
-    emails: JobEmailState;
+    /** Their full name, for "Emails don't reach Zack Miller." */
+    name?: string;
+    /** Whether task emails reach them, or why not (src/lib/portal/job-emails.ts, tasks/delivery.ts taskEmailState). */
+    emails: TaskEmailState;
     /** Their access to the job is unrevoked. */
     accessActive: boolean;
     /** When they last opened the job, from their own read state. */
@@ -212,6 +215,7 @@ export function shapeActivity(input: ShapeInput): ActivityRow[] {
   if (contractor && target) {
     const line = deliveryLine({
       to: contractor.first,
+      name: contractor.name,
       emails: contractor.emails,
       email: input.emailStates.get(target.eventId) ?? null,
       seenAt: contractor.seenAt,
@@ -258,7 +262,7 @@ export function shapeActivity(input: ShapeInput): ActivityRow[] {
 
   const lineFields = (l: LineEntry<ActivityEvent>): LineFields => {
     const own = filesOf(l.events.map((e) => e.id));
-    return { text: l.text, href: l.href ?? null, status: l.status ?? null, previous: l.previousNotes ?? null, by: byOf(l.event), viaAsana: l.viaAsana === true, ...own };
+    return { text: l.text, href: l.href ?? null, status: l.status ?? null, previous: l.previousNotes ?? null, by: byOf(l.event), viaAsana: l.viaAsana === true, viaClaude: l.viaClaude === true, ...own };
   };
 
   const rows: ActivityRow[] = entries.map((entry, i): ActivityRow => {
@@ -298,6 +302,7 @@ export function shapeActivity(input: ShapeInput): ActivityRow[] {
           previous: entry.previousNotes ?? null,
           by: byOf(entry.events[0]),
           viaAsana: false,
+          viaClaude: false,
           media: [],
           files: [],
           members: entry.lines.map((l) => ({ ...lineFields(l), id: l.id, at: l.at.toISOString() })),
@@ -305,7 +310,7 @@ export function shapeActivity(input: ShapeInput): ActivityRow[] {
         };
       case "batch": {
         const own = filesOf(entry.events.map((e) => e.id));
-        return { ...base, type: "batch", text: entry.text, href: null, status: null, previous: null, by: byOf(entry.events[0]), viaAsana: false, ...own };
+        return { ...base, type: "batch", text: entry.text, href: null, status: null, previous: null, by: byOf(entry.events[0]), viaAsana: false, viaClaude: false, ...own };
       }
       case "decision":
         return { ...base, type: "decision", status: entry.line.status ?? null, text: entry.line.text, note: entry.note ? comment(entry.note) : null };

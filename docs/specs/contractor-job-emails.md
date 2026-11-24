@@ -1,5 +1,7 @@
 # Job emails that carry the job
 
+> **Partly superseded (Nov 22, 2026):** what sends, the layout, subject words, previews, From names and the morning emails now follow [emails-redesign.md](emails-redesign.md). Where the two disagree, that spec wins.
+
 Planned with Connor on Nov 14, 2026, one question at a time, each with a low-fi visual. He took the recommendation on most questions and changed several (marked "Connor's call" below). Nothing here is built until Connor says "build it" in chat.
 
 ## 1. Summary
@@ -35,7 +37,7 @@ Planned with Connor on Nov 14, 2026, one question at a time, each with a low-fi 
 | Q3 | B: a button opens that one job with access (lockbox and tenant), no password, until the job closes or they lose access. Contractors forward to their crews a lot (Connor's call, over A) |
 | Q4 | Emails: today's set, every date move either way, taken off a job, 8 am on the job's date, 8 am the morning after the due date once (Connor's call: 8 am on the day, not the day before) |
 | Q4a | The 8 am email goes for every job, on the date the contractor sees |
-| Q5 | "Text to my crew", full text: job, address, due date, notes, checklist, link. Never the code |
+| Q5 | "Text to my crew", full text: job, address, due date, notes, checklist, link. Never the code. Changed Nov 22 (Connor): job, address, day and link only; renamed Share with crew |
 | Q6 | Reply rules: all six as proposed (section 5) |
 | Q7 | Emails still start only after the contractor's first real sign-in. The Nov 14 rule stays (Connor's call, over a switch alone) |
 | Q8 | Body order: What's new first, buttons, then the job |
@@ -82,10 +84,10 @@ One column: full width on a phone, a centered 480px card on tablet and desktop, 
 
 1. **Letterhead,** unchanged.
 2. **What's new.** The first line is the headline (16px, the email's one emphasized line). Then each bundled change on its own line, as `itemLines` writes them today, with a comment's photos as up to four thumbnails and "+3".
-3. **Buttons.** One primary, full width, for the job's next step (`job-view.ts` `nextStep`): Start job (Open, Scheduled, Waiting), Send for review (In progress, named Mark done until Nov 15, docs/specs/send-for-review.md), See job (In review, Done). Under it, secondary: Add photos and Text to my crew. Below 360px they stack.
+3. **Buttons.** One primary, full width, for the job's next step (`job-view.ts` `nextStep`): Start job (Open, Scheduled, Waiting), Send for review (In progress, named Mark done until Nov 15, docs/specs/send-for-review.md), See job (In review, Done). Under it, secondary: Add photos and Share with crew (named Text to my crew until Nov 22). Below 360px they stack.
 4. **The job.**
    - Building photo (the property's `photoUrl`; left out when none).
-   - Title, then street and unit with a Directions link (the job page's `AddressActions` target: Apple Maps, which other phones open as the web map).
+   - Title, then street and unit with a Directions link (the job page's `AddressRow` target: Apple Maps, which other phones open as the web map).
    - Due: the date, Add to calendar, Change date.
    - Access: Show access. Left out when the job has no code (and, once the tenant spec ships, no tenant).
    - Notes: the job's notes in full (D16), line breaks kept.
@@ -120,8 +122,9 @@ The taken-off email carries only the job's title and address: no access, notes, 
 - **What a link opens:** that one job, as the contractor, with everything they can do there today: Start, Mark done (with its finish photos), photos and videos, comments, the checklist, and the lockbox and tenant (each view logged as today, `noteJobViewed`). Not My jobs or any other job.
 - **How long:** until the job closes (Done or Canceled), the contractor is taken off it, or staff use Remove access or Sign out everywhere. An older email's link works for as long as that holds.
 - **Already signed in:** the link opens the job in the contractor's normal session. A link never replaces their own full session with a job-only one.
+- **Back from a link session** (Nov 22, docs/specs/contractor-scheduled-date.md section 12): the contractor's own email link lands on Welcome back, with "Email me a sign-in link" to their own inbox; a Share with crew link shows the job with no way back to My jobs.
 - **Known limits, accepted after review (Nov 14):** a browser holds one portal session, so a link to job B replaces a link session for job A (job A's tab then goes to sign in), and a link a contractor's crew member taps replaces that crew member's own full session, if they have one. A link session lasts through the hour after an approval, while the job still takes the contractor's late photos (attachments/access.ts LATE_UPLOAD_WINDOW_MS), then ends; photos still queued on the phone after that are refused as for any signed-out phone, not as "Job closed". On a job the hand-run Asana delta closes, that hour runs from Asana's completion time.
-- **Never acts on its own:** work email scanners (Outlook Safe Links and others) open every link in a message. So a link only opens the page. "Send for review" opens the job with its sheet up (`?do=done`), "Add photos" at the Updates section (`#updates`), "Show access" at the Lockbox (`#lockbox`), "Text to my crew" with its sheet up (`?do=share`), and nothing happens until the contractor taps on the page.
+- **Never acts on its own:** work email scanners (Outlook Safe Links and others) open every link in a message. So a link only opens the page. "Send for review" opens the job with its sheet up (`?do=done`), "Add photos" at the Updates section (`#updates`), "Show access" at Getting in (`#access`, Tenants when Getting in shows nothing; the Lockbox, `#lockbox`, before Nov 22), "Share with crew" with its sheet up (`?do=share`), and nothing happens until the contractor taps on the page.
 - **The route:** `/j/<token>` (`src/app/j/[token]/route.ts`). A session it starts carries `PortalSession.onlyTaskId`: the portal's gates send it to sign in anywhere but its job, and `core.ts` `assertContractorAccess` refuses it any other job. It never meets the first-password page.
 - **Forwarded:** whoever holds the email can do all of the above as the contractor. That is Connor's call (crews), and the lockbox log will name the contractor.
 - **Photos in the email:** uploads are private files, so thumbnails load through the private file route with the email's link as the key (`/api/files/task/<id>?v=thumb&l=<token>`), with the link's lifetime. Once it ends they show as gray tiles. A partner's email gets a STAFF link for this, made only when the email has photos.
@@ -129,24 +132,20 @@ The taken-off email carries only the job's title and address: no access, notes, 
 
 ## 4. Text to my crew (Q5 B)
 
-- **Where:** a secondary button in the email, and a message button in the job page's header, beside Call (the share-in-the-navigation-bar placement iOS uses).
+- **Where:** a secondary button in the email ("Share with crew"), and the share button in the job page's header, beside Call HG (Connor, Nov 22; it was a labeled button by the address, and before that a header icon).
 - **What opens:** a small page with the message preview, then Messages, Copy and More (the phone's share sheet). Pattern from Grab's share sheet ([Mobbin](https://mobbin.com/screens/30990611-c4a1-4f07-8fb4-e9eccf6a9cea)): a preview of the text above Copy link, Messages and More. Messages is an `sms:` link with the body filled in (`src/lib/portal/login-text.ts` `smsHref`, reused). More is the Web Share API, as the lightbox's Share on touch.
 - **The text:**
 
   ```
   Replace kitchen faucet
-  118 Congress St, Rear
+  118 Congress St, Buffalo, NY 14213 · Rear
   Due Fri, Nov 20
 
-  New faucet is in the garage. Shut-off under the sink sticks.
-
-  To do: swap faucet, check for leaks
-
-  Lockbox, photos, updates:
+  Details, photos and updates:
   hgcapitalpartners.com/j/k7Qm2x
   ```
 
-  Notes are cut at about 300 characters with an ellipsis. The checklist line lists open items only and is left out when there are none. The lockbox code is never in the text; the link shows it, logged.
+  Their scheduled day leads instead of Due when there is one ("Scheduled Mon, Nov 23"). Shortened Nov 22 (Connor, B): the notes and the open checklist items left the text, since behind the link they stay current and a long text pushed the link off the first screen of the message. The lockbox code is never in the text; the link shows it, logged.
 - **The link** is a job link (section 3), with its own token so it can be told apart in the log.
 
 ## 5. Reply by email (Q1 C, Q6, Q9)
@@ -164,7 +163,7 @@ The taken-off email carries only the job's title and address: no access, notes, 
 | Says "done" | A comment only. A reply never changes status |
 | Clutter | Quoted email, "Sent from my iPhone" and signatures are cut. Out-of-office and empty replies are ignored |
 
-**How it's built.** Each job email carries a REPLY link (`JobLink` kind `REPLY`) as its reply address; it lets a reply post to that job as the person the email went to and never opens the job. The webhook (`src/app/api/email/inbound/route.ts`) checks Resend's Svix signature with `RESEND_WEBHOOK_SECRET`, then `src/lib/email/replies.ts` fetches the email and its files from Resend and posts them (`core.addComment`, once per email by its id). Rule 2's sender shows as a last line, "From mike@gmail.com", which everyone on the job sees. Files that post: the portal's photos and videos, and the staff side's documents too (PDFs, an invoice), within each kind's size cap; a signature's small inline logo is left out. Files sent by email have no thumbnail (the server can't make one), so the app shows the full picture. A reply to plain `jobs@` is matched by its thread only when the sender's domain passes DMARC, since a From line and a References header can be forged. Gmail and Outlook publish no enforcing DMARC policy, so their users' replies match only through the r+ address (which their apps use); one that ignores Reply-To is dropped. More than 50 files in one reply: the first 50 post and the contractor gets a note to add the rest on the job. That note, and the one for a video too big to post, has the subject `Error:` and the job, street and unit (2.1), so a contractor with several jobs knows which one.
+**How it's built.** Each job email carries a REPLY link (`JobLink` kind `REPLY`) as its reply address; it lets a reply post to that job as the person the email went to and never opens the job. The webhook (`src/app/api/email/inbound/route.ts`) checks Resend's Svix signature with `RESEND_WEBHOOK_SECRET`, then `src/lib/email/replies.ts` fetches the email and its files from Resend and posts them (`core.addComment`, once per email by its id). Rule 2's sender shows as a last line, "From mike@gmail.com", which everyone on the job sees. Files that post: the portal's photos and videos, and the staff side's documents too (PDFs, an invoice), within each kind's size cap; a signature's small inline logo is left out. Files sent by email have no thumbnail (the server can't make one), so the app shows the full picture. A reply to plain `jobs@` is matched by its thread only when the sender's domain passes DMARC, since a From line and a References header can be forged. Gmail and Outlook publish no enforcing DMARC policy, so their users' replies match only through the r+ address (which their apps use); one that ignores Reply-To is dropped. More than 50 files in one reply: the first 50 post and the contractor gets a note to add the rest on the job. That note, and the one for a file too big to post or sent as an iCloud or Drive link, has the subject `Some files didn't post:` and the job, street and unit (2.1), so a contractor with several jobs knows which one, and says the rest of the reply posted (emails redesign, section 7).
 
 **Staff replies (Q9).** A reply to Connor or Pieter's copy posts as their Shared comment, addressed to the contractor, who gets it by email as any staff comment today. Their copy's footer says so: "Reply to answer Zack."
 
@@ -199,6 +198,8 @@ The 8 am emails run from a cron. Vercel's schedules are UTC, so it runs at 12:00
 
 ## 7. The contractor sets the date (Q10)
 
+> Replaced on Nov 21, 2026 by [contractor-scheduled-date.md](contractor-scheduled-date.md): the contractor's pick becomes a separate scheduled day and never changes the due date. The rest of this section is the Nov 14 behavior, kept as a record.
+
 - **Where:** "Change date" in the email's Due row (`?do=date`), and the date in the job page's header, which is tap-to-edit (dotted underline; "Set a date" when there's none). Both open the date panel the task page's chips use (`DatePanel` in a `PickerLayer`: a popover with a mouse, a sheet on a phone), titled "Due date", with no "No date" (`_components/job-date.tsx`).
 - **The notice:** the job page's "what changed since you last looked" notice leaves out the contractor's own changes, so their new date isn't news to them.
 - **What it writes:** the job's due date. On a job that is Scheduled, the scheduled day too, so the two can't disagree. Earlier or later than before, no approval.
@@ -218,7 +219,7 @@ Same shell, subject and threading as section 2, sent to both partners as today. 
 ## 9. For Connor to set up
 
 1. **DMARC.** A TXT record at `_dmarc` on the root domain (`v=DMARC1; p=none`), which covers `mail.` and `reply.` too, so work inboxes like `outlawcarpentry.com` don't junk the emails. Resend's DKIM and SPF are already in place.
-2. **Receiving.** Receiving turned on for `mail.hgcapitalpartners.com` in Resend (its MX record, `10 receive.forge.rmta.net`, was live Nov 14), and the receiving webhook (`email.received`) at `https://www.hgcapitalpartners.com/api/email/inbound`.
+2. **Receiving.** Receiving turned on for `mail.hgcapitalpartners.com` in Resend (its MX record, `10 receive.forge.rmta.net`, was live Nov 14), and the receiving webhook (`email.received`) at `https://www.hgcapitalpartners.com/api/email/inbound`. Since the emails redesign the same webhook also takes `email.bounced`, `email.suppressed`, `email.complained` and `email.delivered` (src/lib/email/delivery-events.ts).
 3. **One env var** in Vercel: `RESEND_WEBHOOK_SECRET`, from that webhook.
 
 Sections 2 to 4 and 6 to 8 need none of this. Reply by email waits on 2 and 3.

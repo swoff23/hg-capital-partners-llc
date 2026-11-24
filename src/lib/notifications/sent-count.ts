@@ -8,9 +8,10 @@ import type { PrismaClient } from "@prisma/client";
  *
  * Outbox rows count once sent with no error. A row closed unsent ("no
  * login", "no access", "emails off", "gave up", "nothing to send") carries
- * its reason in lastError and never went. Password-reset emails count too:
- * src/lib/portal/reset.ts sends them from the same Resend account and marks
- * its PASSWORD_RESET_REQUESTED event `sent: true` once the email went.
+ * its reason in lastError and never went. Password-reset and sign-in link
+ * emails count too: src/lib/portal/reset.ts and sign-in-link.ts send them
+ * from the same Resend account and mark their PASSWORD_RESET_REQUESTED or
+ * SIGN_IN_LINK_REQUESTED event `sent: true` once the email went.
  *
  * Takes the client as an argument (no `server-only`) so the pg test can run it.
  */
@@ -18,7 +19,7 @@ export async function sentSince(db: Pick<PrismaClient, "notificationOutbox" | "s
   const [outbox, resets] = await Promise.all([
     db.notificationOutbox.count({ where: { sentAt: { gte: since }, lastError: null } }),
     db.securityEvent.count({
-      where: { kind: "PASSWORD_RESET_REQUESTED", createdAt: { gte: since }, data: { path: ["sent"], equals: true } },
+      where: { kind: { in: ["PASSWORD_RESET_REQUESTED", "SIGN_IN_LINK_REQUESTED"] }, createdAt: { gte: since }, data: { path: ["sent"], equals: true } },
     }),
   ]);
   return outbox + resets;

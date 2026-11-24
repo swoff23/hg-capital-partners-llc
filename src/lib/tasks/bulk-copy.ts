@@ -28,7 +28,7 @@ const REASONS: Record<BulkSkip, [one: string, many: string]> = {
   closed: ["is closed", "are closed"],
   changed: ["changed since", "changed since"],
   gone: ["was deleted", "were deleted"],
-  needsDate: ["needs a visit date", "need a visit date"],
+  needsDate: ["needs a day", "need a day"],
   refused: ["couldn't change", "couldn't change"],
 };
 const ORDER: BulkSkip[] = ["closed", "changed", "needsDate", "gone", "refused"];
@@ -107,7 +107,12 @@ export const deleteTitle = (n: number) => `Delete ${tasksCount(n)}?`;
 export const deleteBody = (n: number) =>
   n === 1 ? "It goes for good, with its notes, checklist, activity and files." : "They go for good, with their notes, checklists, activity and files.";
 
+/**
+ * `deleted` and `failed` are what bulk delete answers. Neither counts a pick it left alone (a draft from Claude,
+ * bulk-core.ts deleteEach), so both can be 0: then nothing went, in the words a change that changed nothing uses.
+ */
 export function deletedLine(deleted: number, failed: number): BulkLine {
+  if (!deleted && !failed) return { message: "Nothing changed" };
   if (!failed) return { message: `Deleted ${tasksCount(deleted)}` };
   if (!deleted) {
     return { message: failed === 1 ? "Couldn't delete that task. Try again." : "Couldn't delete those tasks. Try again.", phoneMessage: "Couldn't delete. Try again." };

@@ -1,6 +1,6 @@
 import { invoiceUploadFolder, readInvoiceSendParent } from "./limits";
 import { uploadSlug } from "./media";
-import { taskUploadPath, type UploadRole } from "./paths";
+import { newTaskUploadPath, residentUploadPath, taskUploadPath, type UploadRole } from "./paths";
 import type { FileKind } from "./content-types";
 
 /**
@@ -21,6 +21,7 @@ import type { FileKind } from "./content-types";
  *   lease-upload           staff, a lease's signed term     { leaseId, termId, fileKind }
  *   invoice-upload         staff, an invoice's files        { invoiceId, fileKind }
  *   portal-invoice-upload  a contractor's Send invoice      { taskId, fileKind }, parentId "<taskId>:<contactId>"
+ *   new-task-upload        staff, New task's files before Create { formId, fileKind }
  *
  * A contact document's parentId is "<contactId>:<docKind>" (contactDocParent), so the W-9 and the insurance are
  * two targets in the queue, each with its own folder. A signed lease's is "<leaseId>:<termId>" (leaseDocParent), so
@@ -38,12 +39,14 @@ export const UPLOAD_KINDS = [
   "lease-upload",
   "invoice-upload",
   "portal-invoice-upload",
+  "resident-upload",
+  "new-task-upload",
 ] as const;
 
 export type UploadKind = (typeof UPLOAD_KINDS)[number];
 
 /** The clientPayload key naming the row each kind uploads to, which the token route checks. */
-export const UPLOAD_KIND_PARENT: Record<UploadKind, "taskId" | "propertyId" | "contactId" | "leaseId" | "invoiceId"> = {
+export const UPLOAD_KIND_PARENT: Record<UploadKind, "taskId" | "propertyId" | "contactId" | "leaseId" | "invoiceId" | "linkId" | "formId"> = {
   "task-upload": "taskId",
   "portal-task-upload": "taskId",
   "property-upload": "propertyId",
@@ -56,6 +59,10 @@ export const UPLOAD_KIND_PARENT: Record<UploadKind, "taskId" | "propertyId" | "c
   "invoice-upload": "invoiceId",
   // The job it's sent from: the invoice doesn't exist until the send (docs/contractor-invoices-plan.md, 5.2).
   "portal-invoice-upload": "taskId",
+  // A resident's request link (docs/specs/maintenance-requests.md): files go up before the request exists.
+  "resident-upload": "linkId",
+  // New task's files (docs/specs/new-task-checklist-photos.md): they go up before the task exists, under the form's id.
+  "new-task-upload": "formId",
 };
 
 /** Listing and property photos are public Blob (the public site and PhotoThumb read them); everything else is private, the lockbox photo included. */
@@ -71,6 +78,8 @@ export const UPLOAD_KIND_ACCESS: Record<UploadKind, "private" | "public"> = {
   "lease-upload": "private",
   "invoice-upload": "private",
   "portal-invoice-upload": "private",
+  "resident-upload": "private",
+  "new-task-upload": "private",
 };
 
 /**
@@ -97,6 +106,10 @@ export const UPLOAD_KIND_ALLOWED: Record<UploadKind, readonly FileKind[]> = {
   // An invoice: a PDF or a photo of it (limits.ts INVOICE_FILE_RULES narrows documents to PDF).
   "invoice-upload": ["image", "file"],
   "portal-invoice-upload": ["image", "file"],
+  // A resident's request: photos and videos.
+  "resident-upload": ["image", "video"],
+  // What a staff task upload takes, since they become the task's files.
+  "new-task-upload": ["image", "video", "file"],
 };
 
 /** The kinds whose record step keeps a thumbnail and a video poster (TaskAttachment.thumbPathname, posterPathname). */
@@ -113,6 +126,8 @@ export const UPLOAD_KIND_PREVIEWS: Record<UploadKind, boolean> = {
   "lease-upload": false,
   "invoice-upload": false,
   "portal-invoice-upload": false,
+  "resident-upload": true,
+  "new-task-upload": true,
 };
 
 export function isUploadKind(kind: unknown): kind is UploadKind {
@@ -138,6 +153,8 @@ export function uploadTargetKey(kind: UploadKind, parentId: string): string {
     "lease-upload": "lease-doc",
     "invoice-upload": "invoice",
     "portal-invoice-upload": "portal-invoice",
+    "resident-upload": "resident",
+    "new-task-upload": "new-task",
   };
   return `${prefix[kind]}:${parentId}`;
 }
@@ -160,6 +177,12 @@ export function uploadTargetHref(kind: UploadKind, parentId: string): string {
       return `/invoices/${id}`;
     case "portal-invoice-upload":
       return `/p/jobs/${encodeURIComponent(readInvoiceSendParent(parentId)?.taskId ?? "")}`;
+    case "resident-upload":
+      // The resident's pages carry their link; a toast has nowhere else to send them.
+      return "";
+    case "new-task-upload":
+      // The form they wait on; once Create ran they join the task.
+      return "/tasks/new";
     default:
       return `/properties/${id}`;
   }
@@ -220,6 +243,11 @@ export function uploadRequest(
       const docKind = parent?.docKind ?? "w9";
       return { pathname: `contacts/${contactId}/${docKind}/${slug}`, clientPayload: owned({ contactId, docKind, fileKind: file.fileKind }) };
     }
+    case "resident-upload":
+      // The resident's link rides in `owner` (queue-owner.ts residentScope), which the token route reads.
+      return { pathname: residentUploadPath(parentId, slug, role, file.contentType), clientPayload: owned({ linkId: parentId, fileKind: file.fileKind }) };
+    case "new-task-upload":
+      return { pathname: newTaskUploadPath(parentId, slug, role, file.contentType), clientPayload: owned({ formId: parentId, fileKind: file.fileKind }) };
     case "lease-upload": {
       const parent = readLeaseDocParent(parentId);
       const leaseId = parent?.leaseId ?? "";

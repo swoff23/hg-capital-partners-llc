@@ -199,7 +199,7 @@ Two tokens are public-only.
 | Lead, nav, card meta, second clause | `--muted-foreground` | `#a19e98` | 7.22 / 6.90 |
 | Field outlines | `--input` | `#6e7684` | 4.22 / 4.03 |
 | Hairlines (decorative) | `--border` | `#212835` | 1.30 / 1.25 |
-| HG Login, legal lines, placeholders | `--pub-faint` | `#858991` | 5.50 / 5.25 |
+| Login, legal lines, placeholders | `--pub-faint` | `#858991` | 5.50 / 5.25 |
 | Eyebrow, link hover, CTA hover fill | `--gold` | `#c8a765` | 8.43 / 8.05 |
 | Pressed gold link | `--pub-gold-hi` | `#d8ba7e` | 10.33 / 9.87 |
 | Form errors | `--destructive` | `#f47b76` | 7.30 / 6.97 |
@@ -343,7 +343,7 @@ Everything here reuses or extends what is in `src/components/` (see `docs/compon
 - **Menus and listboxes:** hover and keyboard focus use `--accent`; the chosen option carries a lucide `Check` in `--foreground` at its trailing edge, so the pick never rests on a fill.
 - **Calendar:** today carries a 1px inset `--input` ring at the same weight as other days; the picked day is the `--primary` fill ([Material date picker](https://m3.material.io/components/date-pickers/guidelines)).
 - **Avatar:** `--background` ground with a 1px `--line-strong` edge and `--fg-2` initials at 12px, so it holds on any fill, including a highlighted listbox row. 20px avatars show one initial; 24px and up show two, so two people who share a first letter stay apart. Team members are round; contractors are `rounded-sm` squares, so who's in-house reads without color (GitHub draws people round and organizations square).
-- **Tabs** (`TopTabs`): a fixed 14 / 20 at every size (`text-label` would grow to 16 on touch and push three tabs past 320), idle `--fg-2`, selected `--foreground` with a 2px `--primary` underline, both 500, counts in `--muted-foreground`; links in a labeled `<nav>`, the current page marked with `aria-current="page"`, which the styles read. The row clips at a `--border` divider.
+- **Tabs** (`TopTabs`): a fixed 14 / 20 at every size (`text-label` would grow to 16 on touch and push three tabs past 320), idle `--fg-2`, selected `--foreground` with a 2px `--primary` underline, both 500, counts in `--muted-foreground`; links in a labeled `<nav>`, the current page marked with `aria-current="page"`, which the styles read. The row clips at a `--border` divider, and scrolls sideways by itself when the tabs outgrow the width (Settings at 320).
 - **Sidebar:** `--canvas`. Items 32px, `rounded-md`. Idle label `--fg-2`, icon `--muted-foreground`, hover `--muted`. Current item: `--accent`, label and icon `--foreground`, and a 2px by 16px `--primary` notch at the left edge (12.86 / 12.22). The notch is invented: references select with a fill alone at about 1.2:1.
 - **Desktop header** (from `lg`): `--background` with a `--border` rule, running full width above the `--canvas` sidebar with the monogram centered over the rail's icons, so it reads as part of the work area, as Mercury's does.
 - **Phone navigation:** the drawer from the 52px top bar, on `--canvas`, with the sidebar's item styles at 44px. It scrolls when the screen is short (a phone held sideways), and every control in it, Sign out and Appearance included, is 44px on touch. A bottom tab bar is not part of this rollout; if one comes later it is `--canvas` with a `--border` rule above, 20px `--muted-foreground` icons over 12 / 16 500 `--fg-2` labels, and the current tab `--foreground` with a 16 by 2px `--primary` notch on its top edge.
@@ -433,7 +433,7 @@ The dark front door stays and becomes the app's own dark material. Same Geist, s
 | Wordmark | 13 / 16 | 13 / 16 | 13 / 16 | 500 | 0.28em caps | "HG CAPITAL PARTNERS" |
 
 - **Gutters** 40 / 32 / 16 at 1280 / 768 / 375, for the header, hero type, listings and footer alike.
-- **Header.** 64px over a `--border` rule. Wordmark in `--foreground` left; Rentals and Residents in `--muted-foreground` at 14 / 20, 28px apart, the current page in `--foreground`; HG Login last in `--pub-faint`. Below 600 the links fold into a 44px menu button.
+- **Header.** 64px over a `--border` rule. Wordmark in `--foreground` left; Rentals and Residents in `--muted-foreground` at 14 / 20, 28px apart, the current page in `--foreground`; Login last in `--pub-faint`. Below 600 the links fold into a 44px menu button.
 - **Uppercase** lives only here, in the eyebrow and wordmark. The gold hairline (56px) appears once, under the welcome eyebrow.
 - **Listings** are borderless 4:3 photo cards, `rounded-lg`, with a "1 / 8" counter and swipe on touch ([KOBU](https://mobbin.com/sites/sections/4226456d-e845-483a-ad1b-305a93fe7d36), [Airbnb](https://mobbin.com/screens/8a6b4476-52d7-4c85-965b-2a870b388eb3)).
 - **Caption.** Street with rent right-aligned (tabular, "/mo" in `--muted-foreground`), then neighborhood and unit, then the facts line ([Realtor.com](https://mobbin.com/screens/b0a7e96c-8e57-41b8-9029-a9521f0fa412)). Desktop hover turns the street gold.

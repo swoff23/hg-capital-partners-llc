@@ -7,15 +7,18 @@ import { ComposerDropZone, PendingSendsProvider } from "@/components/composer";
 import { Section } from "@/components/ui";
 import type { Ymd } from "@/lib/dates";
 import type { TaskInvoiceRow } from "@/lib/invoices/queries";
-import type { JobEmailState } from "@/lib/portal/job-emails";
+import { personRefs } from "@/lib/tasks/assignee-people";
+import type { TaskEmailState } from "@/lib/tasks/delivery";
+import type { DraftContractor } from "@/lib/tasks/drafts";
 import { TaskActivity, type ActivityRow } from "./activity";
 import { Checklist, type ChecklistRow } from "./checklist";
 import { Composer, type ComposerDraft } from "./composer";
-import { TaskFields, type PropertyOption, type TaskFieldValues, type TaskLockbox, type TaskTenants } from "./fields";
+import { DraftBanner } from "./draft-banner";
+import { TaskFields, type PropertyOption, type TaskFieldValues, type TaskLockbox, type TaskResident, type TaskTenants } from "./fields";
 import { MoreMenu, TitleField } from "./header";
 import { TaskInvoices } from "./invoices";
 import { NotesField } from "./notes";
-import { ReviewSlot, type ReviewDecision, type ReviewProof } from "./review-banner";
+import { OutcomeLine, ReviewSlot, type ReviewDecision, type ReviewProof } from "./review-banner";
 import { StatusControl, WaitingReason } from "./status-control";
 import { StatusRunProvider } from "./status-run";
 import { TaskMediaSection } from "./task-media";
@@ -48,21 +51,33 @@ export interface TaskPageViewProps {
   lockbox: TaskLockbox | null;
   tenants: TaskTenants | null;
   entryOffered: boolean;
+  /** Set when a resident sent this from their link (docs/specs/maintenance-requests.md, section 4.1). */
+  resident: TaskResident | null;
   created: string;
   /** First name of the assigned contractor. */
   contractorFirst: string | null;
   /** The assigned contractor has a portal login; until then nothing here says they'll see it now. */
   contractorHasLogin: boolean;
   /** The assigned contractor, for the composer's line over the field. */
-  contractor: { id: string; first: string; hasLogin: boolean; emails: JobEmailState } | null;
+  contractor: { id: string; first: string; name?: string; hasLogin: boolean; emails: TaskEmailState } | null;
   /** The partners' first names: who sees an Internal note. */
   staffFirstNames: string[];
+  /** Set while the task is a draft from Claude: the banner in place of the status control, and who hears when it's added. */
+  draft?: { contractor: DraftContractor | null } | null;
   /** The proof the Review banner shows while the job waits on staff, else null. */
   review: ReviewProof | null;
   /** Who decided, while nothing has moved since: the banner's one-line outcome. */
   decision: ReviewDecision | null;
   /** An email's Send back (`?do=send-back`, docs/specs/contractor-job-emails.md 8): the banner opens its sheet once. */
   openSendBack?: boolean;
+  /** An email's Approve (`?do=approve`): the Review banner comes into view with Approve focused. */
+  focusApprove?: boolean;
+  /** An email's Approve or Send back found the job already decided: the outcome line shows. */
+  landed?: boolean;
+  /** An email's Assign (`?do=assign`) on an unassigned job: the assignee picker opens once. */
+  openAssignee?: boolean;
+  /** An email's Assign on a job that already has someone: "Pieter assigned Zack Miller · 9:20 AM", above the fields. */
+  assignedLine?: { text: string; at: string | null } | null;
   checklist: ChecklistRow[];
   /** The job's invoices, Not an invoice left out, oldest first (lib/invoices/queries.ts invoicesForTask). */
   invoices: TaskInvoiceRow[];
@@ -109,22 +124,33 @@ export function TaskPageView(p: TaskPageViewProps) {
         <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 [grid-area:head] [grid-template-areas:'nav_more'_'title_title'_'reason_reason']">
           <div className="flex min-w-0 items-center gap-1.5 [grid-area:nav]">
             <BackLink fallback="/tasks" label="Tasks" />
-            <span aria-hidden="true" className="text-meta text-muted-foreground">
-              /
-            </span>
-            <StatusControl
-              taskId={task.id}
-              status={task.status}
-              waitingOn={task.waitingOn}
-              scheduledFor={p.values.scheduledFor}
-              today={p.today}
-              hasContractor={!!p.values.assignee && "contactId" in p.values.assignee}
-            />
+            {/* A draft has no status to change: its banner below is the one control. */}
+            {!p.draft && (
+              <>
+                <span aria-hidden="true" className="text-meta text-muted-foreground">
+                  /
+                </span>
+                <StatusControl
+                  taskId={task.id}
+                  status={task.status}
+                  waitingOn={task.waitingOn}
+                  scheduledFor={p.values.scheduledFor}
+                  residentName={p.resident?.tenantName ?? null}
+                  today={p.today}
+                  hasContractor={!!p.values.assignee && "contactId" in p.values.assignee}
+                />
+              </>
+            )}
           </div>
           <div className="[grid-area:more]">
-            <MoreMenu taskId={task.id} title={task.title} canceled={task.status === "CANCELED"} />
+            <MoreMenu taskId={task.id} title={task.title} draft={!!p.draft} canceled={task.status === "CANCELED"} />
           </div>
           <div className="min-w-0 [grid-area:title]">
+            {p.draft && (
+              <div className="mb-3">
+                <DraftBanner taskId={task.id} contractor={p.draft.contractor} people={personRefs(p.users, p.contractors)} />
+              </div>
+            )}
             <TitleField taskId={task.id} title={task.title} closed={!p.active} />
           </div>
           {task.status === "WAITING" && task.waitingOn && (
@@ -137,11 +163,17 @@ export function TaskPageView(p: TaskPageViewProps) {
         <aside aria-label="Task details" className="min-w-0 [grid-area:fields] lg:sticky lg:top-20 lg:self-start">
           {/* The Details heading and its rule from lg, where the fields are a rail; below
               that they're a row of chips under the title, with no heading. */}
+          {p.assignedLine && (
+            <div className="mb-2 lg:mb-0 lg:pb-3">
+              <OutcomeLine text={p.assignedLine.text} at={p.assignedLine.at} now={p.now} />
+            </div>
+          )}
           <Section title="Details" className="max-lg:[&>div:first-child]:hidden max-lg:[&>div:last-child]:pt-0">
             <TaskFields
               taskId={task.id}
               today={p.today}
               status={task.status}
+              waitingOn={task.waitingOn}
               overdue={p.overdue}
               values={p.values}
               users={p.users}
@@ -153,7 +185,9 @@ export function TaskPageView(p: TaskPageViewProps) {
               lockbox={p.lockbox}
               tenants={p.tenants}
               entryOffered={p.entryOffered}
+              resident={p.resident}
               created={p.created}
+              openAssignee={p.openAssignee}
             />
           </Section>
         </aside>
@@ -169,11 +203,14 @@ export function TaskPageView(p: TaskPageViewProps) {
               hasLogin={p.contractorHasLogin}
               now={p.now}
               openSendBack={p.openSendBack}
+              focusApprove={p.focusApprove}
+              landed={p.landed}
             />
 
             <div>
               {task.legacyAssignee && <p className="mb-2 text-meta text-muted-foreground">Assigned in Asana to {task.legacyAssignee}</p>}
-              <NotesField taskId={task.id} value={task.description} visibleTo={p.contractorFirst} hasLogin={p.contractorHasLogin} />
+              {/* "Zack sees this" would be untrue on a draft: nobody can open it until it's added. */}
+              <NotesField taskId={task.id} value={task.description} visibleTo={p.draft ? null : p.contractorFirst} hasLogin={p.contractorHasLogin} />
             </div>
 
             <Checklist taskId={task.id} items={p.checklist} />

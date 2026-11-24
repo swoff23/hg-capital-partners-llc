@@ -174,7 +174,7 @@ export async function useAsInvoice(db: Db, ops: InvoiceBlobOps, attachmentId: st
       task: { select: { id: true, status: true, bucket: true, assigneeContact: { select: { id: true, archivedAt: true } } } },
     },
   });
-  if (!a || a.deletedAt || !a.url || !a.pathname || a.task.bucket === TEMPLATE_BUCKET) throw new FieldError({ file: FILE_GONE });
+  if (!a || a.deletedAt || !a.url || !a.pathname || a.task.bucket === TEMPLATE_BUCKET || a.task.status === "DRAFT") throw new FieldError({ file: FILE_GONE });
   if (a.kind !== "IMAGE" && a.kind !== "FILE") throw new FieldError({ file: NOT_A_DOCUMENT });
   if (!isPrivateStoreUrl(a.url, ops.storeId, a.pathname)) throw new FieldError({ file: STILL_PUBLIC });
 

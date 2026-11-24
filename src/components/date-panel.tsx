@@ -80,6 +80,7 @@ export function DatePanel({
   onPick,
   picks: withPicks = true,
   allowNone = true,
+  noneLabel,
   overdue = false,
   repeat,
   onRepeat,
@@ -93,6 +94,8 @@ export function DatePanel({
   /** Quick picks (task dates). A record date has none. */
   picks?: boolean;
   allowNone?: boolean;
+  /** The none pick's words where "No date" would mislead: "Remove day" on a contractor's scheduled day. */
+  noneLabel?: string;
   overdue?: boolean;
   repeat?: RepeatBinding;
   /** Commits a repeat rule and closes the layer. */
@@ -104,8 +107,13 @@ export function DatePanel({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const picks = useMemo(
-    () => (withPicks ? quickPicks(today).filter((p) => allowNone || p.key !== "none") : []),
-    [withPicks, today, allowNone],
+    () =>
+      withPicks
+        ? quickPicks(today)
+            .filter((p) => allowNone || p.key !== "none")
+            .map((p) => (p.key === "none" && noneLabel ? { ...p, label: noneLabel } : p))
+        : [],
+    [withPicks, today, allowNone, noneLabel],
   );
   const steps = layout === "steps";
   const [view, setView] = useState<"date" | "calendar" | "repeat">("date");

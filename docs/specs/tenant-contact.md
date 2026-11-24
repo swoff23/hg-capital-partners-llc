@@ -38,7 +38,7 @@ Connor said "build it after" on Nov 14: it builds once branch `design-calls-nov1
 | Q10 | The task page shows the tenants with Call and Text for staff, and says what the contractor gets |
 | Q11 | Extended by Q24. Applying a playbook prefills `[Tenant]` and `[tenant number]` from the unit's current tenants, except on a move-in playbook |
 | Q12 | A contractor opening a job that shows the tenants is logged, like the lockbox code |
-| Q13 | Text shows on phones and tablets only, as on a contractor's record (ADMIN-004); with a mouse the number shows next to Call |
+| Q13 | Text shows on phones and tablets only, as on a contractor's record (ADMIN-004); with a mouse the number shows next to Call. Changed Nov 21 (Connor): on the job page Text shows at every size |
 | Q14 | Updated by Q26. A Tenants section above Lockbox stays; its Call and Text pair becomes one row per person |
 | Q15 | Built after `design-calls-nov14` lands (was: after chunk 7, which landed Oct 27) |
 | Q16 | Superseded by Q22. Was: a three-way menu on the task's Access row |
@@ -134,14 +134,14 @@ ALTER TYPE "SecurityEventKind" ADD VALUE 'TENANT_VIEWED';
 
 ![The job page: occupied, occupied with permission to enter, and vacant](tenant-contact/01-job-page.svg)
 
-A Tenants section above Lockbox, in `_components/job-details.tsx` beside `LockboxSection`. Its title reads "Tenant" with one person and "Tenants" with more.
+A Tenants section above Lockbox, in `_components/job-details.tsx` beside `LockboxSection`. Since Nov 22 (Connor) the order is Getting in (`GettingInSection`, the entry rule, the code and the lockbox's place and photo) then Tenants, and "Call/text them 24 hours in advance" sits under "The tenant must be home" in Getting in (docs/specs/contractor-scheduled-date.md section 12). Its title reads "Tenant" with one person and "Tenants" with more.
 
 - **One row per person** (Q26), in the order staff entered them, divided by `--border`. On the left, the name (`text-body` `--foreground`) over the number (`num` `--fg-2`); the name truncates (`min-w-0 truncate`) and the number doesn't shrink. On the right, two square icon buttons: plain `<a href="tel:…">` and `<a href="sms:…">` styled with `buttonClass({ variant: "secondary", icon: true })`, so 36px with a mouse and 44px on touch. Icons are lucide `Phone` and `MessageSquareText` at the brand sizes. The `aria-label`s read "Call Dana" and "Text Dana", from the record. They dial `phoneE164` through `telHref` and `textHref` in `src/lib/contacts.ts`.
 - **Occupied, Tenant only:** the Tenants section, and no Lockbox section.
 - **Occupied, Permission to enter:** Tenants, then Lockbox, with "The tenants said you can let yourself in" under the code in `--ok` ("The tenant said" with one person).
 - **Vacant:** the Lockbox section as it is today. A tenancy that hasn't moved in, or has moved out, never shows.
 - **Closed job, or access removed:** neither section (Q2).
-- **Sizes.** Phone 375 and tablet 768 (touch): both icons on every row. Phone 320: the icons keep their 44px and the name truncates before the number does. Laptop 1280 with a mouse: the text icon is left out (Q13), so each row has the call icon and the number in full.
+- **Sizes.** Phone 375 and tablet 768 (touch): both icons on every row. Phone 320: the icons keep their 44px and the name truncates before the number does. Laptop 1280 with a mouse: both icons too (Connor, Nov 21, replacing Q13 here), with the number in full.
 - **My jobs** adds nothing: the Tenants section shows only on the job page.
 - **Job emails.** "Show access" (`src/lib/portal/job-link-paths.ts`) lands at `#lockbox` today. It moves to `#access` on whichever section comes first, and the button shows when either section would. The email itself never carries the tenants or the code.
 

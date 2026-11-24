@@ -125,6 +125,8 @@ test("addComment: a contractor's batch is marked, and its line names its event",
       summary: "added files (+1 file)",
       at: POSTED.toISOString(),
       eventId: "e-batch",
+      // Who wrote it, so a partner's reply link names them (docs/specs/emails-redesign.md, section 7).
+      contactId: "c-zack",
     });
   }
 });
@@ -587,7 +589,8 @@ test("removeAttachment: the removed line names the file as it is under the lock,
   const { tx, calls } = fakeTx(onPost("e1", undefined, "Kitchen before.jpg"));
   assert.equal(await removeAttachment(tx, file({}), CONNOR), true);
   const read = calls.find((c) => c.model === "taskAttachment" && c.op === "findUnique")!.args as CallArgs;
-  assert.deepEqual(read.select, { eventId: true, filename: true }, "one read, under the lock");
+  // Which post, the name, and whether its task is a draft someone discarded: all from the one read under the lock.
+  assert.deepEqual(read.select, { eventId: true, filename: true, task: { select: { discardedAt: true } } }, "one read, under the lock");
   const line = calls.find((c) => c.model === "taskEvent" && c.op === "create")!.args as CallArgs;
   assert.deepEqual(line.data?.data, { attachmentId: "a1", filename: "Kitchen before.jpg", removed: true, eventId: "e1" });
 });
@@ -707,7 +710,7 @@ test("addLateContractorBatch: one email line per partner for the batch, naming i
   const inserts = outboxInserts(calls);
   assert.equal(inserts.length, 2, "one line for each partner, not one per file");
   for (const c of inserts) {
-    assert.deepEqual(insertedItem(c), { kind: "COMMENT", actorLabel: "Zack Outlaw", summary: "added files (+3 files)", at: POSTED.toISOString(), eventId: "e-late" });
+    assert.deepEqual(insertedItem(c), { kind: "COMMENT", actorLabel: "Zack Outlaw", summary: "added files (+3 files)", at: POSTED.toISOString(), eventId: "e-late", contactId: "c-zack" });
     // Into the same 10-minute bundle as every other line for the task.
     assert.match(c.op, /ON CONFLICT \("openKey"\) DO UPDATE SET/);
   }

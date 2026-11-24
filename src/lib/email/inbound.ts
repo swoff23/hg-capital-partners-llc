@@ -205,3 +205,97 @@ export const ADDED_TO_INVOICES = "Added to Invoices to review";
 export function closedReplyItems(words: string, invoiced: boolean): string[] {
   return [...(words ? [words] : []), ...(invoiced ? [ADDED_TO_INVOICES] : [])];
 }
+
+// ---------------------------------------------------------------------------
+// Replies that can't post, and files that don't come through
+// (docs/specs/emails-redesign.md, section 7)
+// ---------------------------------------------------------------------------
+
+/**
+ * A link a mail app put in place of a file too big to attach: Apple's Mail Drop (an iCloud link that stops working
+ * after 30 days), an iCloud Drive share, or Google Drive (Gmail's own "too big" link). Null when the words carry none.
+ */
+export type LinkedFile = "mail-drop" | "icloud" | "drive";
+
+export function linkedFile(text: string): LinkedFile | null {
+  if (/https:\/\/(?:www\.)?icloud\.com\/attachment\//i.test(text)) return "mail-drop";
+  if (/https:\/\/(?:www\.)?icloud\.com\/iclouddrive\//i.test(text)) return "icloud";
+  if (/https:\/\/drive\.google\.com\/(?:file|open|drive)\b/i.test(text)) return "drive";
+  return null;
+}
+
+type Kind = "image" | "video" | "file";
+
+const NOUN: Record<Kind, string> = { image: "photo", video: "video", file: "file" };
+
+/** "your video", "2 photos", "3 files": a mix of kinds is files. */
+function counted(kinds: readonly Kind[]): { words: string; one: boolean } {
+  const kind = kinds.every((k) => k === kinds[0]) ? kinds[0] : "file";
+  const noun = NOUN[kind ?? "file"];
+  return kinds.length === 1 ? { words: `your ${noun}`, one: true } : { words: `${kinds.length} ${noun}s`, one: false };
+}
+
+/**
+ * The one line of the note to a contractor whose reply posted without some of its files (the reply-problem email,
+ * subject "Some files didn't post: …"): it says the rest posted, and what to do. The first that applies: a file over
+ * its size cap, more files than one post takes, then a file sent as a link. Null when every file came through.
+ * `posted` false: the reply was only files, all too big, so nothing posted and the line doesn't say it did.
+ */
+export function postedFilesLine(input: { tooBig: readonly Kind[]; tooMany: boolean; max: number; linked: LinkedFile | null; posted?: boolean }): string | null {
+  if (input.tooBig.length) {
+    const { words, one } = counted(input.tooBig);
+    const what = `${words} ${one ? "was" : "were"} too big for email. Add ${one ? "it" : "them"} on the job.`;
+    return input.posted === false ? what.charAt(0).toUpperCase() + what.slice(1) : `Your reply posted, but ${what}`;
+  }
+  if (input.posted === false) return null;
+  if (input.tooMany) return `Your reply posted with its first ${input.max} files. Add the rest on the job.`;
+  switch (input.linked) {
+    case "mail-drop":
+      return "Your reply posted. Its iCloud link stops working in 30 days, so add the file on the job.";
+    case "icloud":
+      return "Your reply posted with an iCloud link. Add the file itself on the job.";
+    case "drive":
+      return "Your reply posted with a Drive link. Add the file itself on the job.";
+    default:
+      return null;
+  }
+}
+
+/**
+ * The same note for a reply that went to the partners by email instead (a closed job, or one the contractor can't
+ * post on): its files rode along as attachments, and these didn't fit. A link in the words went with the words, so
+ * it needs no note. Null when nothing was left out.
+ */
+export function forwardedFilesLine(partners: string, dropped: readonly Kind[]): string | null {
+  if (!dropped.length) return null;
+  const { words, one } = counted(dropped);
+  const what = one ? words.replace(/^your /, "a ") : words;
+  return `Your reply reached ${partners}, but ${what} didn't fit in the email. Send ${one ? "it" : "them"} as an iCloud or Drive link.`;
+}
+
+/** Why a contractor's reply didn't post on its job, or "no-job" for a fresh email to the jobs address. */
+export type CantPost = "closed" | "off-task" | "login-off" | "old-link" | "no-job";
+
+/** The headline of the email that brings such a reply to the partners, the contractor by full name (Q6). */
+export function forwardHeadline(name: string, why: CantPost): string {
+  switch (why) {
+    case "closed":
+      return `${name} replied after this closed.`;
+    case "off-task":
+      return `${name} replied, but they're no longer on this task.`;
+    case "login-off":
+      return `${name} replied, but their login is off.`;
+    case "old-link":
+      return `${name} replied to an old email, so it didn't post.`;
+    case "no-job":
+      return `${name} wrote to the jobs address. It isn't on a task.`;
+  }
+}
+
+/** That email's line about the files: what's attached, and what didn't fit. Null with no files. */
+export function forwardFilesLine(attached: number, dropped: number): string | null {
+  if (!attached && !dropped) return null;
+  if (!attached) return dropped === 1 ? "Their file didn't fit in this email." : `Their ${dropped} files didn't fit in this email.`;
+  const lead = attached === 1 ? "Their file is attached." : `Their ${attached} files are attached.`;
+  return dropped ? `${lead} ${dropped} more didn't fit.` : lead;
+}

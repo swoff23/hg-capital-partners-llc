@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { EmailProblem, Prisma, PrismaClient } from "@prisma/client";
 import type { JobEmailState } from "@/lib/portal/job-emails";
 
 /**
@@ -77,8 +77,24 @@ export async function emailStatesIn(db: Db, taskId: string, contactId: string, e
   return out;
 }
 
+/**
+ * What the task page knows about email to its contractor: the Job emails rule (portal/job-emails.ts), and
+ * "not-getting-through" while emails go but Resend reported their address bounced, suppressed or marked as spam
+ * (docs/specs/emails-redesign.md, section 5; src/lib/email/delivery-events.ts emailProblemOf). Only while emails go:
+ * with no login, before the first sign-in or with the switch off, that line already says why nothing arrives.
+ */
+export type TaskEmailState = JobEmailState | "not-getting-through";
+
+export function taskEmailState(emails: JobEmailState, problem: EmailProblem | null): TaskEmailState {
+  return emails === "on" && problem ? "not-getting-through" : emails;
+}
+
 /** The line under a staff entry for the contractor it is addressed to. */
-export type Delivery = { state: "no-login" | "not-signed-in" | "emails-off" | "queued" | "emailed" | "seen"; to: string | string[]; at?: string };
+export type Delivery = {
+  state: "no-login" | "not-signed-in" | "emails-off" | "not-getting-through" | "queued" | "emailed" | "seen";
+  to: string | string[];
+  at?: string;
+};
 
 /**
  * The delivery line for one entry the contractor can see, the first that
@@ -88,18 +104,23 @@ export type Delivery = { state: "no-login" | "not-signed-in" | "emails-off" | "q
  *  2. Neither does a login that has never signed in: emails wait for that.
  *  3. Opened after the entry wins over the email states, since it is the
  *     later fact.
- *  4. An email that went says so, whatever the switch says now.
- *  5. "Job emails" off says so. That covers a line still waiting, which the
+ *  4. An address Resend says isn't getting mail says so, by their full name
+ *     ("Emails don't reach Zack Miller."): over "Emailed", since
+ *     the email left but didn't arrive, and over one still waiting, which won't.
+ *  5. An email that went says so, whatever the switch says now.
+ *  6. "Job emails" off says so. That covers a line still waiting, which the
  *     send run drops, and an entry no email was ever queued for.
- *  6. Otherwise the email that is waiting.
+ *  7. Otherwise the email that is waiting.
  *
  * Nothing for an entry with no email on record while emails are on (one
  * posted before the outbox named its events).
  */
 export function deliveryLine(input: {
   to: string;
-  /** Whether task emails reach them, or why not (src/lib/portal/job-emails.ts). */
-  emails: JobEmailState;
+  /** Their full name, for "Emails don't reach Zack Miller."; `to` when not given. */
+  name?: string;
+  /** Whether task emails reach them, or why not (src/lib/portal/job-emails.ts, and taskEmailState above). */
+  emails: TaskEmailState;
   email: EmailState | null;
   /** When the contractor last opened the job. */
   seenAt: Date | string | null;
@@ -110,6 +131,7 @@ export function deliveryLine(input: {
   if (input.emails === "not-signed-in") return { state: "not-signed-in", to: input.to };
   const seen = input.seenAt ? new Date(input.seenAt) : null;
   if (seen && seen.getTime() > new Date(input.eventAt).getTime()) return { state: "seen", to: input.to, at: seen.toISOString() };
+  if (input.emails === "not-getting-through") return { state: "not-getting-through", to: input.name?.trim() || input.to };
   if (input.email === "emailed") return { state: "emailed", to: input.to };
   if (input.emails === "off") return { state: "emails-off", to: input.to };
   // A row a run is sending is still "gets an email" to the person reading.

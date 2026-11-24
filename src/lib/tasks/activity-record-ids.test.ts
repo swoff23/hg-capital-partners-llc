@@ -70,7 +70,7 @@ test("the task page names records from activityRecordNames, ahead of the pickers
 
 test("the task page notes what was seen on the refresh after an action too; only Recent waits for an open", () => {
   // A comment that came in while the page was up and showed with the refresh after a tick came back as unread.
-  assert.match(page, /if \(!\(await isActionRender\(\)\)\) after\(\(\) => recordView\(user\.id, "TASK", task\.id\)\);\n\s*after\(\(\) => markTaskSeen\(user\.id, task\.id, now\)/);
+  assert.match(page, /if \(task\.status !== "DRAFT" && !\(await isActionRender\(\)\)\) after\(\(\) => recordView\(user\.id, "TASK", task\.id\)\);\n\s*after\(\(\) => markTaskSeen\(user\.id, task\.id, now\)/);
   // And the New divider keeps the baseline of the page's first render, so it doesn't move under the reader.
   const activity = readFileSync(new URL("../../app/(app)/tasks/[id]/activity.tsx", import.meta.url), "utf8");
   assert.match(activity, /const \[baseline\] = useState\(newSince\);/);

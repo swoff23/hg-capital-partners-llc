@@ -1,7 +1,24 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import { REPLY_MAX, fromAddress, htmlToText, isAutoReply, isOutOfOfficeReply, replyAddress, replyBody, replyToken, singleAddress, threadTaskId, verifyWebhook } from "./inbound";
+import {
+  REPLY_MAX,
+  forwardFilesLine,
+  forwardHeadline,
+  forwardedFilesLine,
+  fromAddress,
+  htmlToText,
+  isAutoReply,
+  isOutOfOfficeReply,
+  linkedFile,
+  postedFilesLine,
+  replyAddress,
+  replyBody,
+  replyToken,
+  singleAddress,
+  threadTaskId,
+  verifyWebhook,
+} from "./inbound";
 
 const secretBytes = crypto.randomBytes(24);
 const secret = `whsec_${secretBytes.toString("base64")}`;
@@ -103,4 +120,55 @@ test("the invoice inbox drops only true automatic replies, never a billing tool'
   assert.equal(isOutOfOfficeReply({ precedence: "bulk" }, "Invoice 1043"), false);
   assert.equal(isOutOfOfficeReply({ "x-auto-response-suppress": "All" }, "Invoice 1043"), false);
   assert.equal(isOutOfOfficeReply({ "auto-submitted": "no" }, "Invoice 1043"), false);
+});
+
+
+// docs/specs/emails-redesign.md, section 7.
+
+test("only a Mail Drop, iCloud Drive or Google Drive link counts as a file sent as a link", () => {
+  assert.equal(linkedFile("Here it is https://www.icloud.com/attachment/?u=https%3A%2F%2Fcvws&uk=abc"), "mail-drop");
+  assert.equal(linkedFile("https://icloud.com/iclouddrive/0a1b2c#Kitchen"), "icloud");
+  assert.equal(linkedFile("https://drive.google.com/file/d/1AbC/view?usp=drive_web"), "drive");
+  assert.equal(linkedFile("https://drive.google.com/open?id=1AbC"), "drive");
+  assert.equal(linkedFile("Photos on https://www.icloud.com/photos/ and https://example.com/drive.google.com/file"), null);
+  assert.equal(linkedFile("Done, see you Thursday."), null);
+});
+
+test("a reply that posted without some files says the rest posted, and only an actual oversized file is too big", () => {
+  const base = { tooBig: [], tooMany: false, max: 50, linked: null } as const;
+  assert.equal(postedFilesLine(base), null, "every file came through");
+  assert.equal(postedFilesLine({ ...base, tooBig: ["video"] }), "Your reply posted, but your video was too big for email. Add it on the job.");
+  assert.equal(postedFilesLine({ ...base, tooBig: ["image", "image"] }), "Your reply posted, but 2 photos were too big for email. Add them on the job.");
+  assert.equal(postedFilesLine({ ...base, tooBig: ["video", "file"] }), "Your reply posted, but 2 files were too big for email. Add them on the job.");
+  assert.equal(postedFilesLine({ ...base, tooMany: true }), "Your reply posted with its first 50 files. Add the rest on the job.");
+  // A link is never "too big": it gets words for what it is.
+  assert.equal(postedFilesLine({ ...base, linked: "mail-drop" }), "Your reply posted. Its iCloud link stops working in 30 days, so add the file on the job.");
+  assert.equal(postedFilesLine({ ...base, linked: "icloud" }), "Your reply posted with an iCloud link. Add the file itself on the job.");
+  assert.equal(postedFilesLine({ ...base, linked: "drive" }), "Your reply posted with a Drive link. Add the file itself on the job.");
+  assert.match(postedFilesLine({ ...base, tooBig: ["video"], linked: "drive" }) ?? "", /too big/, "an oversized file comes first");
+  // Only files, all too big: nothing posted, and the line doesn't say it did.
+  assert.equal(postedFilesLine({ ...base, tooBig: ["video"], posted: false }), "Your video was too big for email. Add it on the job.");
+  assert.equal(postedFilesLine({ ...base, linked: "drive", posted: false }), null);
+  for (const line of [postedFilesLine({ ...base, tooBig: ["video"] }), postedFilesLine({ ...base, linked: "mail-drop" })]) {
+    assert.ok((line ?? "").length <= 90, `one short line: ${line}`);
+    assert.doesNotMatch(line ?? "", /\u2014/, "no em dash");
+  }
+});
+
+test("files left out of a forward are said to the sender, with what to send instead", () => {
+  assert.equal(forwardedFilesLine("Connor and Pieter", []), null);
+  assert.equal(forwardedFilesLine("Connor and Pieter", ["video"]), "Your reply reached Connor and Pieter, but a video didn't fit in the email. Send it as an iCloud or Drive link.");
+  assert.equal(forwardedFilesLine("Connor and Pieter", ["image", "image", "image"]), "Your reply reached Connor and Pieter, but 3 photos didn't fit in the email. Send them as an iCloud or Drive link.");
+});
+
+test("the forward to the partners names the contractor in full and says why it didn't post", () => {
+  assert.equal(forwardHeadline("Zack Miller", "closed"), "Zack Miller replied after this closed.");
+  assert.equal(forwardHeadline("Zack Miller", "off-task"), "Zack Miller replied, but they're no longer on this task.");
+  assert.equal(forwardHeadline("Zack Miller", "login-off"), "Zack Miller replied, but their login is off.");
+  assert.equal(forwardHeadline("Zack Miller", "old-link"), "Zack Miller replied to an old email, so it didn't post.");
+  assert.equal(forwardHeadline("Zack Miller", "no-job"), "Zack Miller wrote to the jobs address. It isn't on a task.");
+  assert.equal(forwardFilesLine(0, 0), null);
+  assert.equal(forwardFilesLine(1, 0), "Their file is attached.");
+  assert.equal(forwardFilesLine(3, 2), "Their 3 files are attached. 2 more didn't fit.");
+  assert.equal(forwardFilesLine(0, 1), "Their file didn't fit in this email.");
 });

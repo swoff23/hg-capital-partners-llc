@@ -319,6 +319,7 @@ export function MediaUploadTray({
   leading,
   disabled = false,
   label,
+  addLabel = "Add more photos",
   onFill = false,
   className,
 }: {
@@ -332,6 +333,8 @@ export function MediaUploadTray({
   leading?: ReactNode;
   disabled?: boolean;
   label?: string;
+  /** The add tile's name once the slots are full: "Add more photos", or what this tray takes ("Add photos, videos or files"). */
+  addLabel?: string;
   onFill?: boolean;
   className?: string;
 }) {
@@ -365,7 +368,7 @@ export function MediaUploadTray({
               type="button"
               onClick={uploader.chooseFiles}
               disabled={disabled}
-              aria-label="Add more photos"
+              aria-label={addLabel}
               className={slotClass}
             >
               <ImagePlus className="size-5" aria-hidden="true" />

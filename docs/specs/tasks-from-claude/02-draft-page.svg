@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>A draft opened as a task page: a Draft from Claude banner with Discard and Add task above the usual fields, at laptop 1280, tablet 768 and phone 375</title>
+<rect width="900" height="560" fill="#ffffff"/>
+<text x="32" y="36" font-size="15" font-weight="600" fill="#152133">A draft opens as a normal task page, with one banner on top</text>
+
+<g transform="translate(32 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Laptop 1280 and tablet 768</text>
+<rect x="0" y="22" width="560" height="440" rx="12" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="20" y="52" font-size="12" fill="#5b6576">Tasks</text>
+
+<rect x="20" y="66" width="520" height="64" rx="10" fill="#f7f6f3" stroke="#e7e5e0"/>
+<text x="36" y="92" font-size="13" font-weight="600" fill="#152133">Draft from Claude</text>
+<text x="36" y="112" font-size="12" fill="#5b6576">Adding it emails Zack.</text>
+<rect x="356" y="84" width="76" height="28" rx="8" fill="#ffffff" stroke="#c9c6bf"/>
+<text x="394" y="102" font-size="12" fill="#152133" text-anchor="middle">Discard</text>
+<rect x="440" y="84" width="84" height="28" rx="8" fill="#152133"/>
+<text x="482" y="102" font-size="12" font-weight="500" fill="#ffffff" text-anchor="middle">Add task</text>
+
+<text x="20" y="168" font-size="20" font-weight="600" fill="#152133">Fix gutters pulling off the back</text>
+<text x="20" y="196" font-size="13" fill="#152133">Gutters are pulling off the back. Get out there before the rain.</text>
+
+<g font-size="12" fill="#152133">
+<rect x="20" y="216" width="62" height="28" rx="8" fill="#ffffff" stroke="#c9c6bf"/><text x="51" y="234" text-anchor="middle">Zack</text>
+<rect x="90" y="216" width="94" height="28" rx="8" fill="#ffffff" stroke="#c9c6bf"/><text x="137" y="234" text-anchor="middle">Fri, Nov 27</text>
+<rect x="192" y="216" width="158" height="28" rx="8" fill="#ffffff" stroke="#c9c6bf"/><text x="271" y="234" text-anchor="middle">933 Lafayette · Unit 2</text>
+</g>
+<text x="20" y="276" font-size="12" fill="#152133">Permission to enter</text>
+<rect x="508" y="262" width="32" height="18" rx="9" fill="#152133"/><circle cx="531" cy="271" r="7" fill="#ffffff"/>
+<line x1="20" y1="296" x2="540" y2="296" stroke="#e7e5e0"/>
+
+<text x="20" y="324" font-size="13" font-weight="600" fill="#152133">Activity</text>
+<text x="20" y="350" font-size="12" fill="#152133">Pieter created this task</text>
+<text x="158" y="350" font-size="12" fill="#5b6576">via Claude · 2:14 pm</text>
+
+<text x="20" y="414" font-size="11" fill="#5b6576">The banner takes the place of the status control. Every field edits the usual way.</text>
+<text x="20" y="430" font-size="11" fill="#5b6576">Comments and photos wait with the draft. The contractor sees nothing until it's added.</text>
+<text x="20" y="446" font-size="11" fill="#5b6576">Same card the app shows on a contractor's job in Review (review-banner.tsx).</text>
+</g>
+
+<g transform="translate(624 56)">
+<text x="0" y="12" font-size="11" font-weight="500" fill="#424e61">Phone 375</text>
+<rect x="0" y="22" width="244" height="440" rx="16" fill="#ffffff" stroke="#e7e5e0"/>
+<text x="16" y="50" font-size="12" fill="#5b6576">Tasks</text>
+
+<rect x="16" y="62" width="212" height="96" rx="10" fill="#f7f6f3" stroke="#e7e5e0"/>
+<text x="28" y="86" font-size="13" font-weight="600" fill="#152133">Draft from Claude</text>
+<text x="28" y="104" font-size="12" fill="#5b6576">Adding it emails Zack.</text>
+<rect x="28" y="116" width="92" height="32" rx="8" fill="#ffffff" stroke="#c9c6bf"/>
+<text x="74" y="136" font-size="12" fill="#152133" text-anchor="middle">Discard</text>
+<rect x="124" y="116" width="92" height="32" rx="8" fill="#152133"/>
+<text x="170" y="136" font-size="12" font-weight="500" fill="#ffffff" text-anchor="middle">Add task</text>
+
+<text x="16" y="190" font-size="16" font-weight="600" fill="#152133">Fix gutters pulling off</text>
+<text x="16" y="210" font-size="16" font-weight="600" fill="#152133">the back</text>
+<text x="16" y="236" font-size="12" fill="#152133">Gutters are pulling off the back.</text>
+<text x="16" y="252" font-size="12" fill="#152133">Get out there before the rain.</text>
+
+<g font-size="12" fill="#152133">
+<rect x="16" y="268" width="52" height="28" rx="8" fill="#ffffff" stroke="#c9c6bf"/><text x="42" y="286" text-anchor="middle">Zack</text>
+<rect x="74" y="268" width="84" height="28" rx="8" fill="#ffffff" stroke="#c9c6bf"/><text x="116" y="286" text-anchor="middle">Fri, Nov 27</text>
+<rect x="164" y="268" width="80" height="28" rx="8" fill="#ffffff" stroke="#c9c6bf"/><text x="172" y="286">933 Lafa…</text>
+</g>
+<text x="16" y="326" font-size="12" fill="#152133">Permission to enter</text>
+<rect x="196" y="312" width="32" height="18" rx="9" fill="#152133"/><circle cx="219" cy="321" r="7" fill="#ffffff"/>
+
+<text x="16" y="420" font-size="11" fill="#5b6576">Buttons share the banner's width.</text>
+<text x="16" y="436" font-size="11" fill="#5b6576">Chips scroll sideways, never wrap.</text>
+</g>
+
+<text x="32" y="532" font-size="11" fill="#5b6576">The second line changes with who's assigned: "Adding it emails Zack." or "Rob doesn't get job emails."</text>
+<text x="32" y="548" font-size="11" fill="#5b6576">A partner's own task has no second line.</text>
+</svg>

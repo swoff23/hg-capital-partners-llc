@@ -1,14 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { PrismaClient } from "@prisma/client";
-import { signupLinkToken } from "../../src/lib/portal/tokens";
+import { hashToken, residentLinkToken, signupLinkToken } from "../../src/lib/portal/tokens";
 
 const APP_DIR = path.join(__dirname, "../../src/app");
 
 type FindRow = (db: PrismaClient) => Promise<{ id: string } | null>;
 
-/** The "portal" fixture contractor's login (setup.ts), who also gets one job of their own. */
+/** The "portal" fixture contractor's login (setup.ts), who also gets two jobs of their own: one In progress, one To do. */
 export const PORTAL_FIXTURE_EMAIL = "device-check@hg.localhost";
+
+/** The end of the To do fixture job's notes, which is how setup.ts and its sample find it again. */
+export const TODO_FIXTURE_MARK = "To do fixture for npm run test:devices.";
 
 // One real row per dynamic segment, keyed "parent/[param]". IDs are cuids from
 // each machine's own import, so tests/devices/setup.ts looks them up in the
@@ -32,10 +35,23 @@ export const SAMPLE_PARAMS: Record<string, FindRow> = {
     const pick = leases.reduce<(typeof leases)[number] | null>((best, l) => (!best || l._count.tenants > best._count.tenants ? l : best), null);
     return pick ? { id: pick.id } : null;
   },
-  // The contractor portal's job page: the job setup.ts gives the fixture contractor.
+  // The contractor portal's job page: the In progress job setup.ts gives the fixture contractor (its first).
   "jobs/[id]": (db) =>
     db.task.findFirst({
-      where: { access: { some: { revokedAt: null, contact: { portalAccount: { email: PORTAL_FIXTURE_EMAIL } } } } },
+      where: {
+        access: { some: { revokedAt: null, contact: { portalAccount: { email: PORTAL_FIXTURE_EMAIL } } } },
+        OR: [{ description: null }, { description: { not: { endsWith: TODO_FIXTURE_MARK } } }],
+      },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    }),
+  // The same page in its first state: the fixture contractor's To do job with no day (setup.ts seedPortalTodoJob).
+  "jobs/[id]#todo": (db) =>
+    db.task.findFirst({
+      where: {
+        description: { endsWith: TODO_FIXTURE_MARK },
+        access: { some: { revokedAt: null, contact: { portalAccount: { email: PORTAL_FIXTURE_EMAIL } } } },
+      },
       select: { id: true },
       orderBy: { createdAt: "asc" },
     }),
@@ -61,8 +77,35 @@ export const SAMPLE_PARAMS: Record<string, FindRow> = {
     const secret = process.env.DEVICE_SESSION_SECRET;
     return row && secret ? { id: signupLinkToken(row.id, secret) } : null;
   },
+  // A resident's request link (docs/specs/maintenance-requests.md): the fixture link setup.ts keeps live, its token
+  // rebuilt under the device check's own SESSION_SECRET, and an open request on its lease.
+  "r/[token]": async (db) => {
+    const secret = process.env.DEVICE_SESSION_SECRET;
+    const row = await db.residentLink.findUnique({ where: { id: "devicecheckresidentlink" }, select: { id: true } });
+    return row && secret ? { id: residentLinkToken(row.id, secret) } : null;
+  },
+  // A crew link's verdict once its job is deleted (docs/specs/emails-redesign.md, Q7): the note setup.ts
+  // seedGoneCrewJobs keeps under a fresh crew link token each run. The page loads signed out, as a crew member's would.
+  "j/[token]": async (db) => {
+    const token = process.env.DEVICE_GONE_LINK_TOKEN;
+    if (!token) return null;
+    const note = await db.goneCrewJob.findUnique({ where: { tokenHash: hashToken(token) }, select: { kind: true } });
+    return note?.kind === "LINK" ? { id: token } : null;
+  },
+  "[token]/[requestId]": async (db) => {
+    const link = await db.residentLink.findUnique({ where: { id: "devicecheckresidentlink" }, select: { leaseId: true } });
+    return link ? db.residentRequest.findFirst({ where: { leaseId: link.leaseId }, select: { id: true }, orderBy: { createdAt: "desc" } }) : null;
+  },
   "tasks/[id]": (db) =>
-    db.task.findFirst({ where: { bucket: { not: "Template" } }, select: { id: true }, orderBy: { createdAt: "asc" } }),
+    db.task.findFirst({ where: { bucket: { not: "Template" }, status: { not: "DRAFT" } }, select: { id: true }, orderBy: { createdAt: "asc" } }),
+  // A draft from Claude's own page (its banner, both buttons, the one-item menu): the first of the drafts setup.ts
+  // makes, the one with a contractor on it so the banner's line shows. See EXTRA_PAGES.
+  "tasks/[id]#draft": (db) =>
+    db.task.findFirst({
+      where: { status: "DRAFT", discardedAt: null, assigneeContactId: { not: null } },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    }),
   // Playbooks come from the Asana load (scripts/asana/20-load.ts).
   "templates/[id]": (db) =>
     db.taskTemplate.findFirst({ where: { archivedAt: null }, select: { id: true }, orderBy: { createdAt: "asc" } }),
@@ -72,9 +115,21 @@ export const SAMPLE_PARAMS: Record<string, FindRow> = {
  * Which session a route loads with: "staff" for (app) pages, "portal" (the
  * fixture contractor from setup.ts) for (portal) pages. Public pages and
  * /login load signed out. "portal-welcome" is the second fixture, still on
- * its starting password, for the one page only it can see.
+ * its starting password, for the one page only it can see. "portal-email-link"
+ * and "portal-crew-link" are the "portal" fixture through a job email's link
+ * and a Share with crew link (setup.ts seedLinkSessions). "portal-crew-gone" is
+ * a crew session whose job was deleted, which only /j/gone reads (setup.ts
+ * seedGoneCrewJobs).
  */
-export type RouteSession = "none" | "staff" | "portal" | "portal-welcome" | "portal-setup";
+export type RouteSession =
+  | "none"
+  | "staff"
+  | "portal"
+  | "portal-welcome"
+  | "portal-setup"
+  | "portal-email-link"
+  | "portal-crew-link"
+  | "portal-crew-gone";
 
 export interface Route {
   /** The URL pattern, e.g. /deals/[id] */
@@ -95,6 +150,8 @@ export const ROUTE_SESSION_OVERRIDE: Record<string, RouteSession> = {
   "/p/welcome/password": "portal-welcome",
   // Setup is for people who came in by an invite or the sign-up link; the fixture staff added would only bounce to /p.
   "/p/setup": "portal-setup",
+  // A crew session's verdict once its job is gone (docs/specs/emails-redesign.md, Q7); with no session it only goes to sign in.
+  "/j/gone": "portal-crew-gone",
 };
 
 /**
@@ -125,7 +182,28 @@ function findPages(dir: string, segments: string[] = []): string[][] {
   return found;
 }
 
+/**
+ * A page in a state its route's one sample doesn't reach, loaded as well as the route itself. The pattern ends in
+ * `#name`, which is the page's own name in the report and the fragment of the URL it loads (no page reads it), and
+ * the SAMPLE_PARAMS key is the pattern's. A draft's page is one: the task page's sample is never a draft. The
+ * contractor's job page at To do is the other: its sample is In progress.
+ */
+const EXTRA_PAGES: Route[] = [
+  { pattern: "/tasks/[id]#draft", params: ["tasks/[id]#draft"], session: "staff" },
+  // The contractor's job page at To do with no day: the Schedule step, "Not set" and the three-control bar.
+  { pattern: "/p/jobs/[id]#todo", params: ["jobs/[id]#todo"], session: "portal" },
+  // The same job through a Share with crew link: no back arrow, only the job (Connor, Nov 22).
+  { pattern: "/p/jobs/[id]#crew", params: ["jobs/[id]#todo"], session: "portal-crew-link" },
+  // Sign in from a job email's link: Welcome back, the email known, and Email me a sign-in link.
+  { pattern: "/login#welcome-back", params: [], session: "portal-email-link" },
+];
+
 export function listRoutes(): Route[] {
+  const own = listOwnRoutes();
+  return [...own, ...EXTRA_PAGES].sort((a, b) => a.pattern.localeCompare(b.pattern));
+}
+
+function listOwnRoutes(): Route[] {
   return findPages(APP_DIR)
     .map((segments) => {
       // Route groups like (marketing) don't appear in the URL.

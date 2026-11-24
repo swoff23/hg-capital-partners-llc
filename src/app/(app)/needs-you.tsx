@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { ChevronRight, FileBadge, FileClock, HandCoins, Hammer, Landmark, ListChecks, Receipt, RefreshCw, ShieldCheck, Send, Unplug, UserPlus, type LucideIcon } from "lucide-react";
+import { ChevronRight, FileBadge, FileClock, HandCoins, Hammer, Landmark, ListChecks, Receipt, RefreshCw, ShieldCheck, Send, Sparkles, Unplug, UserPlus, type LucideIcon } from "lucide-react";
 import { Money } from "@/components/money";
 import { useToast } from "@/components/toast";
 import { Button, Section, chromeIconClass } from "@/components/ui";
@@ -31,6 +31,8 @@ const ICON: Record<NeedsYouKind, LucideIcon> = {
   baselane: Send,
   draw: HandCoins,
   invoice: Receipt,
+  // Claude's own work, the one place the app marks something as AI.
+  drafts: Sparkles,
 };
 
 /**

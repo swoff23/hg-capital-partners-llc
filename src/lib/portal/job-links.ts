@@ -10,7 +10,7 @@ import { hashToken, isWellFormedToken, newToken } from "./tokens";
  * Each email gets its own token; the database keeps only its SHA-256, as for
  * sessions and reset links (tokens.ts). A contractor's EMAIL link opens that
  * one job as them, lockbox included, until the job closes or they lose it; a
- * CREW link is the same, minted for "Text to my crew" so the log tells them
+ * CREW link is the same, minted for "Share with crew" so the log tells them
  * apart; a partner's STAFF link only shows the email's photos. Remove access
  * and Sign out everywhere revoke a contractor's links (revokeJobLinksFor).
  * The pure half (paths, what a link session may open) is job-link-paths.ts.
@@ -18,10 +18,14 @@ import { hashToken, isWellFormedToken, newToken } from "./tokens";
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
-/** A new link for one job and one person. Returns the token, which goes only into the email. */
+/**
+ * A new link for one job and one person. Returns the token, which goes only into the email. A partner's link may also
+ * name a contractor: a REPLY link's is the contractor the email was about (docs/specs/emails-redesign.md, section 7),
+ * so a reply about someone who has since left the job can be told apart. It is still the partner's link.
+ */
 export async function mintJobLink(
   db: Db,
-  input: { taskId: string; kind: JobLinkKind } & ({ contactId: string; userId?: never } | { userId: string; contactId?: never }),
+  input: { taskId: string; kind: JobLinkKind } & ({ contactId: string; userId?: never } | { userId: string; contactId?: string | null }),
 ): Promise<string> {
   const token = newToken();
   await db.jobLink.create({
@@ -78,7 +82,8 @@ export async function resolveJobLink(token: string): Promise<ResolvedJobLink | n
     account?.status === "ACTIVE" &&
     contact.taskAccess.some((a) => a.taskId === link.taskId) &&
     isActiveStatus(link.task.status);
-  return { id: link.id, kind: link.kind, taskId: link.taskId, contactId: link.contactId, userId: link.userId, opensJob, accountId: account?.id ?? null };
+  // A partner's link that names a contractor (a reply link, mintJobLink) is the partner's: it never starts their session.
+  return { id: link.id, kind: link.kind, taskId: link.taskId, contactId: link.contactId, userId: link.userId, opensJob: opensJob && !link.userId, accountId: link.userId ? null : (account?.id ?? null) };
 }
 
 /** Note when a link was last used. Never throws: a failed note doesn't stop the job opening. */
@@ -86,8 +91,11 @@ export async function touchJobLink(id: string, now = new Date()): Promise<void> 
   await prisma.jobLink.updateMany({ where: { id }, data: { lastUsedAt: now } }).catch(() => undefined);
 }
 
-/** Remove access and Sign out everywhere: every link in the contractor's emails stops. Returns how many. */
+/**
+ * Remove access and Sign out everywhere: every link in the contractor's emails stops. Returns how many. A partner's
+ * link that only names them (a reply link about their job) is the partner's and keeps working.
+ */
 export async function revokeJobLinksFor(db: Db, contactId: string, at: Date = new Date()): Promise<number> {
-  const { count } = await db.jobLink.updateMany({ where: { contactId, revokedAt: null }, data: { revokedAt: at } });
+  const { count } = await db.jobLink.updateMany({ where: { contactId, userId: null, revokedAt: null }, data: { revokedAt: at } });
   return count;
 }

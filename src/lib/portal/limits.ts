@@ -15,6 +15,16 @@ export const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 /** "Forgot password" requests per rolling hour, counted from SecurityEvent rows. */
 export const RESET_LIMITS = { perEmail: 3, perIp: 10, windowMs: 60 * 60 * 1000 } as const;
 
+/** A sign-in link ("Email me a sign-in link", Welcome back) works for 15 minutes, once. */
+export const SIGN_IN_LINK_TTL_MS = 15 * 60 * 1000;
+
+/** Sign-in link emails per login per rolling hour, counted from SecurityEvent rows, as resets are. */
+export const SIGN_IN_LINK_LIMITS = { perAccount: 3, windowMs: 60 * 60 * 1000 } as const;
+
+export function signInLinkExpiresAt(now: Date): Date {
+  return new Date(now.getTime() + SIGN_IN_LINK_TTL_MS);
+}
+
 export function sessionExpiresAt(now: Date): Date {
   return new Date(now.getTime() + PORTAL_SESSION_TTL_MS);
 }
@@ -26,6 +36,18 @@ export function resetTokenExpiresAt(now: Date): Date {
 /** A session row still admits its cookie: not revoked, not past its expiry. */
 export function sessionIsLive(s: { expiresAt: Date; revokedAt: Date | null }, now: Date): boolean {
   return !s.revokedAt && s.expiresAt.getTime() > now.getTime();
+}
+
+/**
+ * How long a deleted job's crew link keeps saying so (docs/specs/emails-redesign.md, Q7; gone-crew-jobs.ts): 30 days,
+ * a full session's life. After that it goes to sign in, as any dead link does.
+ */
+export const GONE_CREW_JOB_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** When a deleted job's note for one crew link or session stops being read: 30 days on, or the session's end if sooner. */
+export function goneCrewJobExpiresAt(deletedAt: Date, sessionEndsAt: Date | null = null): Date {
+  const keep = deletedAt.getTime() + GONE_CREW_JOB_KEEP_MS;
+  return new Date(sessionEndsAt ? Math.min(keep, sessionEndsAt.getTime()) : keep);
 }
 
 export function shouldTouchSession(lastUsedAt: Date, now: Date): boolean {

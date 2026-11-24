@@ -1,14 +1,15 @@
+import type { Prisma, TaskStatus } from "@prisma/client";
 import { HG_TIME_ZONE, type Ymd } from "@/lib/dates";
 import { addDaysYmd } from "@/lib/quick-dates";
 
 /**
- * The 8 am emails (docs/specs/contractor-job-emails.md, section 6, Connor's
- * times): which one a job gets, and when the hour is. Pure; see
- * reminder-rules.test.ts. reminders.ts queues them.
+ * The morning emails (docs/specs/emails-redesign.md, Q8): which one a job
+ * gets, and when the hour is. Pure; see reminder-rules.test.ts. reminders.ts
+ * queues them, and content.ts liveReminders checks each again as it sends.
  */
 
-/** The hour in Buffalo the reminders go out. */
-export const REMINDER_HOUR = 8;
+/** The hour in Buffalo the morning emails go out (Connor, Nov 22: 7 am, before crews leave). */
+export const REMINDER_HOUR = 7;
 
 /** The hour in Buffalo, 0 to 23. */
 export function easternHour(now: Date): number {
@@ -16,17 +17,161 @@ export function easternHour(now: Date): number {
 }
 
 /**
- * True through the 8 o'clock hour in Buffalo. The cron runs every minute, so
- * a run that fails at 8:00 is made up by the next; past 9 a missed morning
+ * True through the 7 o'clock hour in Buffalo. The cron runs every minute, so
+ * a run that fails at 7:00 is made up by the next; past 8 a missed morning
  * stays missed rather than arriving late.
  */
 export function inReminderHour(now: Date): boolean {
   return easternHour(now) === REMINDER_HOUR;
 }
 
-/** Due today, due yesterday, or neither, for a job's date (the one the contractor sees) on Buffalo's today. */
-export function reminderFor(target: Ymd | null, today: Ymd): "DUE_TODAY" | "OVERDUE" | null {
-  if (!target) return null;
-  if (target === today) return "DUE_TODAY";
-  return target === addDaysYmd(today, -1) ? "OVERDUE" : null;
+/**
+ * The morning kinds (Q8). SCHEDULED_TODAY is Today, OVERDUE is Past due: both keep the names rows were queued
+ * under before Nov 22, since they mean what they did.
+ *  - TELL_TENANT: Tell the tenant, two mornings before their day at a home that needs notice.
+ *  - SCHEDULED_TODAY: Today, on their day.
+ *  - STILL_OPEN: Not started, the morning after their day, never started.
+ *  - NO_DAY: Not yet scheduled (or "Due Thu, Nov 26"), once.
+ *  - DUE_TODAY, OVERDUE: Due today and Past due, on any job not yet done (docs/specs/emails-redesign.md section 8).
+ *    OVERDUE goes once, the morning after the due date, to the contractor and the partners.
+ */
+export type ReminderKind = "TELL_TENANT" | "SCHEDULED_TODAY" | "STILL_OPEN" | "NO_DAY" | "DUE_TODAY" | "OVERDUE";
+
+/**
+ * Kinds only rows queued before Nov 22 carry: the day-before heads-up and its Due twin. They send as what they
+ * became (canonicalReminder), so a row waiting at deploy still reads sensibly.
+ */
+export type LegacyReminderKind = "SCHEDULED_TOMORROW" | "DUE_TOMORROW";
+
+export const REMINDER_KINDS: readonly (ReminderKind | LegacyReminderKind)[] = [
+  "TELL_TENANT",
+  "SCHEDULED_TODAY",
+  "STILL_OPEN",
+  "NO_DAY",
+  "DUE_TODAY",
+  "OVERDUE",
+  "SCHEDULED_TOMORROW",
+  "DUE_TOMORROW",
+];
+
+export function isReminderKind(kind: string): kind is ReminderKind | LegacyReminderKind {
+  return (REMINDER_KINDS as readonly string[]).includes(kind);
+}
+
+/** What an old row's kind is now: the day-before heads-up is Tell the tenant, Due tomorrow is No day yet. */
+export function canonicalReminder(kind: ReminderKind | LegacyReminderKind): ReminderKind {
+  if (kind === "SCHEDULED_TOMORROW") return "TELL_TENANT";
+  if (kind === "DUE_TOMORROW") return "NO_DAY";
+  return kind;
+}
+
+/**
+ * Jobs still waiting on the contractor to plan or start: the morning emails go only for these. Not Waiting (on hold
+ * gets nothing, Q8), and not In progress: in-progress work isn't nagged (Q8, Still open), and Due today and Due
+ * yesterday go only while no day is set, with Schedule as the button.
+ */
+export const REMINDER_STATUSES: readonly TaskStatus[] = ["OPEN", "SCHEDULED"];
+
+/**
+ * Jobs not yet done, for Due today and Past due (section 8: "we care that the due date passed and it's not yet done"):
+ * To do, Scheduled and In progress. Not in review (their work is done), on hold, done or canceled.
+ */
+export const DUE_REMINDER_STATUSES: readonly TaskStatus[] = ["OPEN", "SCHEDULED", "IN_PROGRESS"];
+
+/** Whether a job gets Past due this morning: not yet done, and its due date was yesterday. */
+export function pastDueToday(job: { status: TaskStatus; due: Ymd | null }, today: Ymd): boolean {
+  return DUE_REMINDER_STATUSES.includes(job.status) && !!job.due && job.due === addDaysYmd(today, -1);
+}
+
+/** Tell the tenant goes this many mornings before their day (Q8: two, so 24 hours' notice fits even an early visit). */
+export const TELL_TENANT_DAYS = 2;
+
+/**
+ * The one morning email a job gets today, and the day it's for, or null (Q8, section 8), highest first:
+ *  - Past due, the morning after the due date, on any job not yet done (To do, Scheduled or In progress).
+ *  - With a day (Scheduled): Today on it; Tell the tenant two mornings before it, at a home that needs notice
+ *    (someone lives there and Permission to enter is off); Not started the morning after, while it was never
+ *    started; else Due today.
+ *  - In progress: Due today.
+ *  - Without a day (To do): Due today, else Not yet scheduled, once: the second morning after New (`newOn`, the day
+ *    the New email went), or the morning before Due if that comes first. Never the morning of a New sent that same
+ *    day. The once is kept by core.ts queueDueReminder; this only says it's due.
+ */
+export function reminderFor(
+  job: { status: TaskStatus; due: Ymd | null; scheduled: Ymd | null; needsNotice: boolean; newOn?: Ymd | null },
+  today: Ymd,
+): { kind: ReminderKind; day: Ymd } | null {
+  if (!DUE_REMINDER_STATUSES.includes(job.status)) return null;
+  if (pastDueToday(job, today)) return { kind: "OVERDUE", day: job.due! };
+  const dueToday = job.due === today ? { kind: "DUE_TODAY" as const, day: today } : null;
+  if (job.status === "IN_PROGRESS") return dueToday;
+  const day = job.status === "SCHEDULED" ? job.scheduled : null;
+  if (day) {
+    if (day === today) return { kind: "SCHEDULED_TODAY", day };
+    if (job.needsNotice && day === addDaysYmd(today, TELL_TENANT_DAYS)) return { kind: "TELL_TENANT", day };
+    if (day === addDaysYmd(today, -1)) return { kind: "STILL_OPEN", day };
+    return dueToday;
+  }
+  if (dueToday) return dueToday;
+  const newOn = job.newOn ?? null;
+  if (newOn && newOn >= today) return null;
+  if ((newOn && newOn === addDaysYmd(today, -2)) || (job.due && job.due === addDaysYmd(today, 1))) return { kind: "NO_DAY", day: today };
+  return null;
+}
+
+/**
+ * Whether a morning line queued earlier is still true as it sends (content.ts liveReminders): the job is where the
+ * line found it and the day it named still holds. `scheduled` is their day while Scheduled, `planned` the day column
+ * whatever the status (an In progress job keeps it). Today alone also goes on a job they started this morning, with
+ * Send for review as its button (section 4).
+ */
+export function reminderStillTrue(
+  line: { kind: ReminderKind | LegacyReminderKind; due?: string },
+  job: { status: TaskStatus; due: Ymd | null; scheduled: Ymd | null; planned?: Ymd | null; needsNotice: boolean },
+  today: Ymd,
+): boolean {
+  const day = line.due ?? null;
+  const kind = line.kind;
+  switch (kind) {
+    case "TELL_TENANT":
+    case "SCHEDULED_TOMORROW":
+      return job.status === "SCHEDULED" && !!day && job.scheduled === day && job.needsNotice && day >= today;
+    case "SCHEDULED_TODAY":
+      return day === today && ((job.status === "SCHEDULED" && job.scheduled === day) || (job.status === "IN_PROGRESS" && job.planned === day));
+    case "STILL_OPEN":
+      return job.status === "SCHEDULED" && !!day && job.scheduled === day && day < today;
+    case "NO_DAY":
+      return job.status === "OPEN";
+    case "DUE_TOMORROW":
+      return job.status === "OPEN" && !!day && job.due === day && day >= today;
+    case "DUE_TODAY":
+      return DUE_REMINDER_STATUSES.includes(job.status) && day === today && job.due === day && !(job.status === "SCHEDULED" && job.scheduled === today);
+    case "OVERDUE":
+      return DUE_REMINDER_STATUSES.includes(job.status) && day === addDaysYmd(today, -1) && job.due === day;
+  }
+}
+
+/**
+ * Whether a day set now lands inside Tell the tenant's window, from two mornings before it through the day itself
+ * (Q8: "A day set inside that window sends it at once").
+ */
+export function inTellWindow(day: Ymd, today: Ymd): boolean {
+  const last = addDaysYmd(today, TELL_TENANT_DAYS);
+  return !!last && day >= today && day <= last;
+}
+
+/**
+ * The outbox rows that told a contractor they have a job (a New email that went, with no error), since `since`: for No
+ * day yet's second morning (reminders.ts). A Prisma JSON filter, so the outbox's raw SQL stays in core.ts and the send
+ * run (portal/upload-guards.test.ts).
+ */
+export function newEmailRowsWhere(since: Date): Prisma.NotificationOutboxWhereInput {
+  return {
+    recipientContactId: { not: null },
+    taskId: { not: null },
+    sentAt: { not: null },
+    lastError: null,
+    firstAt: { gte: since },
+    items: { array_contains: [{ kind: "ASSIGNED" }] },
+  };
 }

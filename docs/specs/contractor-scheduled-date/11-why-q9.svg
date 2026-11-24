@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="400" viewBox="0 0 1100 400" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Why Q9 comes up</title>
+<defs>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#5d6778"/></marker>
+</defs>
+<rect width="1100" height="400" fill="#ffffff"/>
+<text x="32" y="40" font-size="17" font-weight="600" fill="#152133">Why Q9 comes up: the app does this today</text>
+<text x="32" y="62" font-size="12" fill="#5d6778">One job, due Thu, Nov 19 (your date). Zack agrees Mon, Nov 23 with the tenant and taps the date on the job page.</text>
+
+<!-- 1 -->
+<rect x="16" y="84" width="340" height="290" rx="12" fill="#ffffff" stroke="#b4452b" stroke-width="1.5"/>
+<text x="36" y="112" font-size="14" font-weight="600" fill="#152133">1. Live now, since Nov 14</text>
+<text x="36" y="130" font-size="11" fill="#5d6778">The old Change date.</text>
+<text x="36" y="168" font-size="11" fill="#424e61">Before</text>
+<text x="120" y="168" font-size="11" fill="#152133">Due Thu, Nov 19</text>
+<line x1="186" y1="180" x2="186" y2="206" stroke="#5d6778" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="196" y="198" font-size="10" fill="#5d6778">Zack picks Mon, Nov 23</text>
+<text x="36" y="232" font-size="11" fill="#424e61">After</text>
+<text x="120" y="232" font-size="11" font-weight="600" fill="#b4452b">Due Mon, Nov 23</text>
+<text x="36" y="270" font-size="11" fill="#424e61">Your Thu, Nov 19 is gone from the job.</text>
+<text x="36" y="286" font-size="11" fill="#424e61">This is the thing you don't want.</text>
+
+<!-- 2 -->
+<rect x="380" y="84" width="340" height="290" rx="12" fill="#ffffff" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="400" y="112" font-size="14" font-weight="600" fill="#152133">2. After this build</text>
+<text x="400" y="130" font-size="11" fill="#5d6778">Everything in Q1 to Q8.</text>
+<text x="400" y="168" font-size="11" fill="#424e61">Before</text>
+<text x="484" y="168" font-size="11" fill="#152133">Due Thu, Nov 19</text>
+<line x1="550" y1="180" x2="550" y2="206" stroke="#5d6778" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="560" y="198" font-size="10" fill="#5d6778">Zack picks Mon, Nov 23</text>
+<text x="400" y="232" font-size="11" fill="#424e61">After</text>
+<text x="484" y="232" font-size="11" fill="#152133">Due Thu, Nov 19</text>
+<text x="484" y="250" font-size="11" fill="#152133">Scheduled Mon, Nov 23</text>
+<text x="400" y="286" font-size="11" fill="#424e61">Due never moves. Only you change it.</text>
+
+<!-- 3 -->
+<rect x="744" y="84" width="340" height="290" rx="12" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<text x="764" y="112" font-size="14" font-weight="600" fill="#152133">3. Q9: jobs already hit by step 1</text>
+<text x="764" y="130" font-size="11" fill="#5d6778">Their due date shows the contractor's day.</text>
+<text x="764" y="168" font-size="11" fill="#424e61">Now</text>
+<text x="848" y="168" font-size="11" fill="#b4452b">Due Mon, Nov 23</text>
+<line x1="914" y1="180" x2="914" y2="206" stroke="#5d6778" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="924" y="198" font-size="10" fill="#5d6778">A: put yours back</text>
+<text x="764" y="232" font-size="11" fill="#424e61">Fixed</text>
+<text x="848" y="232" font-size="11" fill="#152133">Due Thu, Nov 19</text>
+<text x="848" y="250" font-size="11" fill="#152133">Scheduled Mon, Nov 23</text>
+<text x="764" y="286" font-size="11" fill="#424e61">Your date comes back from the activity</text>
+<text x="764" y="302" font-size="11" fill="#424e61">log, so these jobs match step 2.</text>
+<text x="764" y="326" font-size="11" fill="#424e61">B would leave their day as the due date.</text>
+</svg>

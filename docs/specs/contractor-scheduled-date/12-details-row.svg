@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>Scheduled row in Details</title>
+<defs>
+  <g id="warn">
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" fill="none" stroke="#a54e09" stroke-width="2.2" stroke-linejoin="round"/>
+    <path d="M12 9v4M12 17h.01" stroke="#a54e09" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+  <g id="cal"><rect x="0" y="1" width="10" height="9" rx="1.5" fill="none" stroke="#5d6778" stroke-width="1.1"/><line x1="0" y1="4" x2="10" y2="4" stroke="#5d6778" stroke-width="1.1"/></g>
+</defs>
+<rect width="1200" height="700" fill="#ffffff"/>
+<text x="32" y="40" font-size="17" font-weight="600" fill="#152133">Q10. A Scheduled row in your task page's Details, always there</text>
+<text x="32" y="62" font-size="12" fill="#5d6778">Today it only appears after you set the status to Scheduled. Now: pick a day and the task turns Scheduled. Contractors already get this on their own job page.</text>
+
+<!-- A -->
+<rect x="16" y="80" width="580" height="600" rx="12" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<text x="36" y="108" font-size="14" font-weight="600" fill="#152133">A. Right below Due (recommended)</text>
+<text x="36" y="126" font-size="11" fill="#5d6778">The two dates sit together, Due first: yours, then theirs.</text>
+
+<text x="36" y="156" font-size="10.5" font-weight="500" fill="#424e61">Laptop 1280, before a day is set</text>
+<g transform="translate(36 166)">
+  <rect width="250" height="196" rx="8" fill="#ffffff" stroke="#d5d1ca"/>
+  <text x="12" y="24" font-size="12" font-weight="600" fill="#152133">Details</text>
+  <line x1="12" y1="36" x2="238" y2="36" stroke="#e7e5e0"/>
+  <text x="12" y="58" font-size="10.5" fill="#5d6778">Assignee</text><rect x="96" y="44" width="110" height="22" rx="5" fill="#fff" stroke="#c9c5bd"/><text x="106" y="59" font-size="10" fill="#152133">Zack</text>
+  <line x1="12" y1="74" x2="238" y2="74" stroke="#e7e5e0"/>
+  <text x="12" y="96" font-size="10.5" fill="#5d6778">Due</text><rect x="96" y="82" width="86" height="22" rx="5" fill="#fff" stroke="#c9c5bd"/><use href="#cal" transform="translate(104 88)"/><text x="120" y="97" font-size="10" fill="#152133">Fri, Nov 20</text>
+  <line x1="12" y1="112" x2="238" y2="112" stroke="#e7e5e0"/>
+  <rect x="2" y="113" width="246" height="38" fill="#f8f7f3"/>
+  <text x="12" y="134" font-size="10.5" fill="#5d6778">Scheduled</text><rect x="96" y="120" width="72" height="22" rx="5" fill="#fff" stroke="#c9c5bd" stroke-dasharray="3 2"/><use href="#cal" transform="translate(104 126)"/><text x="120" y="135" font-size="10" fill="#5d6778">Set a day</text>
+  <line x1="12" y1="150" x2="238" y2="150" stroke="#e7e5e0"/>
+  <text x="12" y="172" font-size="10.5" fill="#5d6778">Property</text><rect x="96" y="158" width="110" height="22" rx="5" fill="#fff" stroke="#c9c5bd"/><text x="106" y="173" font-size="10" fill="#152133">118 Congress St.</text>
+</g>
+<text x="300" y="188" font-size="11.5" fill="#424e61">Status To do. "Set a day" reads like</text>
+<text x="300" y="204" font-size="11.5" fill="#424e61">the rail's other empty facts</text>
+<text x="300" y="220" font-size="11.5" fill="#424e61">("Add property").</text>
+<text x="300" y="248" font-size="11.5" fill="#424e61">Pick Sat, Nov 21 and the status</text>
+<text x="300" y="264" font-size="11.5" fill="#424e61">turns Scheduled. Toast: "Scheduled</text>
+<text x="300" y="280" font-size="11.5" fill="#424e61">for Sat, Nov 21", with Undo.</text>
+<text x="300" y="308" font-size="11.5" fill="#424e61">Zack gets the email, as when you</text>
+<text x="300" y="324" font-size="11.5" fill="#424e61">schedule it from the status menu.</text>
+
+<text x="36" y="392" font-size="10.5" font-weight="500" fill="#424e61">After the pick</text>
+<g transform="translate(36 402)">
+  <rect width="250" height="84" rx="8" fill="#ffffff" stroke="#d5d1ca"/>
+  <text x="12" y="24" font-size="10.5" fill="#5d6778">Due</text><rect x="96" y="10" width="86" height="22" rx="5" fill="#fff" stroke="#c9c5bd"/><use href="#cal" transform="translate(104 16)"/><text x="120" y="25" font-size="10" fill="#152133">Fri, Nov 20</text>
+  <line x1="12" y1="40" x2="238" y2="40" stroke="#e7e5e0"/>
+  <text x="12" y="62" font-size="10.5" fill="#5d6778">Scheduled</text><rect x="96" y="48" width="86" height="22" rx="5" fill="#fff" stroke="#c9c5bd"/><use href="#cal" transform="translate(104 54)"/><text x="120" y="63" font-size="10" fill="#152133">Sat, Nov 21</text>
+  <use href="#warn" transform="translate(188 52) scale(0.55)"/>
+</g>
+<text x="300" y="430" font-size="11.5" fill="#424e61">Header status reads Scheduled.</text>
+<text x="300" y="446" font-size="11.5" fill="#424e61">The warning shows when it's</text>
+<text x="300" y="462" font-size="11.5" fill="#424e61">after Due, as everywhere.</text>
+
+<text x="36" y="516" font-size="10.5" font-weight="500" fill="#424e61">Phone 375 and tablet 768: the chip row under the title</text>
+<g transform="translate(36 526)">
+  <rect width="320" height="40" rx="8" fill="#ffffff" stroke="#d5d1ca"/>
+  <rect x="8" y="9" width="70" height="22" rx="5" fill="#fff" stroke="#c9c5bd"/><text x="16" y="24" font-size="9.5" fill="#152133">Zack</text>
+  <rect x="84" y="9" width="96" height="22" rx="5" fill="#fff" stroke="#c9c5bd"/><use href="#cal" transform="translate(91 15)"/><text x="106" y="24" font-size="9.5" fill="#152133">Fri, Nov 20</text>
+  <rect x="186" y="9" width="126" height="22" rx="5" fill="#fff" stroke="#c9c5bd" stroke-dasharray="3 2"/><use href="#cal" transform="translate(193 15)"/><text x="208" y="24" font-size="9.5" fill="#5d6778">Scheduled · Set a day</text>
+</g>
+<text x="36" y="590" font-size="11.5" fill="#424e61">Its chip follows Due's; the row scrolls sideways as today, never wraps.</text>
+<text x="36" y="616" font-size="11.5" fill="#424e61">Shown while To do, Waiting or Scheduled, as on their job page. Once the job</text>
+<text x="36" y="632" font-size="11.5" fill="#424e61">is In progress the row goes away: they're there.</text>
+
+<!-- B -->
+<rect x="612" y="80" width="572" height="320" rx="12" fill="#ffffff" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="632" y="108" font-size="14" font-weight="600" fill="#152133">B. Right above Due</text>
+<text x="632" y="126" font-size="11" fill="#5d6778">Their day first, as their job page lists it.</text>
+<g transform="translate(632 166)">
+  <rect width="250" height="158" rx="8" fill="#ffffff" stroke="#d5d1ca"/>
+  <text x="12" y="24" font-size="12" font-weight="600" fill="#152133">Details</text>
+  <line x1="12" y1="36" x2="238" y2="36" stroke="#e7e5e0"/>
+  <text x="12" y="58" font-size="10.5" fill="#5d6778">Assignee</text><rect x="96" y="44" width="110" height="22" rx="5" fill="#fff" stroke="#c9c5bd"/><text x="106" y="59" font-size="10" fill="#152133">Zack</text>
+  <line x1="12" y1="74" x2="238" y2="74" stroke="#e7e5e0"/>
+  <text x="12" y="96" font-size="10.5" fill="#5d6778">Scheduled</text><rect x="96" y="82" width="72" height="22" rx="5" fill="#fff" stroke="#c9c5bd" stroke-dasharray="3 2"/><use href="#cal" transform="translate(104 88)"/><text x="120" y="97" font-size="10" fill="#5d6778">Set a day</text>
+  <line x1="12" y1="112" x2="238" y2="112" stroke="#e7e5e0"/>
+  <text x="12" y="134" font-size="10.5" fill="#5d6778">Due</text><rect x="96" y="120" width="86" height="22" rx="5" fill="#fff" stroke="#c9c5bd"/><use href="#cal" transform="translate(104 126)"/><text x="120" y="135" font-size="10" fill="#152133">Fri, Nov 20</text>
+</g>
+<text x="896" y="188" font-size="11.5" fill="#424e61">Same behavior as A.</text>
+<text x="896" y="212" font-size="11.5" fill="#424e61">Matches the Tasks list, where</text>
+<text x="896" y="228" font-size="11.5" fill="#424e61">Scheduled sits left of Due.</text>
+<text x="896" y="252" font-size="11.5" fill="#424e61">But Due, the date you own and</text>
+<text x="896" y="268" font-size="11.5" fill="#424e61">late goes by, drops below a row</text>
+<text x="896" y="284" font-size="11.5" fill="#424e61">that's empty on most tasks.</text>
+</svg>

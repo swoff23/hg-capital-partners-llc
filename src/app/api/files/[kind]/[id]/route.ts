@@ -21,6 +21,7 @@ import { readJobAccess, readLockboxAccess } from "@/lib/portal/access-code";
 import { resolveJobLink } from "@/lib/portal/job-links";
 import { isLockboxPhotoPath } from "@/lib/properties/photo";
 import { getPortalPrincipal } from "@/lib/portal/session";
+import { resolveResidentLink } from "@/lib/residents/links";
 import { isActiveStatus } from "@/lib/task-scope";
 import { assertContractorAccess } from "@/lib/tasks/core";
 
@@ -48,6 +49,12 @@ export const maxDuration = 300;
  *   invoice of theirs they may see (invoices/fields.ts mayOpenInvoiceFile,
  *   M14), never from a one-job link session (M16).
  *
+ * - A resident gets what their household sent (docs/specs/maintenance-requests.md, section 6), by their request
+ *   link (`?r=`): `resident`, a file on one of their lease's requests that a tenant uploaded, and
+ *   `resident-upload`, a photo or video their link uploaded that waits for Send. Never staff's or a
+ *   contractor's files.
+ * - New task's files before Create (`new-task-upload`): staff, the person whose form holds them.
+ *
  * `?v=thumb` / `?v=poster` serve the row's thumbnail or video poster,
  * authorized by the row itself. A LINK row has no bytes here (the UI links
  * straight to it), so it's a 404. Videos redirect to a signed Blob URL for
@@ -62,7 +69,10 @@ export const maxDuration = 300;
  */
 
 // onlyTaskId: a viewer let in by a job email's link (`?l=`) sees that job's files only.
-type Viewer = { kind: "staff"; onlyTaskId?: string | null } | { kind: "contractor"; contactId: string; onlyTaskId: string | null };
+type Viewer =
+  | { kind: "staff"; onlyTaskId?: string | null; userId?: string }
+  | { kind: "contractor"; contactId: string; onlyTaskId: string | null }
+  | { kind: "resident"; linkId: string; leaseId: string; onlyTaskId?: null };
 
 const KIND_VIEWERS: Record<string, readonly Viewer["kind"][]> = {
   task: ["staff", "contractor"],
@@ -80,6 +90,11 @@ const KIND_VIEWERS: Record<string, readonly Viewer["kind"][]> = {
   // An invoice's PDF or photo (docs/contractor-invoices-plan.md, 5.2): staff, and the contractor whose invoice it is
   // while they may see it. No email link opens one.
   invoice: ["staff", "contractor"],
+  // A resident's own files, by their request link (`?r=`), never by a session.
+  resident: ["resident"],
+  "resident-upload": ["resident"],
+  // New task's files before Create (docs/specs/new-task-checklist-photos.md): the person whose form holds them.
+  "new-task-upload": ["staff"],
 };
 
 interface Served {
@@ -109,7 +124,10 @@ async function linkViewer(kind: string, token: string, variant: string | null): 
 }
 
 async function currentViewer(allowed: readonly Viewer["kind"][]): Promise<Viewer | null> {
-  if (allowed.includes("staff") && (await getCurrentUser())) return { kind: "staff" };
+  if (allowed.includes("staff")) {
+    const user = await getCurrentUser();
+    if (user) return { kind: "staff", userId: user.id };
+  }
   if (allowed.includes("contractor")) {
     const portal = await getPortalPrincipal();
     if (portal) return { kind: "contractor", contactId: portal.contactId, onlyTaskId: portal.onlyTaskId };
@@ -131,6 +149,9 @@ async function lookup(
     if (!isLockboxPhotoPath(id, pathname)) return null;
     return { source: pathname, privatePathname: pathname, filename: LOCKBOX_PHOTO_NAME, contentType: null, publicFallback: false };
   }
+  if (kind === "resident" || kind === "resident-upload") return viewer.kind === "resident" ? residentFile(kind, id, variant, viewer, storeId) : null;
+  if (viewer.kind === "resident") return null;
+  if (kind === "new-task-upload") return viewer.kind === "staff" && viewer.userId && !viewer.onlyTaskId ? heldFile(id, variant, viewer.userId, storeId) : null;
   if (kind === "task") {
     const a = await prisma.taskAttachment.findUnique({
       where: { id },
@@ -248,6 +269,47 @@ async function lockboxPhoto(taskId: string, variant: Variant | null, viewer: Vie
   return { source: pathname, privatePathname: pathname, filename: LOCKBOX_PHOTO_NAME, contentType: null, publicFallback: false };
 }
 
+/** A household's own photo or video: on one of its lease's requests and uploaded by a tenant, or held for Send by its link. */
+async function residentFile(
+  kind: "resident" | "resident-upload",
+  id: string,
+  variant: Variant | null,
+  viewer: Extract<Viewer, { kind: "resident" }>,
+  storeId: string | null,
+): Promise<Served | null> {
+  const f =
+    kind === "resident"
+      ? await prisma.taskAttachment
+          .findUnique({
+            where: { id },
+            select: { url: true, pathname: true, filename: true, contentType: true, thumbPathname: true, posterPathname: true, deletedAt: true, uploadedByTenantId: true, task: { select: { resident: { select: { leaseId: true } } } } },
+          })
+          .then((a) => (a && !a.deletedAt && a.uploadedByTenantId && a.task.resident?.leaseId === viewer.leaseId ? a : null))
+      : await prisma.residentUpload
+          .findUnique({ where: { id }, select: { url: true, pathname: true, filename: true, contentType: true, thumbPathname: true, posterPathname: true, linkId: true } })
+          .then((u) => (u && u.linkId === viewer.linkId ? u : null));
+  if (!f?.url || !f.pathname || !isPrivateStoreUrl(f.url, storeId, f.pathname)) return null;
+  if (variant) {
+    const p = variant === "thumb" ? f.thumbPathname : f.posterPathname;
+    return p ? { source: p, privatePathname: p, filename: previewName(f.filename, variant, p), contentType: null, publicFallback: false } : null;
+  }
+  return { source: f.url, privatePathname: f.pathname, filename: f.filename, contentType: f.contentType, publicFallback: false };
+}
+
+/** A file New task holds for Create: the viewer's own form only, from our private store. */
+async function heldFile(id: string, variant: Variant | null, userId: string, storeId: string | null): Promise<Served | null> {
+  const f = await prisma.newTaskUpload.findUnique({
+    where: { id },
+    select: { userId: true, url: true, pathname: true, filename: true, contentType: true, thumbPathname: true, posterPathname: true },
+  });
+  if (!f || f.userId !== userId || !isPrivateStoreUrl(f.url, storeId, f.pathname)) return null;
+  if (variant) {
+    const p = variant === "thumb" ? f.thumbPathname : f.posterPathname;
+    return p ? { source: p, privatePathname: p, filename: previewName(f.filename, variant, p), contentType: null, publicFallback: false } : null;
+  }
+  return { source: f.url, privatePathname: f.pathname, filename: f.filename, contentType: f.contentType, publicFallback: false };
+}
+
 /** A GET URL for exactly this pathname, valid 10 minutes; null when the token can't sign one. */
 async function signedVideoUrl(pathname: string, token: string): Promise<string | null> {
   // Signed URLs are built from the raw pathname; an old name with spaces or
@@ -270,6 +332,11 @@ export async function GET(req: Request, ctx: RouteContext<"/api/files/[kind]/[id
   const { kind, id } = await ctx.params;
   if (!Object.hasOwn(KIND_VIEWERS, kind)) return fail("Not found", 404);
   const allowed = KIND_VIEWERS[kind];
+  if (allowed.includes("resident")) {
+    const link = await resolveResidentLink(new URL(req.url).searchParams.get("r"));
+    if (!link || link.state !== "live") return fail("Not found", 404);
+    return serve(req, kind, id, { kind: "resident", linkId: link.ctx.linkId, leaseId: link.ctx.leaseId });
+  }
   const linkToken = new URL(req.url).searchParams.get("l");
   if (linkToken !== null) {
     const byLink = await linkViewer(kind, linkToken, new URL(req.url).searchParams.get("v"));

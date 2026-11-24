@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="616" viewBox="0 0 1200 616" font-family="Geist, -apple-system, system-ui, sans-serif">
+<title>A My jobs row with both dates</title>
+<defs>
+  <g id="warn">
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" fill="none" stroke="#a54e09" stroke-width="2.2" stroke-linejoin="round"/>
+    <path d="M12 9v4M12 17h.01" stroke="#a54e09" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+  <g id="frame">
+    <rect width="260" height="300" rx="22" fill="#ffffff" stroke="#d5d1ca" stroke-width="1.5"/>
+    <text x="16" y="30" font-size="15" font-weight="600" fill="#152133">My jobs</text>
+    <rect x="16" y="44" width="228" height="26" rx="7" fill="#f2f0ec"/>
+    <rect x="18" y="46" width="112" height="22" rx="6" fill="#ffffff" stroke="#c9c5bd"/>
+    <text x="74" y="61" font-size="10" fill="#152133" text-anchor="middle">By date</text>
+    <text x="186" y="61" font-size="10" fill="#5d6778" text-anchor="middle">By property</text>
+    <rect x="16" y="88" width="38" height="38" rx="6" fill="#f2f0ec"/>
+    <rect x="16" y="150" width="38" height="38" rx="6" fill="#f2f0ec"/>
+    <rect x="16" y="212" width="38" height="38" rx="6" fill="#f2f0ec"/>
+    <text x="64" y="102" font-size="11" font-weight="500" fill="#152133">Fix the kitchen faucet</text>
+    <text x="64" y="164" font-size="11" font-weight="500" fill="#152133">Unclog the basement drain</text>
+    <text x="64" y="226" font-size="11" font-weight="500" fill="#152133">Patch the hall drywall</text>
+    <line x1="64" y1="138" x2="246" y2="138" stroke="#e7e5e0"/>
+    <line x1="64" y1="200" x2="246" y2="200" stroke="#e7e5e0"/>
+  </g>
+  <g id="pillS"><rect width="50" height="15" rx="7.5" fill="#f2f0ec"/><text x="25" y="11" font-size="8.5" font-weight="500" fill="#424e61" text-anchor="middle">Scheduled</text></g>
+  <g id="pillT"><rect width="32" height="15" rx="7.5" fill="#f2f0ec"/><text x="16" y="11" font-size="8.5" font-weight="500" fill="#424e61" text-anchor="middle">To do</text></g>
+</defs>
+<rect width="1200" height="616" fill="#ffffff"/>
+<text x="32" y="40" font-size="17" font-weight="600" fill="#152133">Q8. On their My jobs list, which date does a row show?</text>
+<text x="32" y="62" font-size="12" fill="#5d6778">Phone 375. Today is Sat, Nov 21. From 480 up the status moves to its own column on the right, as now, and the line starts with the date.</text>
+
+<!-- ============ A ============ -->
+<rect x="16" y="80" width="376" height="520" rx="12" fill="#ffffff" stroke="#152133" stroke-width="2"/>
+<text x="36" y="108" font-size="14" font-weight="600" fill="#152133">A. Their day if they have one, else Due</text>
+<text x="36" y="126" font-size="11" fill="#5d6778">(recommended) By date sorts by the day shown.</text>
+<g transform="translate(74 144)">
+  <use href="#frame"/>
+  <use href="#pillS" x="64" y="110"/>
+  <text x="118" y="121" font-size="9.5" fill="#5d6778">· Mon, Nov 23 · 1412 Elm St</text>
+  <use href="#pillS" x="64" y="172"/>
+  <text x="118" y="183" font-size="9.5" fill="#5d6778">· Sat, Nov 28</text>
+  <use href="#warn" transform="translate(183 174) scale(0.42)"/>
+  <text x="196" y="183" font-size="9.5" fill="#5d6778">· 56 Tama…</text>
+  <use href="#pillT" x="64" y="234"/>
+  <text x="100" y="245" font-size="9.5" fill="#5d6778">· Due Tue, Dec 1 · 56 Tamar…</text>
+</g>
+<text x="36" y="474" font-size="11" fill="#424e61">The list reads as their week: the day they plan to go,</text>
+<text x="36" y="490" font-size="11" fill="#424e61">soonest first. A job with no day yet shows Due, so it</text>
+<text x="36" y="506" font-size="11" fill="#424e61">still sorts in. The warning flags a day after Due.</text>
+<text x="36" y="530" font-size="11" fill="#424e61">Your due date is on the job page (Q3 rows).</text>
+<text x="36" y="554" font-size="11" fill="#424e61">From 480 up: "Scheduled Mon, Nov 23 · 1412 Elm St".</text>
+<text x="36" y="578" font-size="11" fill="#424e61">"Visit date" goes away for good.</text>
+
+<!-- ============ B ============ -->
+<rect x="412" y="80" width="376" height="520" rx="12" fill="#ffffff" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="432" y="108" font-size="14" font-weight="600" fill="#152133">B. Both dates on the line</text>
+<text x="432" y="126" font-size="11" fill="#5d6778">Their day, then Due.</text>
+<g transform="translate(470 144)">
+  <use href="#frame"/>
+  <use href="#pillS" x="64" y="110"/>
+  <text x="118" y="121" font-size="9.5" fill="#5d6778">· Mon, Nov 23 · Due Wed, No…</text>
+  <use href="#pillS" x="64" y="172"/>
+  <text x="118" y="183" font-size="9.5" fill="#5d6778">· Sat, Nov 28</text>
+  <use href="#warn" transform="translate(183 174) scale(0.42)"/>
+  <text x="196" y="183" font-size="9.5" fill="#5d6778">· Due Fri…</text>
+  <use href="#pillT" x="64" y="234"/>
+  <text x="100" y="245" font-size="9.5" fill="#5d6778">· Due Tue, Dec 1 · 56 Tamar…</text>
+</g>
+<text x="432" y="474" font-size="11" fill="#424e61">Everything on one line, so the address drops off on</text>
+<text x="432" y="490" font-size="11" fill="#424e61">every booked job at 375, and Due cuts off. At 320</text>
+<text x="432" y="506" font-size="11" fill="#424e61">only the first date fits.</text>
+
+<!-- ============ C ============ -->
+<rect x="808" y="80" width="376" height="520" rx="12" fill="#ffffff" stroke="#e7e5e0" stroke-width="1.5"/>
+<text x="828" y="108" font-size="14" font-weight="600" fill="#152133">C. Due only</text>
+<text x="828" y="126" font-size="11" fill="#5d6778">Their day shows only on the job page.</text>
+<g transform="translate(866 144)">
+  <use href="#frame"/>
+  <use href="#pillS" x="64" y="110"/>
+  <text x="118" y="121" font-size="9.5" fill="#5d6778">· Due Wed, Nov 25 · 1412 Elm…</text>
+  <use href="#pillS" x="64" y="172"/>
+  <text x="118" y="183" font-size="9.5" fill="#5d6778">· Due Fri, Nov 27 · 56 Tama…</text>
+  <use href="#pillT" x="64" y="234"/>
+  <text x="100" y="245" font-size="9.5" fill="#5d6778">· Due Tue, Dec 1 · 56 Tamar…</text>
+</g>
+<text x="828" y="474" font-size="11" fill="#424e61">They can't see their own week without opening each</text>
+<text x="828" y="490" font-size="11" fill="#424e61">job, and the after-Due warning is hidden here.</text>
+</svg>
