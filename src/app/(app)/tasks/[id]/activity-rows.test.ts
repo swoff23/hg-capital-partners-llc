@@ -211,3 +211,11 @@ test("a folded run keeps its member lines, the text before a notes run, and ever
   assert.deepEqual(row.ids, notes.map((n) => n.id));
   assert.deepEqual(row.members.map((m) => m.previous), ["v0", "v1"]);
 });
+
+test("a resident's reply by email reads 'Dana Lee (resident) by email'; their form's additions keep their own name", () => {
+  const resident = { actorLabel: "Dana Lee (resident)", actorUserId: null, actorContactId: null, source: "SYSTEM", visibility: "SHARED" } as const;
+  const byEmail = ev("COMMENT", { resident: "t-dana", byEmail: true, emailId: "em-1" }, { ...resident, body: "Is the plumber still coming?" });
+  const byForm = ev("COMMENT", { resident: "t-dana" }, { ...resident, body: "It's worse at night." });
+  const authors = shape([byEmail, byForm]).flatMap((r) => (r.type === "comment" ? [r.comment.author] : []));
+  assert.deepEqual(authors, ["Dana Lee (resident) by email", "Dana Lee (resident)"]);
+});

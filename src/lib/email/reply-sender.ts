@@ -1,11 +1,13 @@
 import type { Prisma, TaskStatus, Visibility } from "@prisma/client";
+import { todayYmdEastern } from "@/lib/dates";
 import { JOB_EMAIL_SELECT, jobEmailState } from "@/lib/portal/job-emails";
 import { hashToken, isWellFormedToken } from "@/lib/portal/tokens";
+import { linkLeaseEnded, requestClosed } from "@/lib/residents/steps";
 import { escapeLike } from "@/lib/search";
 import { isActiveStatus } from "@/lib/task-scope";
 import type { Principal } from "@/lib/tasks/core";
 import { EMAIL_PROBLEM_SELECT, emailProblemOf } from "./delivery-events";
-import { fromAddress, replyToken, singleAddress, threadTaskId, type CantPost } from "./inbound";
+import { fromAddress, replyToken, singleAddress, threadTaskId, type CantPost, type ResidentCantPost } from "./inbound";
 
 /**
  * Where a received email goes (docs/specs/contractor-job-emails.md, section 5;
@@ -27,9 +29,16 @@ import { fromAddress, replyToken, singleAddress, threadTaskId, type CantPost } f
  *    domain (DMARC pass) and name one address. With a thread that names a job,
  *    it posts (or goes to the partners) as above; with none, a fresh email
  *    from a contractor's login goes to both partners. Anyone else is dropped.
+ *  - A tenant's reply through a resident email's own address
+ *    (ResidentReplyAddress, docs/specs/tenant-welcome-email.md, Q2) counts
+ *    only from the tenant's own email on file, vouched for by its domain
+ *    (DMARC pass); anything else drops. About an open request, while they're
+ *    still on the lease, it posts there as their own addition. About none
+ *    (the form email), a closed request, or after they moved out, it goes to
+ *    both partners with the home named. Never to the contractor.
  */
 
-type Db = Pick<Prisma.TransactionClient, "jobLink" | "user" | "portalAccount" | "contact" | "task" | "taskAccess">;
+type Db = Pick<Prisma.TransactionClient, "jobLink" | "user" | "portalAccount" | "contact" | "task" | "taskAccess" | "residentReplyAddress" | "tenant" | "lease" | "residentRequest">;
 
 /** What replies.ts reads off the received email to route it. */
 export interface Envelope {
@@ -54,9 +63,20 @@ export interface ForwardFrom {
   reachable: boolean;
 }
 
+/** The tenant a reply through a resident email's address is from, and the home it's about. */
+export interface ResidentFrom {
+  tenantId: string;
+  leaseId: string;
+  fullName: string;
+  address: string;
+  unitLabel: string | null;
+}
+
 export type ReplyRoute =
   | { route: "post"; taskId: string; p: Principal; loginEmail: string; visibility: Visibility }
   | { route: "forward"; taskId: string | null; why: CantPost; from: ForwardFrom }
+  | { route: "resident-post"; taskId: string; requestId: string; from: ResidentFrom }
+  | { route: "resident-forward"; taskId: string | null; why: ResidentCantPost; from: ResidentFrom }
   | { route: "ignore"; reason: string };
 
 /** The facts about a contractor and a job that decide whether their reply posts. */
@@ -145,10 +165,37 @@ async function partnerRoute(db: Db, link: { taskId: string; userId: string; cont
 }
 
 /**
+ * A tenant's reply through a resident email's own address: only from the tenant's own email on file, with DMARC pass
+ * and one address in the From line (a reply address travels in To and CC lines and address books, so unlike a job
+ * email's it isn't proof on its own). It posts on the request the email was about while that's open and they're still
+ * on the lease; otherwise both partners get it, the home named.
+ */
+async function residentRoute(db: Db, address: { tenantId: string; leaseId: string; requestId: string | null }, email: Envelope, now: Date): Promise<ReplyRoute> {
+  if (email.authentication?.dmarc !== "pass" || !singleAddress(email.from)) return ignore("not the tenant");
+  const tenant = await db.tenant.findUnique({ where: { id: address.tenantId }, select: { fullName: true, email: true } });
+  if (!tenant?.email || fromAddress(email.from) !== tenant.email.trim().toLowerCase()) return ignore("not the tenant");
+  const lease = await db.lease.findUnique({
+    where: { id: address.leaseId },
+    select: { unitLabel: true, movesOut: true, property: { select: { address: true } }, tenants: { where: { tenantId: address.tenantId }, select: { tenantId: true } } },
+  });
+  if (!lease) return ignore("no lease");
+  const from: ResidentFrom = { tenantId: address.tenantId, leaseId: address.leaseId, fullName: tenant.fullName, address: lease.property.address, unitLabel: lease.unitLabel };
+  // The request, if the email was about one that's still there and on this lease.
+  const request = address.requestId
+    ? await db.residentRequest.findUnique({ where: { id: address.requestId }, select: { id: true, taskId: true, leaseId: true, task: { select: { status: true } } } })
+    : null;
+  if (!request || request.leaseId !== address.leaseId) return { route: "resident-forward", taskId: null, why: "no-request", from };
+  if (requestClosed(request.task.status)) return { route: "resident-forward", taskId: request.taskId, why: "closed", from };
+  // As the form refuses an action from a link whose lease is over (links.ts resolveResidentLink).
+  if (lease.tenants.length === 0 || linkLeaseEnded(lease, todayYmdEastern(now))) return { route: "resident-forward", taskId: request.taskId, why: "moved-out", from };
+  return { route: "resident-post", taskId: request.taskId, requestId: request.id, from };
+}
+
+/**
  * Where this email goes. `jobsAddresses` are ours (EMAIL_FROM's and EMAIL_REPLY_TO's, bare and lowercased): a fresh
  * email reaches the partners only when it was sent to one of them, or to a reply address whose job is gone.
  */
-export async function routeReply(db: Db, email: Envelope, jobsAddresses: readonly string[]): Promise<ReplyRoute> {
+export async function routeReply(db: Db, email: Envelope, jobsAddresses: readonly string[], now: Date = new Date()): Promise<ReplyRoute> {
   const recipients = [...(email.to ?? []), ...(email.received_for ?? []), ...(email.cc ?? [])];
   const token = replyToken(recipients);
   if (token && isWellFormedToken(token)) {
@@ -157,6 +204,11 @@ export async function routeReply(db: Db, email: Envelope, jobsAddresses: readonl
     if (link && link.kind !== "REPLY") return ignore("no job");
     if (link?.userId) return partnerRoute(db, { ...link, userId: link.userId });
     if (link?.contactId) return contractorRoute(db, link.taskId, link.contactId, !!link.revokedAt);
+    // A resident email's address: the same r+ shape, its own table and token.
+    if (!link) {
+      const resident = await db.residentReplyAddress.findUnique({ where: { tokenHash: hashToken(token) }, select: { tenantId: true, leaseId: true, requestId: true } });
+      if (resident) return residentRoute(db, resident, email, now);
+    }
     // No such link: its job was deleted, and its links with it. A known contractor's reply still reaches the partners
     // below, as a fresh email, when their domain vouches for them.
   }

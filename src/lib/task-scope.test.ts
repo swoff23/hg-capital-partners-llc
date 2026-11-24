@@ -209,6 +209,7 @@ test("every file that reaches tasks through another model or in raw SQL is on a 
   const RAW = /\b(FROM|JOIN|UPDATE|INTO)\s+"Task/;
   const KNOWN: Record<string, string> = {
     "app/api/files/[kind]/[id]/route.ts": "a resident's file reads its task's request for the lease; a resident's request task is never a draft (createTask refuses one for anyone but a partner)",
+    "lib/email/reply-sender.ts": "a tenant's reply reads its request's task status by id (tenant-welcome-email.md); a resident's request task is never a draft",
     "lib/invoices/core.ts": "an invoice's job by id: jobToLink refuses a draft, and a send reads its job's status, which must be In review or Done",
     "lib/invoices/files.ts": "a task file made into an invoice: refused when its task is a draft or a playbook row",
     "lib/invoices/queries.ts": "the jobs on invoices, which jobToLink never makes a draft; a contractor's are contractorCanOpen's",

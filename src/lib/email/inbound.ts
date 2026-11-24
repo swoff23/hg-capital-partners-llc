@@ -111,7 +111,9 @@ export const REPLY_MAX = 5000;
  * contractors use: Gmail and Apple Mail ("On Mon, Nov 23, 2026 at 9:31 AM
  * HG Capital Partners <…> wrote:", which Gmail may wrap onto two lines),
  * Outlook ("From: …" after a rule, or "-----Original Message-----"), and a
- * forwarded copy.
+ * forwarded copy. Tenants' phones add the same lines in Spanish ("El … escribió:",
+ * "De: … Enviado:", Samsung's "Mensaje original"), French ("Le … a écrit :") and
+ * Portuguese ("Em … escreveu:").
  */
 const QUOTE_STARTS = [
   /^On .{0,300}wrote:\s*$/im,
@@ -121,10 +123,16 @@ const QUOTE_STARTS = [
   /^From: .+\n(?:Sent|Date): .+$/im,
   /^-{2,}\s*Forwarded message\s*-{2,}\s*$/im,
   /^Begin forwarded message:\s*$/im,
+  /^El .{0,300}escribió:\s*$/im,
+  /^El .{0,200}\n.{0,200}escribió:\s*$/im,
+  /^-{2,}\s*Mensaje original\s*-{2,}\s*$/im,
+  /^De: .+\n(?:Enviado(?: el)?|Fecha): .+$/im,
+  /^Le .{0,300}a\sécrit\s?:\s*$/im,
+  /^Em .{0,300}escreveu:\s*$/im,
 ];
 
 /** Sign-offs a phone adds, and the start of a signature ("-- " on its own line). */
-const SIGN_OFFS = [/^Sent from my .{1,40}$/im, /^Get Outlook for .{1,20}$/im, /^-- ?$/m];
+const SIGN_OFFS = [/^Sent from my .{1,40}$/im, /^Enviado desde mi .{1,40}$/im, /^Envoyé de mon .{1,40}$/im, /^Enviado do meu .{1,40}$/im, /^Get Outlook for .{1,20}$/im, /^-- ?$/m];
 
 /**
  * What the person wrote in a reply: the text before the quoted email and
@@ -148,6 +156,54 @@ export function replyBody(text: string): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
   return body.length > REPLY_MAX ? `${body.slice(0, REPLY_MAX - 1).trimEnd()}…` : body;
+}
+
+/** Our app's address and our sending addresses (EMAIL_FROM's and EMAIL_REPLY_TO's), for telling our own email apart. */
+export interface OurAddresses {
+  appUrl: string;
+  addresses: readonly string[];
+}
+
+/** The hosts our emails name: the app's, and the sending domains, lowercased, without "www.". */
+function ourHosts(ours: OurAddresses): string[] {
+  let app = "";
+  try {
+    app = new URL(ours.appUrl).hostname;
+  } catch {
+    // No app address to look for; the sending domains still count.
+  }
+  const hosts = [app, ...ours.addresses.map((a) => fromAddress(a).split("@")[1] ?? "")].map((h) => h.trim().toLowerCase().replace(/^www\./, ""));
+  return [...new Set(hosts.filter(Boolean))];
+}
+
+/**
+ * A resident's no-login link (`/r/<token>`, links.ts residentUrl) and a reply address (`r+<token>@…`), wherever they
+ * sit, also percent-encoded inside another link (Outlook's Safe Links wraps ours as `?url=https%3A%2F%2F…%2Fr%2F<token>`).
+ */
+const RESIDENT_LINK = /[^\S\n]?\S*(?:\/|%2F)r(?:\/|%2F)[A-Za-z0-9_-]{32,}\S*/gi;
+const REPLY_ADDRESS = /[^\S\n]?\S*\br(?:\+|%2B)[A-Za-z0-9_-]{32,}(?:@|%40)\S*/gi;
+
+/**
+ * A tenant's reply, safe to post on their request (docs/specs/tenant-welcome-email.md, Q2). It posts Shared, where the
+ * contractor on the job reads it, and every resident email carries the tenant's own form link, which opens their page
+ * with no login. So a quote replyBody didn't know (another mail app, or a language it doesn't read) must not post: the
+ * words stop at the first line that names our app or our sending domain, which only our own email being quoted does,
+ * and a resident link or reply address left anywhere else is taken out.
+ */
+export function residentReplyWords(written: string, ours: OurAddresses): string {
+  const hosts = ourHosts(ours);
+  const lines = written.split("\n");
+  const at = lines.findIndex((line) => {
+    const l = line.toLowerCase();
+    return hosts.some((h) => l.includes(h));
+  });
+  return (at === -1 ? lines : lines.slice(0, at))
+    .join("\n")
+    .replace(RESIDENT_LINK, "")
+    .replace(REPLY_ADDRESS, "")
+    .replace(/[^\S\n]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /**
@@ -289,6 +345,28 @@ export function forwardHeadline(name: string, why: CantPost): string {
       return `${name} replied to an old email, so it didn't post.`;
     case "no-job":
       return `${name} wrote to the jobs address. It isn't on a task.`;
+  }
+}
+
+/**
+ * Why a tenant's reply to a resident email goes to the partners instead of posting on their request
+ * (docs/specs/tenant-welcome-email.md, Q2): it's about no request (the form email), the request closed, or they moved
+ * out. "files": it posted, but some of its files can't go on a request (a document, or past ten).
+ */
+export type ResidentCantPost = "no-request" | "closed" | "moved-out";
+export type ResidentForward = ResidentCantPost | "files";
+
+/** That email's headline, the tenant by full name as a contractor is (forwardHeadline). */
+export function residentForwardHeadline(name: string, why: ResidentForward): string {
+  switch (why) {
+    case "no-request":
+      return `${name} replied by email. It isn't about a request.`;
+    case "closed":
+      return `${name} replied after this closed.`;
+    case "moved-out":
+      return `${name} replied after moving out.`;
+    case "files":
+      return `${name} replied with files that can't go on the request.`;
   }
 }
 

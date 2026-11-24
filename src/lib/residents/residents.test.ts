@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { requestedResidentUploadRole, residentUploadPath, storedResidentUploadRole, requestedUploadRole } from "../attachments/paths";
 import { residentUploadLimits } from "../attachments/limits";
 import { residentScope, residentTokenOf } from "../attachments/queue-owner";
-import { emailSteps, linkEmail, requestCopyEmail, updateEmail } from "./emails";
-import { linkLeaseEnded, residentMayCancel, stepOf } from "./steps";
+import { emailSteps, linkEmail, moveInCopyEmail, requestCopyEmail, updateEmail } from "./emails";
+import { endedMessage, endedWords, linkLeaseEnded, newTenant, requestClosed, residentMayCancel, stepOf } from "./steps";
 
 // docs/specs/maintenance-requests.md
 
@@ -58,13 +58,120 @@ test("the resident's queue names their link, which the token route reads back", 
   assert.equal(residentTokenOf(undefined), null);
 });
 
-test("the link email sets the rule and says where emergencies go (5)", () => {
-  const e = linkEmail({ firstName: "Dana", home: "56 Tamarack St · Upper", url: "https://example.test/r/t" });
-  assert.equal(e.subject, "Your maintenance request link");
-  assert.match(e.text, /Hi Dana, here.s your maintenance request link/);
-  assert.match(e.text, /From now on, send repairs for 56 Tamarack St · Upper here/);
-  assert.match(e.text, /Emergency\? Text us in our group chat\./);
-  assert.match(e.text, /Report a problem/);
+// docs/specs/tenant-welcome-email.md
+
+const FORM = "https://example.test/r/t/new";
+const HOME = "933 Lafayette Avenue · Floor 2";
+
+/** The HTML's visible text, in order, one cell a line. */
+const htmlLines = (html: string) =>
+  html
+    .replace(/<div style="display:none[\s\S]*?<\/div>/, "")
+    .split(/<\/td>/)
+    .map((c) => c.replace(/<[^>]+>/g, "").replace(/&#39;/g, "'").replace(/&amp;/g, "&").trim())
+    .filter(Boolean);
+
+test("the form email: Connor's words, the button to the form, two lines under it, the emergency footer (Q1)", () => {
+  const e = linkEmail({ firstName: "Dana", home: HOME, url: FORM });
+  assert.equal(e.subject, "Your maintenance request form for 933 Lafayette Avenue · Floor 2");
+  assert.equal(e.fromName, "HG Capital");
+  assert.equal(
+    e.text,
+    [
+      "HG Capital Partners",
+      "",
+      "Hi Dana, here's your maintenance request form.",
+      "Use it for all maintenance requests.",
+      "",
+      `Report a problem: ${FORM}`,
+      "",
+      "Emergency? Text us in our group chat.",
+    ].join("\n"),
+  );
+  // Short and sweet (Nov 24): the preview is the one line; the HTML keeps the same order, nothing under the button.
+  assert.ok(e.html.includes("Use it for all maintenance requests."));
+  assert.deepEqual(htmlLines(e.html).slice(-4), [
+    "Hi Dana, here's your maintenance request form.",
+    "Use it for all maintenance requests.",
+    "Report a problem",
+    "Emergency? Text us in our group chat.",
+  ]);
+  assert.ok(!e.text.includes("Keep this email") && !e.text.includes("scheduled and done"));
+  assert.ok(e.html.includes(`href="${FORM}"`), "the button opens the form itself");
+  assert.ok(e.html.includes("HG Capital Partners"), "the full letterhead");
+});
+
+test("a new link says the old one stopped, in the subject, preview, headline and first line (Q1)", () => {
+  const e = linkEmail({ firstName: "Dana", home: HOME, url: FORM, replaced: true });
+  assert.equal(e.subject, "Your new maintenance request form for 933 Lafayette Avenue · Floor 2");
+  assert.match(e.text, /^Hi Dana, here's your new maintenance request form\.\nYour old link no longer works\. Use this one from now on\.$/m);
+  assert.match(e.html, /Your old link no longer works\. Use this one from now on\./);
+  assert.ok(!e.text.includes("Use it for all maintenance requests."));
+  // The rest is the same email.
+  assert.match(e.text, /Report a problem: .+\n\nEmergency\? Text us in our group chat\.$/);
+  // A new tenant's new link still says it's new: the old link stopping is what they need to know.
+  assert.equal(linkEmail({ firstName: "Dana", home: HOME, url: FORM, replaced: true, welcome: true }).text, e.text);
+});
+
+test("a new tenant is welcomed: move-in in the last 30 days or still ahead (Q3)", () => {
+  const today = "2026-11-23";
+  assert.equal(newTenant("2026-11-23", today), true, "moves in today");
+  assert.equal(newTenant("2026-12-01", today), true, "still ahead");
+  assert.equal(newTenant("2026-10-24", today), true, "30 days ago");
+  assert.equal(newTenant("2026-10-23", today), false, "31 days ago");
+  assert.equal(newTenant(new Date("2025-06-01T00:00:00Z"), today), false, "years ago");
+  assert.equal(newTenant(null, today), false, "no move-in date: they live there now");
+  const welcome = linkEmail({ firstName: "Dana", home: HOME, url: FORM, welcome: true });
+  assert.match(welcome.text, /^Welcome, Dana\. Here's your maintenance request form\.$/m);
+  assert.equal(welcome.subject, "Your maintenance request form for 933 Lafayette Avenue · Floor 2");
+  assert.match(linkEmail({ firstName: "Dana", home: HOME, url: FORM, welcome: false }).text, /^Hi Dana, here's your maintenance request form\.$/m);
+});
+
+test("every resident email is From HG Capital, never via, and none has an em dash (Q4)", () => {
+  const facts = { whatsWrong: "Kitchen sink leaks", home: "56 Tamarack St · Upper", details: null, letUsIn: true, pets: null, petsNote: null, url: "https://example.test/r/t/1" };
+  const update = { ...facts, closedNote: null, today: "2026-11-21", moved: false };
+  const emails = [
+    linkEmail({ firstName: "Dana", home: HOME, url: FORM }),
+    linkEmail({ firstName: "Dana", home: HOME, url: FORM, replaced: true }),
+    linkEmail({ firstName: "Dana", home: HOME, url: FORM, welcome: true }),
+    requestCopyEmail({ ...facts, firstName: "Dana" }),
+    updateEmail({ ...update, step: "scheduled", day: "2026-11-25" }),
+    updateEmail({ ...update, step: "scheduled", moved: true, day: "2026-11-27" }),
+    updateEmail({ ...update, step: "done", day: null }),
+    updateEmail({ ...update, step: "closed", day: null }),
+    moveInCopyEmail({ name: "Dana Lee", firstName: "Dana", where: "56 Tamarack St, Upper", lines: ["Kitchen: Good"], today: "2026-11-23", appUrl: "https://example.test" }),
+  ];
+  for (const e of emails) {
+    assert.equal(e.fromName, "HG Capital", e.subject);
+    assert.ok(!/—/.test(e.subject + e.text), e.subject);
+  }
+});
+
+test("the move-in report copy names HG Capital in its footnote", () => {
+  const e = moveInCopyEmail({ name: "Dana Lee", firstName: "Dana", where: "56 Tamarack St, Upper", lines: ["Kitchen: Good", " "], today: "2026-11-23", appUrl: "https://example.test" });
+  assert.equal(e.subject, "Your move-in report for 56 Tamarack St, Upper");
+  assert.match(e.text, /^Thanks, Dana\. Here's a copy of the move-in report you sent for 56 Tamarack St, Upper\.$/m);
+  // One line at 320 and 375 for every date, "HG Capital" spelled out (never bare "HG").
+  assert.match(e.text, /^Sent to HG Capital on Nov 23\.$/m);
+  assert.ok(!/\bHG\b(?! Capital)/.test(e.text.replace(/HG Capital Partners/g, "")));
+});
+
+test("an old link's page says it was replaced only when a newer one was emailed (Q1)", () => {
+  assert.deepEqual(endedWords("replaced"), { heading: "This link was replaced.", lines: ["Use the newest email from HG Capital.", "Questions? Text us in our group chat."] });
+  assert.deepEqual(endedWords("gone"), { heading: "This link no longer works.", lines: ["Questions? Text us in our group chat."] });
+  // An action's refusal is the heading and the first line: Cancel shows it as a toast, which stays under about 90.
+  assert.equal(endedMessage("replaced"), "This link was replaced. Use the newest email from HG Capital.");
+  assert.equal(endedMessage("gone"), "This link no longer works. Questions? Text us in our group chat.");
+  for (const why of ["replaced", "gone"] as const) {
+    assert.ok(!endedMessage(why).includes("ticket"));
+    assert.ok(endedMessage(why).length <= 90, why);
+  }
+});
+
+test("a request takes additions until it's Done or canceled, by the form or by email", () => {
+  assert.equal(requestClosed("DONE"), true);
+  assert.equal(requestClosed("CANCELED"), true);
+  for (const s of ["OPEN", "WAITING", "SCHEDULED", "IN_PROGRESS", "REVIEW"] as const) assert.equal(requestClosed(s), false, s);
 });
 
 test("every email shows their three steps, Closed ending the row (drawing 15 B)", () => {

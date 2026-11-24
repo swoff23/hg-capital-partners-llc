@@ -15,7 +15,7 @@ Residents report repairs from their phone through a link of their own. Each requ
 
 - Every current tenant gets **their own link**. It opens on their unit, already knowing who they are, with no address to type and no password.
 - **Report a problem** is one screen: what's wrong, more detail if they want, photos or video, and "Can we fix it if you're not home?" A Yes asks about pets.
-- The request **becomes a task** in Needs you, due the day it arrives, and **you both get an email** about it.
+- The request **becomes a task** in Needs you, unassigned with no due date, and **you both get an email** about it.
 - The resident follows it on **three steps**: Received, Scheduled (with the day), Done. They get an email when it's scheduled, when the day changes, when it's done, and when you close it. Your comments, files and contractor notes never reach them.
 - They can **add photos or a note** while it's open, and **cancel their own** while it's still Received.
 - You **close** a request you won't do with Canceled, as today, plus an optional note they see.
@@ -45,7 +45,7 @@ Approving a drawing approves the copy and the small behaviors drawn in it. Every
 
 - **Status emails go to the person who sent it.** Anyone else on the lease sees it on their own page but gets no email.
 - **A household sees its own lease's requests only**, never a past tenant's. The unit's history stays on your side.
-- **The link works until the lease's move-out day passes.** After that it opens a short page: "This ticket has been closed. Questions? Text us in our group chat." A link sent before move-in works from the day it's sent.
+- **The link works until the lease's move-out day passes.** After that it opens a short page: "This link no longer works. Questions? Text us in our group chat." ("This link was replaced. Use the newest email from HG Capital." when a newer link was emailed; [tenant-welcome-email.md](tenant-welcome-email.md), Nov 23). A link sent before move-in works from the day it's sent.
 - **Reopening a closed or done request sends nothing.** Their page goes back to Received.
 - **A resident canceling their own** puts a line in your task email ("Dana canceled the request") and shows "Dana canceled it" in Activity. No email to the resident; the page already says Closed.
 - **Bulk Canceled from the Tasks list asks for no note.** Those residents see the blank-note line, "Questions? Text us in our group chat."
@@ -142,7 +142,7 @@ What the form fills in, through `createTask`:
 | Address and unit | Property and Unit |
 | Yes, you can come in | Permission to enter on (`entryPermittedAt`) |
 | No, please coordinate when I'm home | Permission to enter off (Tenant only) |
-| Arrival | Due today, unassigned, Open, like the move-in report |
+| Arrival | No due date, unassigned, Open (Connor, Nov 24; the move-in report stays due today) |
 
 Details gets two rows, after Permission to enter:
 
@@ -181,11 +181,13 @@ Drawing: [04](maintenance-requests/04-letting-us-in.svg) (footer). Beside Access
 
 ## 5. Emails to residents
 
-All in the resident layout (`lib/residents/email-layout.ts`; Connor picked [15 B](maintenance-requests/15-email-structure.svg) after the build): the contractor job email's frame, with "What's new" and a headline, their three steps under it (Closed ends the row), one line, the full-width button, then **Your request** as labeled rows (Entry, Pets after a Yes, Comments), and "Questions? Text us in our group chat." at the foot. Replies aren't read; the foot says where to go instead.
+All in the resident layout (`lib/residents/email-layout.ts`; Connor picked [15 B](maintenance-requests/15-email-structure.svg) after the build): the contractor job email's frame, with "What's new" and a headline, their three steps under it (Closed ends the row), one line, the full-width button, then **Your request** as labeled rows (Entry, Pets after a Yes, Comments), and "Questions? Text us in our group chat." at the foot.
+
+Since Nov 23 ([tenant-welcome-email.md](tenant-welcome-email.md)): every email to a resident, the move-in report copy included, is From "HG Capital"; each has its own reply address, so a tenant's reply posts on the request as their own addition ("Dana Lee (resident) by email") or, about no request, reaches both partners; and the first email is the maintenance request form email below. That spec has the words and the reply rules.
 
 | When | Subject | Body |
 |---|---|---|
-| You send their link | Your maintenance request link | Headline "Hi Dana, here's your maintenance request link", then "From now on, send repairs for 56 Tamarack St · Upper here. You'll see when each one is scheduled and done." and "Save it to your home screen." **Report a problem**. No steps or request rows |
+| You send their link | Your maintenance request form for 933 Lafayette Avenue · Floor 2 | Headline "Hi Dana, here's your maintenance request form." ("Welcome, Dana. Here's your maintenance request form." for a move-in in the last 30 days or still ahead), then "Use it for all maintenance requests." and **Report a problem**, opening the form itself. Send a new link: "Your new maintenance request form for …", "Hi Dana, here's your new maintenance request form." and "Your old link no longer works. Use this one from now on." No steps or request rows ([tenant-welcome-email.md](tenant-welcome-email.md)) |
 | They send a request | Your request: Kitchen sink leaks | Headline "Thanks, Dana. We got your request", Received the current step, then "We'll email you when it's scheduled." **See your request** |
 | It's scheduled | Scheduled for Wed, Nov 25: Kitchen sink leaks | Headline "Scheduled for Wed, Nov 25", Scheduled the current step, then "We'll let the contractor in, since you said that's okay." or "We'll coordinate a time when you're home." **See your request** |
 | The day changes | Moved to Fri, Nov 27: Kitchen sink leaks | Headline "Moved to Fri, Nov 27", the same line |
@@ -284,5 +286,6 @@ After a code review on Nov 21:
 - **Email me my link answers before it sends**, so its timing never says whether an address is on file.
 - **The new-request form and each request's Add use their own upload queue keys.**
 - **The partners' New request line carries the resident's words and answers** ("sent this request with 2 photos: "…" · Can come in · Pets: a cat").
+- **No due date on arrival** (Nov 24). Connor asked that a new request not be due right away; it arrives undated and unassigned, and Home lists it under Unassigned until someone picks it up.
 
 **Not proven yet:** a real photo or video upload from a phone (the local check used the shared Blob store's settings, so no test files were uploaded), and real emails through Resend (local runs print them). Both work the same way as the contractor's job page and the move-in copy.

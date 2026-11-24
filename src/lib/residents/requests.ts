@@ -10,9 +10,11 @@ import { sendEmail } from "@/lib/email/send";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
 import * as core from "@/lib/tasks/core";
+import { ResidentRequestError, addResidentUpdate, lockOpenRequest, photoWords, residentPrincipal, writeResidentUpdate } from "./additions";
 import { requestCopyEmail, residentHome, type ResidentStep } from "./emails";
 import { residentMayCancel, stepOf } from "./steps";
 import { residentUrl, type ResidentContext } from "./links";
+import { residentReplyTo } from "./reply-address";
 
 /**
  * What a resident does from their link (docs/specs/maintenance-requests.md,
@@ -23,13 +25,8 @@ import { residentUrl, type ResidentContext } from "./links";
  * contractor on the job sees them (portal/queries.ts visibleFile).
  */
 
-/** Refused with a line the resident can act on. */
-export class ResidentRequestError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ResidentRequestError";
-  }
-}
+// The refusal and the addition core live in additions.ts, which a reply by email posts through too.
+export { ResidentRequestError };
 
 /** Short, since it leads every email subject; the rest goes in Tell us more. */
 export const WHATS_WRONG_MAX = 50;
@@ -48,7 +45,7 @@ export async function residentUploadsFull(linkId: string, now = new Date()): Pro
   return (await prisma.residentUpload.count({ where: { linkId, createdAt: { gt: since } } })) >= UPLOADS_PER_DAY;
 }
 
-const principalFor = (ctx: Pick<ResidentContext, "tenantName">): core.Principal => ({ kind: "system", label: `${ctx.tenantName} (resident)` });
+const principalFor = residentPrincipal;
 
 // ---------------------------------------------------------------------------
 // Uploads: checked with head(), held until a send attaches them
@@ -129,9 +126,24 @@ export async function recordResidentUpload(ctx: ResidentContext, input: Resident
   return row;
 }
 
+/** The held uploads a send names: only this link's, only ones not attached yet, oldest first. */
+async function heldUploads(tx: core.Tx, ctx: ResidentContext, uploadIds: readonly string[]) {
+  return uploadIds.length
+    ? tx.residentUpload.findMany({ where: { id: { in: [...uploadIds] }, linkId: ctx.linkId, usedAt: null }, orderBy: { createdAt: "asc" } })
+    : [];
+}
+
+/** Mark the held uploads attached. Only ones still unattached: a second send racing this one for the same files finds none left and is refused. */
+async function markUsed(tx: core.Tx, ids: readonly string[], now: Date): Promise<void> {
+  if (!ids.length) return;
+  const { count } = await tx.residentUpload.updateMany({ where: { id: { in: [...ids] }, usedAt: null }, data: { usedAt: now } });
+  if (count !== ids.length) throw new ResidentRequestError("Those photos are already on a request. Add them again.");
+}
+
 /**
- * The held uploads a send names, as file rows on the task, under one Shared update by the resident. Only this
- * link's, only ones not attached yet. Returns the update's id, or null when there were none.
+ * The held uploads a send names, as file rows on the task, under one Shared update by the resident. Returns the
+ * update's id, or null when there were none. `first`: the photos sent with the request, which its page shows under
+ * Additional comments.
  */
 async function attachUploads(
   tx: core.Tx,
@@ -142,50 +154,12 @@ async function attachUploads(
   now: Date,
   first = false,
 ): Promise<{ eventId: string | null; photos: number }> {
-  const uploads = uploadIds.length
-    ? await tx.residentUpload.findMany({ where: { id: { in: [...uploadIds] }, linkId: ctx.linkId, usedAt: null }, orderBy: { createdAt: "asc" } })
-    : [];
+  const uploads = await heldUploads(tx, ctx, uploadIds);
   if (!uploads.length && !body) return { eventId: null, photos: 0 };
-  const event = await core.addEvent(tx, taskId, principalFor(ctx), {
-    kind: "COMMENT",
-    visibility: "SHARED",
-    body,
-    audienceContactId: null,
-    // `first`: the photos sent with the request, which its page shows under Additional comments.
-    data: first ? { resident: ctx.tenantId, first: true } : { resident: ctx.tenantId },
-    createdAt: now,
-  });
-  for (const u of uploads) {
-    await tx.taskAttachment.create({
-      data: {
-        taskId,
-        eventId: event.id,
-        url: u.url,
-        pathname: u.pathname,
-        filename: u.filename,
-        size: u.size,
-        contentType: u.contentType,
-        kind: u.kind,
-        visibility: "SHARED",
-        uploadedByTenantId: ctx.tenantId,
-        audienceContactId: null,
-        thumbPathname: u.thumbPathname,
-        posterPathname: u.posterPathname,
-        width: u.width,
-        height: u.height,
-        durationSec: u.durationSec,
-      },
-    });
-  }
-  if (uploads.length) {
-    // Only ones still unattached: a second send racing this one for the same files finds none left and is refused.
-    const { count } = await tx.residentUpload.updateMany({ where: { id: { in: uploads.map((u) => u.id) }, usedAt: null }, data: { usedAt: now } });
-    if (count !== uploads.length) throw new ResidentRequestError("Those photos are already on a request. Add them again.");
-  }
-  return { eventId: event.id, photos: uploads.length };
+  const eventId = await writeResidentUpdate(tx, taskId, ctx, body, uploads, now, first ? { first: true } : {});
+  await markUsed(tx, uploads.map((u) => u.id), now);
+  return { eventId, photos: uploads.length };
 }
-
-const photoWords = (n: number) => `${n} ${n === 1 ? "photo" : "photos"}`;
 
 // ---------------------------------------------------------------------------
 // Send, add, cancel
@@ -201,7 +175,8 @@ export interface RequestInput {
 }
 
 /**
- * Send a request (section 3.2): a task in Needs you, due today and unassigned like the move-in report, with
+ * Send a request (section 3.2): a task in Needs you, unassigned and with no due date (Connor, Nov 24: HG Capital sets
+ * the day once it's planned; Home lists an undated unassigned task under Unassigned), with
  * Permission to enter on after a Yes, the resident's photos on it, a line in both partners' email, and the resident's
  * own copy by email.
  */
@@ -226,7 +201,7 @@ export async function submitRequest(ctx: ResidentContext, input: RequestInput, n
   const made = await prisma.$transaction(async (tx) => {
     const task = await core.createTask(
       tx,
-      { title: whatsWrong, description: details, propertyId: ctx.propertyId, unitLabel: ctx.unitLabel, dueDate: todayYmdEastern(now), entryPermitted: input.letUsIn },
+      { title: whatsWrong, description: details, propertyId: ctx.propertyId, unitLabel: ctx.unitLabel, entryPermitted: input.letUsIn },
       p,
       now,
     );
@@ -265,7 +240,8 @@ export async function submitRequest(ctx: ResidentContext, input: RequestInput, n
         petsNote,
         url: residentUrl(ctx.token, `/${made.id}`),
       });
-      await sendEmail({ to: ctx.email, subject: mail.subject, text: mail.text, html: mail.html });
+      const replyTo = await residentReplyTo({ tenantId: ctx.tenantId, leaseId: ctx.leaseId, requestId: made.id });
+      await sendEmail({ to: ctx.email, subject: mail.subject, text: mail.text, html: mail.html, fromName: mail.fromName, ...(replyTo ? { replyTo } : {}) });
     } catch (err) {
       logError("residents:request-copy", err, { requestId: made.id }, { level: "warning" });
     }
@@ -280,7 +256,7 @@ async function ownRequest(ctx: ResidentContext, requestId: string) {
   return r;
 }
 
-/** Add photos or a note (section 3.5), while it's open. */
+/** Add photos or a note (section 3.5), while it's open: the same addition a reply by email makes (additions.ts). */
 export async function addToRequest(ctx: ResidentContext, requestId: string, input: { note?: string | null; uploadIds?: string[] }, now = new Date()): Promise<void> {
   const note = input.note?.trim() || null;
   if (note && note.length > NOTE_MAX) throw new ResidentRequestError("That note is long. Shorten it a little.");
@@ -289,14 +265,11 @@ export async function addToRequest(ctx: ResidentContext, requestId: string, inpu
   if (!note && !uploadIds.length) throw new ResidentRequestError("Write something or add a photo.");
   const r = await ownRequest(ctx, requestId);
   await prisma.$transaction(async (tx) => {
-    // The task row first, as every writer on a task takes it (core.ts addComment).
-    await tx.$executeRaw`SELECT 1 FROM "Task" WHERE "id" = ${r.taskId} FOR NO KEY UPDATE`;
-    const task = await tx.task.findUnique({ where: { id: r.taskId }, select: { status: true } });
-    if (!task || task.status === "DONE" || task.status === "CANCELED") throw new ResidentRequestError("This request is closed. Send a new one if it's still a problem.");
-    const attached = await attachUploads(tx, r.taskId, ctx, uploadIds, note, now);
-    if (!attached.eventId) throw new ResidentRequestError("Those photos are already on a request. Add them again.");
-    const what = [note ? "a note" : null, attached.photos ? photoWords(attached.photos) : null].filter(Boolean).join(" and ");
-    await core.notifyPartners(tx, r.taskId, { kind: "COMMENT", actorLabel: principalFor(ctx).label, summary: `added ${what}`, at: now.toISOString(), eventId: attached.eventId }, now);
+    await lockOpenRequest(tx, r.taskId);
+    const uploads = await heldUploads(tx, ctx, uploadIds);
+    if (!note && !uploads.length) throw new ResidentRequestError("Those photos are already on a request. Add them again.");
+    await addResidentUpdate(tx, r.taskId, ctx, { note, files: uploads }, now);
+    await markUsed(tx, uploads.map((u) => u.id), now);
   });
 }
 

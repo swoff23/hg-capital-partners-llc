@@ -237,13 +237,14 @@ export function shapeActivity(input: ShapeInput): ActivityRow[] {
   }
 
   const comment = (e: ActivityEvent & { audienceContactId?: string | null }): CommentFields => {
-    const d = (e.data && typeof e.data === "object" ? e.data : {}) as { fromChecklistItem?: { title?: string }; clientId?: unknown; edited?: unknown };
+    const d = (e.data && typeof e.data === "object" ? e.data : {}) as { fromChecklistItem?: { title?: string }; clientId?: unknown; edited?: unknown; byEmail?: unknown };
     const own = filesOf([e.id]);
     const text = e.body && e.body.trim() ? e.body : null;
     const mine = e.source === "APP" && e.actorUserId === viewerId;
     return {
       id: e.id,
-      author: e.actorLabel,
+      // A resident's reply by email (docs/specs/tenant-welcome-email.md, Q2): "Dana Lee (resident) by email".
+      author: d.byEmail === true ? `${e.actorLabel} by email` : e.actorLabel,
       isContractor: !!e.actorContactId,
       internal: e.visibility === "INTERNAL",
       onItem: d.fromChecklistItem?.title ?? null,

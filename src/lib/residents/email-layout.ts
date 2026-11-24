@@ -7,8 +7,10 @@ import { FONT, LABEL, LETTERHEAD, PRIMARY, escapeHtml, escapeWithBreaks, factRow
  * 15 B): the contractor job email's frame (email/render.ts renderJobEmail)
  * with the resident's three steps under the headline. Letterhead, "What's
  * new" and its headline, the steps, a line or two, the full-width button, then
- * "Your request" as labeled rows, and the group chat line at the foot. One
- * 480px column, full width on a phone. Pure; see residents.test.ts.
+ * "Your request" as labeled rows, and the group chat line at the foot. The form
+ * email has no news, so no steps or request, and lines under its button
+ * instead (docs/specs/tenant-welcome-email.md). One 480px column, full width
+ * on a phone. Pure; see residents.test.ts.
  */
 
 export interface EmailStep {
@@ -41,7 +43,9 @@ function stepsHtml(steps: readonly EmailStep[]): string {
     const into =
       i === 0
         ? ""
-        : `<td style="padding:0 8px;vertical-align:middle;"><div style="width:20px;border-top:1px solid ${s.reached ? t.foreground : t.border};font-size:0;line-height:0;">&nbsp;</div></td>`;
+        : // 8px with 4px each side, so the three steps fit 238px of content at 320 (measured 254px with 20px lines and 8px
+          // sides: a 36px sideways scroll on the request copy and every update email).
+          `<td style="padding:0 4px;vertical-align:middle;"><div style="width:8px;border-top:1px solid ${s.reached ? t.foreground : t.border};font-size:0;line-height:0;">&nbsp;</div></td>`;
     return `${into}<td style="white-space:nowrap;vertical-align:middle;">${dot}${label}</td>`;
   });
   return `<table role="presentation" cellpadding="0" cellspacing="0"><tr>${cells.join("")}</tr></table>`;

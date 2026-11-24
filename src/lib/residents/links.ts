@@ -5,7 +5,8 @@ import { todayYmdEastern, type Ymd } from "@/lib/dates";
 import { getEnv } from "@/lib/env";
 import { firstName } from "@/lib/names";
 import { hashToken, isWellFormedToken, residentLinkToken } from "@/lib/portal/tokens";
-import { linkLeaseEnded } from "./steps";
+import { whyLinkEnded } from "./link-ended";
+import { endedMessage, linkLeaseEnded, type LinkEnded } from "./steps";
 
 /**
  * A tenant's own link for reporting repairs (docs/specs/maintenance-requests.md,
@@ -16,7 +17,8 @@ import { linkLeaseEnded } from "./steps";
  *
  * It works through the move-out day while the person is still on the lease.
  * Turn off link and Send a new link revoke it; an old link then opens the ended
- * page. Only a partner's Email link, Copy link or Send a new link, or the
+ * page, which says "This link was replaced." when a newer one was emailed
+ * (docs/specs/tenant-welcome-email.md). Only a partner's Email link, Copy link or Send a new link, or the
  * resident's own Email me my link, makes a new one: the update emails and the
  * tenant sheet never do, so Turn off link sticks.
  */
@@ -136,14 +138,15 @@ export interface ResidentContext {
   unitLabel: string | null;
 }
 
-export type ResolvedLink = { state: "live"; ctx: ResidentContext } | { state: "ended" };
+export type ResolvedLink = { state: "live"; ctx: ResidentContext } | { state: "ended"; why: LinkEnded };
 
 /** A last-used stamp at most every ten minutes, so a busy page isn't a write per load. */
 const TOUCH_EVERY_MS = 10 * 60_000;
 
 /**
  * What a /r/<token> link opens: live, ended (turned off, replaced, moved out,
- * or no longer on the lease), or null for a token we never made.
+ * or no longer on the lease) with why for the ended page's words
+ * (link-ended.ts), or null for a token we never made.
  */
 export async function resolveResidentLink(token: unknown, now = new Date()): Promise<ResolvedLink | null> {
   if (!isWellFormedToken(token)) return null;
@@ -153,6 +156,7 @@ export async function resolveResidentLink(token: unknown, now = new Date()): Pro
       id: true,
       revokedAt: true,
       lastUsedAt: true,
+      createdAt: true,
       tenant: { select: { id: true, fullName: true, email: true } },
       lease: {
         select: {
@@ -169,7 +173,10 @@ export async function resolveResidentLink(token: unknown, now = new Date()): Pro
   });
   if (!row) return null;
   const onLease = row.lease.tenants.some((t) => t.tenantId === row.tenant.id);
-  if (row.revokedAt || !onLease || linkLeaseEnded(row.lease, todayYmdEastern(now))) return { state: "ended" };
+  const leaseCurrent = onLease && !linkLeaseEnded(row.lease, todayYmdEastern(now));
+  if (row.revokedAt || !leaseCurrent) {
+    return { state: "ended", why: await whyLinkEnded(prisma, { id: row.id, tenantId: row.tenant.id, leaseId: row.lease.id, createdAt: row.createdAt }, leaseCurrent) };
+  }
   if (!row.lastUsedAt || now.getTime() - row.lastUsedAt.getTime() > TOUCH_EVERY_MS) {
     await prisma.residentLink.update({ where: { id: row.id }, data: { lastUsedAt: now } }).catch(() => undefined);
   }
@@ -190,9 +197,9 @@ export async function resolveResidentLink(token: unknown, now = new Date()): Pro
   };
 }
 
-/** A live link's context, for a resident action: anything else is refused with one line. */
+/** A live link's context, for a resident action: anything else is refused with the ended page's words as one line. */
 export async function requireResidentLink(token: unknown, now = new Date()): Promise<ResidentContext> {
   const r = await resolveResidentLink(token, now);
-  if (!r || r.state !== "live") throw new ResidentLinkError("This ticket has been closed. Questions? Text us in our group chat.");
+  if (!r || r.state !== "live") throw new ResidentLinkError(endedMessage(r?.state === "ended" ? r.why : "gone"));
   return r.ctx;
 }

@@ -1,8 +1,7 @@
 "use server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { fmtDay, todayYmdEastern } from "@/lib/dates";
-import { renderPlainEmail } from "@/lib/email/render";
+import { todayYmdEastern } from "@/lib/dates";
 import { sendEmail } from "@/lib/email/send";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
@@ -11,6 +10,7 @@ import { firstName } from "@/lib/names";
 import { shortAddress } from "@/lib/normalize";
 import { rentableUnitLabels } from "@/lib/property-types";
 import { onMoveInForm } from "@/lib/record-scope";
+import { moveInCopyEmail } from "@/lib/residents/emails";
 import { withResult } from "@/lib/server-action";
 import { createTask, systemPrincipal } from "@/lib/tasks/service";
 import { headers } from "next/headers";
@@ -152,22 +152,15 @@ async function submitMoveInInspectionBody(input: unknown): Promise<ActionResult<
 }
 
 /**
- * The resident's own copy of what they sent (PUBLIC-046), in the one email
- * layout. Only the report's own lines go, nothing from the app. It can fail
- * without failing the report, which is already saved: false means no copy
- * went, and the sent screen says nothing of one.
+ * The resident's own copy of what they sent (PUBLIC-046), From "HG Capital" like every resident email
+ * (residents/emails.ts moveInCopyEmail). It can fail without failing the report, which is already saved: false means
+ * no copy went, and the sent screen says nothing of one. No reply address of its own: the form names no tenant on
+ * file, so a reply has no request or lease to reach.
  */
 async function emailCopy(to: string, name: string, where: string, lines: readonly string[]): Promise<boolean> {
   try {
-    const { text, html } = renderPlainEmail({
-      line: `Thanks, ${firstName(name) || name}. Here's a copy of the move-in report you sent for ${where}.`,
-      items: lines.map((l) => l.trim()).filter(Boolean),
-      closing: "We'll follow up if anything needs attention.",
-      buttonLabel: "Moving in",
-      buttonUrl: `${getEnv().appUrl}/residents/moving-in`,
-      footnote: `Sent ${fmtDay(todayYmdEastern(), { year: "auto" })} through the HG residents page.`,
-    });
-    const sent = await sendEmail({ to, subject: `Your move-in report for ${where}`, text, html });
+    const mail = moveInCopyEmail({ name, firstName: firstName(name), where, lines, today: todayYmdEastern(), appUrl: getEnv().appUrl });
+    const sent = await sendEmail({ to, subject: mail.subject, text: mail.text, html: mail.html, fromName: mail.fromName });
     return sent.ok;
   } catch (err) {
     logError("moving-in:copy", err);
