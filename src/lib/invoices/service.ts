@@ -40,6 +40,7 @@ export type {
   EmailInvoiceInput,
   InvoiceFileMeta,
   InvoicePatch,
+  InvoiceSave,
   JobRef,
   PaidInput,
   ReplyInvoiceInput,
@@ -89,6 +90,13 @@ async function inReview<T>(invoiceId: string, run: () => Promise<T>): Promise<T>
 
 export async function editInvoice(invoiceId: string, patch: core.InvoicePatch, by: core.Staff): Promise<{ changed: string[] }> {
   const r = await inReview(invoiceId, () => core.editInvoice(prisma, invoiceId, patch, by));
+  if (r.changed.length > 0) revalidateInvoices(invoiceId);
+  return r;
+}
+
+/** The invoice page's Save: fields and jobs in one transaction (core.saveInvoice). */
+export async function saveInvoice(invoiceId: string, input: core.InvoiceSave, by: core.Staff): Promise<{ changed: string[] }> {
+  const r = await inReview(invoiceId, () => core.saveInvoice(prisma, invoiceId, input, by));
   if (r.changed.length > 0) revalidateInvoices(invoiceId);
   return r;
 }

@@ -417,7 +417,7 @@ async function insertInvoice(tx: Tx, x: Insert, by: Actor, now: Date = new Date(
   });
   await addEvent(tx, inv.id, "ARRIVED", by, { source: x.source, files: x.files.length });
   await recomputeDuplicates(tx, inv.id);
-  if (x.tellStaff) await queueInvoiceReview(tx, inv.id, now);
+  if (x.tellStaff) await queueInvoiceReview(tx, inv.id, now, x.createdByUserId ?? null);
   return inv;
 }
 
@@ -456,8 +456,8 @@ export async function createStaffInvoice(db: Db, input: StaffInvoiceInput, by: S
           createdByUserId: by.userId,
           taskIds: input.taskIds ?? [],
           files: input.files ?? [],
-          // A partner's own entry: no staff email (M12).
-          tellStaff: false,
+          // A partner's own entry emails the other partners, never the one who entered it (M12, changed Nov 24).
+          tellStaff: true,
         },
         by,
       ),
@@ -649,63 +649,72 @@ type Change = { field: string; from: string | null; to: string | null };
 export async function editInvoice(db: Db, invoiceId: string, patch: InvoicePatch, by: Staff): Promise<{ changed: string[] }> {
   return db.$transaction(async (tx) => {
     // A contractor or number can change "Possible duplicate", so that save queues with the others like it first.
-    if (patch.contactId !== undefined || patch.invoiceNumber !== undefined) await lockDuplicates(tx);
-    const row = await openInvoice(tx, invoiceId, ["REVIEW"], by);
-    const data: Prisma.InvoiceUncheckedUpdateManyInput = {};
-    const changes: Change[] = [];
-    if (patch.contactId !== undefined && patch.contactId !== row.contactId) {
-      const next = patch.contactId ? await checkContact(tx, patch.contactId, row.contactId) : null;
-      data.contactId = next?.id ?? null;
-      changes.push({ field: "contractor", from: row.contact?.fullName ?? null, to: next?.fullName ?? null });
-    }
-    if (patch.invoiceNumber !== undefined) {
-      const n = readNumber(patch.invoiceNumber);
-      if (n.invoiceNumber !== row.invoiceNumber) {
-        Object.assign(data, n);
-        changes.push({ field: "invoiceNumber", from: row.invoiceNumber, to: n.invoiceNumber });
-      }
-    }
-    if (patch.invoiceDate !== undefined) {
-      const day = ymdToDate(patch.invoiceDate);
-      if (!day) throw new FieldError({ invoiceDate: DATE_NEEDED });
-      if (toYmd(day) !== toYmd(row.invoiceDate)) {
-        data.invoiceDate = day;
-        changes.push({ field: "invoiceDate", from: toYmd(row.invoiceDate), to: toYmd(day) });
-      }
-    }
-    if (patch.totalCents !== undefined) {
-      const total = readTotalCents(patch.totalCents);
-      const before = row.total == null ? null : centsToDecimal(decimalToCents(row.total) ?? 0);
-      if (total !== before) {
-        data.total = total;
-        changes.push({ field: "total", from: before, to: total });
-      }
-    }
-    if (patch.note !== undefined) {
-      const note = readText(patch.note, NOTE_MAX, "note", NOTE_TOO_LONG);
-      if (note !== row.note) {
-        data.note = note;
-        changes.push({ field: "note", from: row.note, to: note });
-      }
-    }
-    if (changes.length === 0) return { changed: [] };
-    await updateInStage(tx, row, data);
-    for (const c of changes) await addEvent(tx, invoiceId, "EDITED", by, c);
-    if (changes.some((c) => c.field === "contractor" || c.field === "invoiceNumber")) await recomputeDuplicates(tx, invoiceId);
-    return { changed: changes.map((c) => c.field) };
+    if (touchesDuplicates(patch)) await lockDuplicates(tx);
+    return editIn(tx, invoiceId, patch, by);
   });
+}
+
+const touchesDuplicates = (patch: InvoicePatch): boolean => patch.contactId !== undefined || patch.invoiceNumber !== undefined;
+
+/** editInvoice's body, for a transaction that holds lockDuplicates already when the patch touches them. */
+async function editIn(tx: Tx, invoiceId: string, patch: InvoicePatch, by: Staff): Promise<{ changed: string[] }> {
+  const row = await openInvoice(tx, invoiceId, ["REVIEW"], by);
+  const data: Prisma.InvoiceUncheckedUpdateManyInput = {};
+  const changes: Change[] = [];
+  if (patch.contactId !== undefined && patch.contactId !== row.contactId) {
+    const next = patch.contactId ? await checkContact(tx, patch.contactId, row.contactId) : null;
+    data.contactId = next?.id ?? null;
+    changes.push({ field: "contractor", from: row.contact?.fullName ?? null, to: next?.fullName ?? null });
+  }
+  if (patch.invoiceNumber !== undefined) {
+    const n = readNumber(patch.invoiceNumber);
+    if (n.invoiceNumber !== row.invoiceNumber) {
+      Object.assign(data, n);
+      changes.push({ field: "invoiceNumber", from: row.invoiceNumber, to: n.invoiceNumber });
+    }
+  }
+  if (patch.invoiceDate !== undefined) {
+    const day = ymdToDate(patch.invoiceDate);
+    if (!day) throw new FieldError({ invoiceDate: DATE_NEEDED });
+    if (toYmd(day) !== toYmd(row.invoiceDate)) {
+      data.invoiceDate = day;
+      changes.push({ field: "invoiceDate", from: toYmd(row.invoiceDate), to: toYmd(day) });
+    }
+  }
+  if (patch.totalCents !== undefined) {
+    const total = readTotalCents(patch.totalCents);
+    const before = row.total == null ? null : centsToDecimal(decimalToCents(row.total) ?? 0);
+    if (total !== before) {
+      data.total = total;
+      changes.push({ field: "total", from: before, to: total });
+    }
+  }
+  if (patch.note !== undefined) {
+    const note = readText(patch.note, NOTE_MAX, "note", NOTE_TOO_LONG);
+    if (note !== row.note) {
+      data.note = note;
+      changes.push({ field: "note", from: row.note, to: note });
+    }
+  }
+  if (changes.length === 0) return { changed: [] };
+  await updateInStage(tx, row, data);
+  for (const c of changes) await addEvent(tx, invoiceId, "EDITED", by, c);
+  if (changes.some((c) => c.field === "contractor" || c.field === "invoiceNumber")) await recomputeDuplicates(tx, invoiceId);
+  return { changed: changes.map((c) => c.field) };
 }
 
 /** Tacks a job onto a To review invoice (M7). Linking one already on it does nothing. */
 export async function linkJob(db: Db, invoiceId: string, taskId: string, by: Staff): Promise<void> {
-  await db.$transaction(async (tx) => {
-    await openInvoice(tx, invoiceId, ["REVIEW"], by);
-    const on = await tx.invoiceTask.findFirst({ where: { invoiceId, taskId }, select: { id: true } });
-    if (on) return;
-    const job = await jobToLink(tx, taskId);
-    await tx.invoiceTask.create({ data: { invoiceId, taskId: job.id, title: job.title } });
-    await addEvent(tx, invoiceId, "EDITED", by, { field: "jobs", taskId: job.id, added: job.title });
-  });
+  await db.$transaction((tx) => linkIn(tx, invoiceId, taskId, by));
+}
+
+async function linkIn(tx: Tx, invoiceId: string, taskId: string, by: Staff): Promise<void> {
+  await openInvoice(tx, invoiceId, ["REVIEW"], by);
+  const on = await tx.invoiceTask.findFirst({ where: { invoiceId, taskId }, select: { id: true } });
+  if (on) return;
+  const job = await jobToLink(tx, taskId);
+  await tx.invoiceTask.create({ data: { invoiceId, taskId: job.id, title: job.title } });
+  await addEvent(tx, invoiceId, "EDITED", by, { field: "jobs", taskId: job.id, added: job.title });
 }
 
 /** A job on an invoice, by the job, or by the link itself for a deleted job that kept only its title. */
@@ -713,15 +722,40 @@ export type JobRef = { taskId: string } | { linkId: string };
 
 /** Takes a job off a To review invoice. One already off does nothing. */
 export async function unlinkJob(db: Db, invoiceId: string, ref: JobRef, by: Staff): Promise<void> {
-  await db.$transaction(async (tx) => {
-    await openInvoice(tx, invoiceId, ["REVIEW"], by);
-    const link = await tx.invoiceTask.findFirst({
-      where: { invoiceId, ...("taskId" in ref ? { taskId: ref.taskId } : { id: ref.linkId }) },
-      select: { id: true, taskId: true, title: true },
-    });
-    if (!link) return;
-    await tx.invoiceTask.delete({ where: { id: link.id } });
-    await addEvent(tx, invoiceId, "EDITED", by, { field: "jobs", taskId: link.taskId, removed: link.title });
+  await db.$transaction((tx) => unlinkIn(tx, invoiceId, ref, by));
+}
+
+async function unlinkIn(tx: Tx, invoiceId: string, ref: JobRef, by: Staff): Promise<void> {
+  await openInvoice(tx, invoiceId, ["REVIEW"], by);
+  const link = await tx.invoiceTask.findFirst({
+    where: { invoiceId, ...("taskId" in ref ? { taskId: ref.taskId } : { id: ref.linkId }) },
+    select: { id: true, taskId: true, title: true },
+  });
+  if (!link) return;
+  await tx.invoiceTask.delete({ where: { id: link.id } });
+  await addEvent(tx, invoiceId, "EDITED", by, { field: "jobs", taskId: link.taskId, removed: link.title });
+}
+
+export interface InvoiceSave {
+  patch: InvoicePatch;
+  /** Jobs to put on, by job. */
+  link: readonly string[];
+  /** Jobs to take off. */
+  unlink: readonly JobRef[];
+}
+
+/**
+ * The invoice page's Save (drawing 17, option B): the changed fields and the job diff in one transaction, so a
+ * refusal anywhere (a canceled job, a contractor since archived, another partner's move) writes nothing and the
+ * draft stays as it was. Each part keeps its own rules and history lines; the answer names the fields that changed.
+ */
+export async function saveInvoice(db: Db, invoiceId: string, input: InvoiceSave, by: Staff): Promise<{ changed: string[] }> {
+  return db.$transaction(async (tx) => {
+    if (touchesDuplicates(input.patch)) await lockDuplicates(tx);
+    const { changed } = await editIn(tx, invoiceId, input.patch, by);
+    for (const ref of input.unlink) await unlinkIn(tx, invoiceId, ref, by);
+    for (const taskId of input.link) await linkIn(tx, invoiceId, taskId, by);
+    return { changed: input.link.length > 0 || input.unlink.length > 0 ? [...changed, "jobs"] : changed };
   });
 }
 

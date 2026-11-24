@@ -1,4 +1,4 @@
-import { Copy, CircleHelp } from "lucide-react";
+import { CircleHelp, TriangleAlert } from "lucide-react";
 import { WarnMark } from "@/components/source-line";
 import type { InvoiceRow } from "@/lib/invoices/queries";
 
@@ -21,7 +21,7 @@ export function Flags({
   const duplicate = row.possibleDuplicate && !(firstOnly && row.needsContractor);
   return (
     <span className={className}>
-      {duplicate && <WarnMark icon={Copy} className="whitespace-nowrap">Possible duplicate</WarnMark>}
+      {duplicate && <WarnMark icon={TriangleAlert} className="whitespace-nowrap">Possible duplicate</WarnMark>}
       {row.needsContractor && <WarnMark icon={CircleHelp} className="whitespace-nowrap">Who&apos;s this from?</WarnMark>}
     </span>
   );

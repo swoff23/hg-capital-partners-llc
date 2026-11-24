@@ -11,37 +11,24 @@ import { callAction, type ActionResult } from "@/lib/action-result";
 import { pickerAccept } from "@/lib/attachments/media";
 import { UPLOAD_KIND_ALLOWED } from "@/lib/attachments/upload-kinds";
 import type { Ymd } from "@/lib/dates";
-import { approveBlocker, cleanInvoiceNumber, readTotal } from "@/lib/invoices/fields";
+import { isDirty, type FieldValues } from "@/lib/invoices/draft";
+import { approveBlocker, readTotal } from "@/lib/invoices/fields";
 import { cn } from "@/lib/utils";
-import { approveInvoiceAction, backToReviewAction, linkJobAction, saveInvoiceFieldsAction, unlinkJobAction } from "../[id]/actions";
+import { approveInvoiceAction, backToReviewAction } from "../[id]/actions";
 import { invoiceUploadTarget } from "../[id]/file-pane";
-import { InvoiceFields, failureToResult, totalText, useSaveFlush, type FieldPatch, type FieldValues, type JobRow, type SaveResult } from "../[id]/fields";
+import { InvoiceFields, UnsavedMark, failureToErrors } from "../[id]/fields";
 import type { ContractorChoice, JobChoice } from "../[id]/load";
+import { jobRow, useInvoiceDraft, type InvoiceDraft } from "../[id]/use-invoice-draft";
 import { createInvoiceAction } from "./actions";
 
 const EMPTY: FieldValues = { contactId: null, invoiceNumber: "", invoiceDate: null, total: "", note: "" };
 
-/** The values after a save of `patch`, as the fields read them back: the number without its "#", the total as dollars. */
-function applied(v: FieldValues, patch: FieldPatch): FieldValues {
-  const next = { ...v };
-  if (patch.contactId !== undefined) next.contactId = patch.contactId;
-  if (patch.invoiceNumber !== undefined) next.invoiceNumber = cleanInvoiceNumber(patch.invoiceNumber) ?? "";
-  if (patch.total !== undefined) {
-    const read = readTotal(patch.total);
-    next.total = read.ok ? totalText(read.cents) : v.total;
-  }
-  if (patch.note !== undefined) next.note = patch.note ?? "";
-  return next;
-}
-
-const jobRow = (j: JobChoice): JobRow => ({ linkId: j.id, taskId: j.id, title: j.title, address: j.address, status: j.status });
-
 /**
  * New invoice (docs/contractor-invoices-plan.md, M6 and drawing 12, option A): the invoice page with nothing on it
- * yet. The invoice is made, in To review, when the first file drops or the first field saves, so the upload has
- * an invoice to belong to; from then on every field saves as you leave it, as on any invoice, and Approve moves it to
- * To pay. A dropped file makes the invoice and carries on to its page, where the file shows as it goes up. One you
- * walk away from waits in To review, where Not an invoice clears it.
+ * yet. The fields and jobs are a draft, as on any To review invoice (drawing 17, option B), and the bar is Save and
+ * Approve. The invoice is made, in To review, when the first file drops or the first Save (or Approve) comes, so the
+ * upload has an invoice to belong to; whichever it is, the draft goes into it and the screen carries on to that
+ * invoice's page. One you walk away from after a file drop waits in To review, where Not an invoice clears it.
  */
 export function NewInvoice({
   contractors,
@@ -58,113 +45,65 @@ export function NewInvoice({
   const { toast } = useToast();
   const queue = useUploadQueue();
   const run = useRun();
-  const [values, setValues] = useState<FieldValues>(EMPTY);
-  const valuesRef = useRef(values);
-  const [jobs, setJobsState] = useState<JobRow[]>(initialJob ? [jobRow(initialJob)] : []);
-  const jobsRef = useRef(jobs);
-  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [over, setOver] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const { track, flush } = useSaveFlush();
-  // The total as typed, so Approve follows the text and not the last save.
-  const [draftTotal, setDraftTotal] = useState<string | null>(null);
   const picker = useRef<HTMLInputElement>(null);
-  // The one create: a second field left while it's still going waits for it, so there is only ever one invoice.
+  // The one create: a file dropped while a Save is still going waits for it, so there is only ever one invoice.
   const created = useRef<Promise<ActionResult<{ id: string }>> | null>(null);
+  // The job `?job=` names is on the list from the start and isn't an unsaved change.
+  const start: InvoiceDraft = { values: EMPTY, jobs: initialJob ? [jobRow(initialJob)] : [] };
+  const { draft, baseline, errors, setErrors, edit, addJob, removeJob, validate } = useInvoiceDraft(start, { active: true });
+  // Unsaved changes, or the one job it came with: either is worth saving.
+  const dirty = isDirty(baseline, draft);
+  const saveable = dirty || draft.jobs.length > 0;
 
-  const setBoth = (v: FieldValues) => {
-    valuesRef.current = v;
-    setValues(v);
-  };
-  const setJobs = (j: JobRow[]) => {
-    jobsRef.current = j;
-    setJobsState(j);
-  };
-
-  /** Makes the invoice from what's saved so far plus `patch`. Resolves to its id, or to the refusal. */
-  async function ensure(patch: FieldPatch): Promise<ActionResult<{ id: string }>> {
+  /** Makes the invoice from the draft as it is now. Resolves to its id, or to the refusal. */
+  function ensure(): Promise<ActionResult<{ id: string }>> {
     if (!created.current) {
-      const v = valuesRef.current;
-      created.current = callAction(() =>
+      const v = draft.values;
+      const made = callAction(() =>
         createInvoiceAction({
-          contactId: patch.contactId !== undefined ? patch.contactId : v.contactId,
-          invoiceNumber: patch.invoiceNumber !== undefined ? patch.invoiceNumber : v.invoiceNumber || null,
-          total: patch.total !== undefined ? patch.total : v.total || null,
-          note: patch.note !== undefined ? patch.note : v.note || null,
-          taskIds: jobsRef.current.flatMap((j) => (j.taskId ? [j.taskId] : [])),
+          contactId: v.contactId,
+          invoiceNumber: v.invoiceNumber.trim() || null,
+          total: v.total.trim() || null,
+          note: v.note.trim() || null,
+          taskIds: draft.jobs.flatMap((j) => (j.taskId ? [j.taskId] : [])),
         }),
       );
-      const res = await created.current;
-      // The address stays /invoices/new while this is the editor: a later save refreshes the page at its address, and
-      // an address that named the invoice would swap this screen for the invoice page under the person's typing.
-      if (res.ok) setBoth(applied(v, patch));
-      else created.current = null;
-      return res;
+      created.current = made;
+      void made.then((res) => {
+        if (!res.ok) created.current = null;
+      });
     }
     return created.current;
   }
 
-  function save(patch: FieldPatch): Promise<SaveResult> {
-    return track(saveNow(patch));
+  /** Makes the invoice from the draft, or says why it can't. The id on success. */
+  async function make(): Promise<string | null> {
+    if (!validate()) return null;
+    const made = await ensure();
+    if (made.ok) return made.data.id;
+    setErrors(failureToErrors(made));
+    toast({ message: made.error });
+    return null;
   }
 
-  async function saveNow(patch: FieldPatch): Promise<SaveResult> {
-    setSaved(false);
-    const first = !created.current;
-    const made = await ensure(patch);
-    if (!made.ok) return failureToResult(made);
-    if (first) {
-      setSaved(true);
-      return { ok: true };
-    }
-    const res = await callAction(() => saveInvoiceFieldsAction(made.data.id, patch));
-    if (res.ok) {
-      setBoth(applied(valuesRef.current, patch));
-      setSaved(true);
-      return { ok: true };
-    }
-    const lost = res.fieldErrors?.stage;
-    if (lost) {
-      toast({ message: lost });
-      return { ok: false, errors: {} };
-    }
-    return failureToResult(res);
-  }
-
-  function addJob(job: JobChoice) {
-    const row = jobRow(job);
-    setJobs([...jobsRef.current, row]);
-    if (created.current)
-      void created.current.then((made) => {
-        // A refused link leaves nothing on the invoice, so the row comes back off.
-        if (made.ok)
-          run.run(() => linkJobAction(made.data.id, job.id), {
-            failed: () => setJobs(jobsRef.current.filter((j) => j.linkId !== row.linkId)),
-          });
-      });
-  }
-
-  function removeJob(job: JobRow) {
-    setJobs(jobsRef.current.filter((j) => j.linkId !== job.linkId));
-    if (created.current && job.taskId) {
-      const taskId = job.taskId;
-      void created.current.then((made) => {
-        // A refused unlink leaves the job on the invoice, so its row comes back.
-        if (made.ok)
-          run.run(() => unlinkJobAction(made.data.id, { taskId }), {
-            failed: () => {
-              if (!jobsRef.current.some((j) => j.linkId === job.linkId)) setJobs([...jobsRef.current, job]);
-            },
-          });
-      });
-    }
+  async function save() {
+    setSaving(true);
+    const id = await make();
+    setSaving(false);
+    if (!id) return;
+    toast({ message: "Saved" });
+    router.replace(`/invoices/${id}`);
   }
 
   /** A file, picked or dropped: make the invoice, queue the file for it and carry on to its page. */
   async function addFiles(files: FileList | File[]) {
     if (files.length === 0) return;
     setProblem(null);
-    const made = await ensure({});
+    if (!validate()) return;
+    const made = await ensure();
     if (!made.ok) {
       setProblem(made.error);
       return;
@@ -179,22 +118,21 @@ export function NewInvoice({
     void addFiles(e.dataTransfer.files);
   }
 
-  const read = readTotal(draftTotal ?? values.total);
-  const blocker = approveBlocker({ contactId: values.contactId, totalCents: read.ok ? read.cents : null });
+  const read = readTotal(draft.values.total);
+  const blocker = approveBlocker({ contactId: draft.values.contactId, totalCents: read.ok ? read.cents : null });
 
   async function approve() {
-    await flush();
-    const made = await ensure({});
-    if (!made.ok) {
-      toast({ message: made.error });
-      return;
-    }
-    const id = made.data.id;
+    setSaving(true);
+    const id = await make();
+    setSaving(false);
+    if (!id) return;
     run.run(() => approveInvoiceAction(id), {
       done: "Approved",
       key: `invoice:${id}:stage`,
       undo: () => backToReviewAction(id),
       succeeded: () => router.replace(`/invoices/${id}`),
+      // The invoice exists by now, so its page is where the refusal can be dealt with.
+      failed: () => router.replace(`/invoices/${id}`),
     });
   }
 
@@ -251,27 +189,32 @@ export function NewInvoice({
         </div>
         <div className="min-w-0">
           <InvoiceFields
-            values={values}
+            values={draft.values}
             editable
             contractors={contractors}
             jobChoices={jobChoices}
-            jobs={jobs}
+            jobs={draft.jobs}
             today={today}
             duplicateOf={null}
             needsContractor={false}
-            save={save}
+            errors={errors}
+            onChange={edit}
             onAddJob={addJob}
             onRemoveJob={removeJob}
-            saved={saved}
-            onTotalDraft={setDraftTotal}
           />
         </div>
       </div>
 
       <ActionBar
         placement="app"
+        actions={dirty ? <UnsavedMark /> : null}
+        secondary={
+          <Button variant="secondary" className={actionBarButton} pending={saving} disabled={!saveable || run.pending} onClick={() => void save()}>
+            Save
+          </Button>
+        }
         primary={
-          <Button className={actionBarButton} pending={run.pending} disabled={!!blocker} onClick={approve}>
+          <Button className={actionBarButton} pending={run.pending} disabled={!!blocker || saving} onClick={() => void approve()}>
             Approve
           </Button>
         }

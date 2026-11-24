@@ -9,33 +9,29 @@ import { useRun } from "@/components/use-run";
 import { Button } from "@/components/ui";
 import { callAction } from "@/lib/action-result";
 import { fmtDay, type Ymd } from "@/lib/dates";
+import { draftChanges, totalText } from "@/lib/invoices/draft";
 import { PAID_BY, formatCents } from "@/lib/invoices/email-content";
 import { PAY_METHOD_LABEL, STAGE_LABEL, approveBlocker, readTotal } from "@/lib/invoices/fields";
 import type { InvoiceRecord } from "@/lib/invoices/queries";
 import { firstName } from "@/lib/names";
 import { focusRecordMenu } from "@/lib/record-menu-focus";
-import {
-  approveInvoiceAction,
-  backToReviewAction,
-  linkJobAction,
-  restoreInvoiceAction,
-  saveInvoiceFieldsAction,
-  unlinkJobAction,
-} from "./actions";
+import { approveInvoiceAction, backToReviewAction, restoreInvoiceAction, saveInvoiceAction } from "./actions";
 import { senderName } from "./email-text";
 import { EmailCard, FilePane } from "./file-pane";
-import { InvoiceFields, failureToResult, totalText, useSaveFlush, type FieldPatch, type JobRow, type SaveResult } from "./fields";
+import { InvoiceFields, UnsavedMark, failureToErrors, type JobRow } from "./fields";
 import { InvoiceHistory } from "./history";
 import type { ContractorChoice, JobChoice } from "./load";
 import { MarkPaidSheet } from "./mark-paid-sheet";
 import { InvoiceMenu } from "./more-menu";
+import { useInvoiceDraft } from "./use-invoice-draft";
 
 /**
  * An invoice's page (docs/contractor-invoices-plan.md, section 6, item 2; drawings 03, 04 and 11). The header is the
  * record pages': Back with the stage, the ⋯ on the first line, the title below, and once it's Paid the paid line
  * under it. A computer with a mouse draws the file in a frame on the left and the fields in a 420px column on the
- * right; touch and anything narrower than lg stack the file card, the fields and History. The bar holds only the next
- * step: Approve in To review, Mark paid in To pay, and no bar once it's Paid.
+ * right; touch and anything narrower than lg stack the file card, the fields and History. In To review the fields and
+ * jobs are a draft that nothing writes until Save (drawing 17, option B) and the bar holds Save and Approve; Approve
+ * saves first. To pay's bar is Mark paid, and there's no bar once it's Paid.
  */
 export function InvoicePage({
   invoice,
@@ -54,34 +50,11 @@ export function InvoicePage({
 }) {
   const { toast } = useToast();
   const run = useRun();
-  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [paying, setPaying] = useState(false);
-  const { track, flush } = useSaveFlush();
-  // The total as typed, so the bar follows the text and not the last save; null until someone types.
-  const [draftTotal, setDraftTotal] = useState<string | null>(null);
   const id = invoice.id;
   const stage = invoice.stage;
   const editable = stage === "REVIEW";
-
-  function save(patch: FieldPatch): Promise<SaveResult> {
-    return track(saveNow(patch));
-  }
-
-  async function saveNow(patch: FieldPatch): Promise<SaveResult> {
-    setSaved(false);
-    const res = await callAction(() => saveInvoiceFieldsAction(id, patch));
-    if (res.ok) {
-      setSaved(true);
-      return { ok: true };
-    }
-    const lost = res.fieldErrors?.stage;
-    if (lost) {
-      // Another partner moved it first; the page behind already shows where it is.
-      toast({ message: lost });
-      return { ok: false, errors: {} };
-    }
-    return failureToResult(res);
-  }
 
   const jobs: JobRow[] = invoice.jobs.map((j) => ({
     linkId: j.linkId,
@@ -90,25 +63,48 @@ export function InvoicePage({
     address: j.taskId ? (addresses[j.taskId] ?? null) : null,
     status: j.status,
   }));
+  const { draft, baseline, dirty, errors, setErrors, edit, addJob, removeJob, validate, commit } = useInvoiceDraft(
+    {
+      values: {
+        contactId: invoice.contact?.id ?? null,
+        invoiceNumber: invoice.invoiceNumber ?? "",
+        invoiceDate: invoice.invoiceDate,
+        total: totalText(invoice.totalCents),
+        note: invoice.note ?? "",
+      },
+      jobs,
+    },
+    { active: editable, resetKey: stage },
+  );
 
-  function addJob(job: JobChoice) {
-    run.run(() => linkJobAction(id, job.id), {});
-  }
-  function removeJob(job: JobRow) {
-    const taskId = job.taskId;
-    run.run(() => unlinkJobAction(id, { linkId: job.linkId }), {
-      done: "Job taken off",
-      key: `invoice:${id}:jobs`,
-      undo: taskId ? () => linkJobAction(id, taskId) : undefined,
-    });
+  /** Writes the draft in one go. True when it's saved (or there was nothing to save); a refusal keeps the draft and says why. */
+  async function save(): Promise<boolean> {
+    const changes = draftChanges(baseline, draft);
+    if (!changes) return true;
+    if (!validate()) return false;
+    setSaving(true);
+    const sent = draft;
+    const res = await callAction(() => saveInvoiceAction(id, changes));
+    setSaving(false);
+    if (res.ok) {
+      commit(sent);
+      toast({ message: "Saved" });
+      return true;
+    }
+    // Another partner moved it first; the page behind already shows where it is.
+    if (res.fieldErrors?.stage) toast({ message: res.fieldErrors.stage });
+    else {
+      setErrors(failureToErrors(res));
+      toast({ message: res.error });
+    }
+    return false;
   }
 
-  const typed = draftTotal == null ? null : readTotal(draftTotal);
-  const blocker =
-    typed == null ? invoice.approveBlocker : approveBlocker({ contactId: invoice.contact?.id ?? null, totalCents: typed.ok ? typed.cents : null });
+  const read = readTotal(draft.values.total);
+  const blocker = approveBlocker({ contactId: draft.values.contactId, totalCents: read.ok ? read.cents : null });
 
   async function approve() {
-    await flush();
+    if (!(await save())) return;
     run.run(() => approveInvoiceAction(id), {
       done: "Approved",
       key: `invoice:${id}:stage`,
@@ -163,25 +159,18 @@ export function InvoicePage({
         <div className="min-w-0 space-y-6">
           {invoice.email && invoice.files.length > 0 && <EmailCard email={invoice.email} contactName={contactName} />}
           <InvoiceFields
-            values={{
-              contactId: invoice.contact?.id ?? null,
-              invoiceNumber: invoice.invoiceNumber ?? "",
-              invoiceDate: invoice.invoiceDate,
-              total: totalText(invoice.totalCents),
-              note: invoice.note ?? "",
-            }}
+            values={draft.values}
             editable={editable}
             contractors={contractors}
             jobChoices={jobChoices}
-            jobs={jobs}
+            jobs={draft.jobs}
             today={today}
             duplicateOf={invoice.duplicateOf}
             needsContractor={!invoice.contact && invoice.source !== "STAFF"}
-            save={save}
+            errors={errors}
+            onChange={edit}
             onAddJob={addJob}
             onRemoveJob={removeJob}
-            saved={saved}
-            onTotalDraft={setDraftTotal}
           />
           <InvoiceHistory events={invoice.history} today={today} now={now} fromName={fromName} />
         </div>
@@ -190,8 +179,14 @@ export function InvoicePage({
       {stage === "REVIEW" && (
         <ActionBar
           placement="app"
+          actions={dirty ? <UnsavedMark /> : null}
+          secondary={
+            <Button variant="secondary" className={actionBarButton} pending={saving} disabled={!dirty || run.pending} onClick={() => void save()}>
+              Save
+            </Button>
+          }
           primary={
-            <Button className={actionBarButton} pending={run.pending} disabled={!!blocker} onClick={approve}>
+            <Button className={actionBarButton} pending={run.pending} disabled={!!blocker || saving} onClick={() => void approve()}>
               Approve
             </Button>
           }

@@ -298,8 +298,9 @@ test("no Paid row for a contractor without a login, and the toast says so; a swi
 // The partners' bundle (M12)
 // ---------------------------------------------------------------------------
 
-test("a staff bundle with no task sends for a portal send, skips staff entries and job replies, and drops what left To review", { skip }, async () => {
+test("a staff bundle with no task sends for a portal send, tells only the other partner of a staff entry, skips job replies, and drops what left To review", { skip }, async () => {
   const before = new Set(await bundled(connorId));
+  const beforePieter = new Set(await bundled(pieterId));
   const staff = await createStaffInvoice(prisma, { contactId: zackId }, connor, today);
   const done = await job("Paint hall", "DONE", { contactId: zackId });
   await prisma.taskAccess.create({ data: { taskId: done, contactId: zackId } });
@@ -311,9 +312,9 @@ test("a staff bundle with no task sends for a portal send, skips staff entries a
   const reply = await createReplyInvoice(prisma, { inboundEmailId: replyEmail.id, taskId: done, files: [file()] }, zack);
 
   const now = (await bundled(connorId)).filter((i) => !before.has(i));
-  assert.deepEqual(now, [sent.id], "only the portal send, not the staff entry or the reply");
+  assert.deepEqual(now, [sent.id], "Connor: the portal send, not his own entry or the reply");
   assert.ok(!now.includes(staff.id) && !now.includes(reply.id));
-  assert.deepEqual((await bundled(pieterId)).filter((i) => !before.has(i)), [sent.id], "both partners");
+  assert.deepEqual((await bundled(pieterId)).filter((i) => !beforePieter.has(i)).sort(), [staff.id, sent.id].sort(), "Pieter: Connor's entry and the portal send");
 
   const row = (await bundleRow(connorId))!;
   assert.equal(row.taskId, null);
