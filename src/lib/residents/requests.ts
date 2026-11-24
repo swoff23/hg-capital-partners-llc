@@ -201,7 +201,8 @@ export interface RequestInput {
 }
 
 /**
- * Send a request (section 3.2): a task in Needs you, due today and unassigned like the move-in report, with
+ * Send a request (section 3.2): a task in Needs you, unassigned and with no due date (Connor, Nov 24: HG Capital sets
+ * the day once it's planned; Home lists an undated unassigned task under Unassigned), with
  * Permission to enter on after a Yes, the resident's photos on it, a line in both partners' email, and the resident's
  * own copy by email.
  */
@@ -226,7 +227,7 @@ export async function submitRequest(ctx: ResidentContext, input: RequestInput, n
   const made = await prisma.$transaction(async (tx) => {
     const task = await core.createTask(
       tx,
-      { title: whatsWrong, description: details, propertyId: ctx.propertyId, unitLabel: ctx.unitLabel, dueDate: todayYmdEastern(now), entryPermitted: input.letUsIn },
+      { title: whatsWrong, description: details, propertyId: ctx.propertyId, unitLabel: ctx.unitLabel, entryPermitted: input.letUsIn },
       p,
       now,
     );

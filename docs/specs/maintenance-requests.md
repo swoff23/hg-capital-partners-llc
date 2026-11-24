@@ -15,7 +15,7 @@ Residents report repairs from their phone through a link of their own. Each requ
 
 - Every current tenant gets **their own link**. It opens on their unit, already knowing who they are, with no address to type and no password.
 - **Report a problem** is one screen: what's wrong, more detail if they want, photos or video, and "Can we fix it if you're not home?" A Yes asks about pets.
-- The request **becomes a task** in Needs you, due the day it arrives, and **you both get an email** about it.
+- The request **becomes a task** in Needs you, unassigned with no due date, and **you both get an email** about it.
 - The resident follows it on **three steps**: Received, Scheduled (with the day), Done. They get an email when it's scheduled, when the day changes, when it's done, and when you close it. Your comments, files and contractor notes never reach them.
 - They can **add photos or a note** while it's open, and **cancel their own** while it's still Received.
 - You **close** a request you won't do with Canceled, as today, plus an optional note they see.
@@ -142,7 +142,7 @@ What the form fills in, through `createTask`:
 | Address and unit | Property and Unit |
 | Yes, you can come in | Permission to enter on (`entryPermittedAt`) |
 | No, please coordinate when I'm home | Permission to enter off (Tenant only) |
-| Arrival | Due today, unassigned, Open, like the move-in report |
+| Arrival | No due date, unassigned, Open (Connor, Nov 24; the move-in report stays due today) |
 
 Details gets two rows, after Permission to enter:
 
@@ -284,5 +284,6 @@ After a code review on Nov 21:
 - **Email me my link answers before it sends**, so its timing never says whether an address is on file.
 - **The new-request form and each request's Add use their own upload queue keys.**
 - **The partners' New request line carries the resident's words and answers** ("sent this request with 2 photos: "…" · Can come in · Pets: a cat").
+- **No due date on arrival** (Nov 24). Connor asked that a new request not be due right away; it arrives undated and unassigned, and Home lists it under Unassigned until someone picks it up.
 
 **Not proven yet:** a real photo or video upload from a phone (the local check used the shared Blob store's settings, so no test files were uploaded), and real emails through Resend (local runs print them). Both work the same way as the contractor's job page and the move-in copy.
