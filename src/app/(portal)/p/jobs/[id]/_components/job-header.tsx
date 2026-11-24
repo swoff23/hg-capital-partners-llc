@@ -19,18 +19,16 @@ import { cn } from "@/lib/utils";
  * loaded, is loading or failed to load; the last two have no address or
  * Share. Someone the job was shared with gets no back arrow, only the job
  * (Connor, Nov 22): My jobs isn't theirs. Its empty slot keeps the middle
- * centered. `wide` runs the bar to 1600 for a list page (Your invoices),
- * where the job page's record column is 1200; a list page carries its own
- * heading, so the middle says nothing there.
+ * centered. The list pages (My jobs, Your invoices) draw PortalHeader instead.
  */
-export function JobHeader({ place = null, share = null, wide = false }: { place?: string | null; share?: ReactNode; wide?: boolean }) {
+export function JobHeader({ place = null, share = null }: { place?: string | null; share?: ReactNode }) {
   const tel = officeTelHref();
   // Both sides as wide as the wider one (two 44px buttons), so the middle is centered on the screen.
   const side = tel && share ? "5.75rem" : "2.75rem";
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-canvas">
       <div
-        className={cn("mx-auto grid h-14 items-center gap-2 px-2 sm:px-4 lg:px-6", wide ? "max-w-400" : "max-w-300")}
+        className="mx-auto grid h-14 max-w-300 items-center gap-2 px-2 sm:px-4 lg:px-6"
         style={{ gridTemplateColumns: `minmax(${side}, 1fr) minmax(0, max-content) minmax(${side}, 1fr)` }}
       >
         <div className="flex min-w-0 justify-start">
@@ -39,7 +37,7 @@ export function JobHeader({ place = null, share = null, wide = false }: { place?
           </NotWhenShared>
         </div>
         <div className="min-w-0 text-center">
-          {!wide && <p className="text-micro text-muted-foreground">Project details</p>}
+          <p className="text-micro text-muted-foreground">Project details</p>
           {place && <p className="truncate text-meta font-medium text-foreground">{place}</p>}
         </div>
         <div className="flex items-center justify-end gap-1">
