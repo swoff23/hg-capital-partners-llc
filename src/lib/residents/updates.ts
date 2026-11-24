@@ -6,6 +6,7 @@ import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
 import { residentHome, updateEmail } from "./emails";
 import { liveResidentLink, residentUrl } from "./links";
+import { residentReplyTo } from "./reply-address";
 import { SEND_GAP_MS } from "./service";
 import { stepOf } from "./steps";
 
@@ -25,7 +26,9 @@ import { stepOf } from "./steps";
  *
  * The email's button opens their live link and never makes one, so a partner's
  * Turn off link sticks; with none it goes to the Residents page, where they can
- * ask for theirs. Sends are spaced for Resend, carry an idempotency key, and stop
+ * ask for theirs. Each is From "HG Capital" with its own reply address, so a
+ * reply posts on the request (docs/specs/tenant-welcome-email.md, Q2 and Q4).
+ * Sends are spaced for Resend, carry an idempotency key, and stop
  * at a time budget so the cron's other work keeps its minute. A refused address
  * is recorded as sent; anything else is put back for the next minute.
  */
@@ -119,6 +122,7 @@ export async function sendResidentUpdates(now = new Date()): Promise<{ sent: num
         url: link ? residentUrl(link.token, `/${r.id}`) : `${getEnv().appUrl}/residents/maintenance`,
         buttonLabel: link ? undefined : "Get your link",
       });
+      const replyTo = await residentReplyTo({ tenantId: r.tenantId, leaseId: r.leaseId, requestId: r.id });
       const wait = lastSendAt + SEND_GAP_MS - Date.now();
       if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
       lastSendAt = Date.now();
@@ -127,9 +131,13 @@ export async function sendResidentUpdates(now = new Date()): Promise<{ sent: num
         subject: mail.subject,
         text: mail.text,
         html: mail.html,
+        fromName: mail.fromName,
+        ...(replyTo ? { replyTo } : {}),
         idempotencyKey: `resident:${r.id}:${step}:${day ?? ""}`,
       });
-      if (sent.ok) {
+      // 409: Resend already has this key, from a send that went through but answered too late. Each try has its own
+      // reply address, so the bodies differ and Resend refuses the second rather than sending it twice.
+      if (sent.ok || sent.status === 409) {
         result.sent++;
       } else if (refusedForGood(sent.status)) {
         logError("residents:update-email", new Error(`refused: ${sent.code ?? sent.status}`), { requestId: r.id }, { level: "warning" });

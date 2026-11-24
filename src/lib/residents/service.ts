@@ -4,9 +4,10 @@ import { todayYmdEastern } from "@/lib/dates";
 import { sendEmail } from "@/lib/email/send";
 import { logError } from "@/lib/log";
 import { firstName } from "@/lib/names";
-import { linkLeaseEnded } from "./steps";
+import { linkLeaseEnded, newTenant } from "./steps";
 import { linkEmail, residentHome } from "./emails";
 import { ResidentLinkError, currentResidentLink, markResidentLinkEmailed, residentUrl, type LinkState } from "./links";
+import { residentReplyTo } from "./reply-address";
 
 /**
  * Sending request links (docs/specs/maintenance-requests.md, sections 3.7,
@@ -14,18 +15,29 @@ import { ResidentLinkError, currentResidentLink, markResidentLinkEmailed, reside
  * resident who asks the Residents page for theirs again.
  */
 
-/** Email one person their link. Refused with one line when there's no email on file or the lease has ended. */
-export async function emailResidentLink(tenantId: string, leaseId: string, now = new Date()): Promise<LinkState> {
+/**
+ * Email one person their maintenance request form (docs/specs/tenant-welcome-email.md): From "HG Capital", the button
+ * opening the form itself, a reply address of its own, "Welcome" for a new tenant, and the new-link words when
+ * `replaced` (the sheet's Send a new link). Refused with one line when there's no email on file or the lease has ended.
+ */
+export async function emailResidentLink(tenantId: string, leaseId: string, now = new Date(), opts: { replaced?: boolean } = {}): Promise<LinkState> {
   const who = await prisma.leaseTenant.findUnique({
     where: { leaseId_tenantId: { leaseId, tenantId } },
-    select: { tenant: { select: { fullName: true, email: true } }, lease: { select: { unitLabel: true, property: { select: { address: true } } } } },
+    select: { tenant: { select: { fullName: true, email: true } }, lease: { select: { unitLabel: true, movesIn: true, property: { select: { address: true } } } } },
   });
   if (!who) throw new ResidentLinkError("They aren't on this lease anymore.");
   const first = firstName(who.tenant.fullName) || who.tenant.fullName;
   if (!who.tenant.email) throw new ResidentLinkError(`Add an email for ${first} first, or copy the link.`);
   const link = await currentResidentLink(tenantId, leaseId, now);
-  const email = linkEmail({ firstName: first, home: residentHome(who.lease.property.address, who.lease.unitLabel), url: residentUrl(link.token) });
-  const sent = await sendEmail({ to: who.tenant.email, subject: email.subject, text: email.text, html: email.html });
+  const email = linkEmail({
+    firstName: first,
+    home: residentHome(who.lease.property.address, who.lease.unitLabel),
+    url: residentUrl(link.token, "/new"),
+    replaced: opts.replaced,
+    welcome: newTenant(who.lease.movesIn, todayYmdEastern(now)),
+  });
+  const replyTo = await residentReplyTo({ tenantId, leaseId, requestId: null });
+  const sent = await sendEmail({ to: who.tenant.email, subject: email.subject, text: email.text, html: email.html, fromName: email.fromName, ...(replyTo ? { replyTo } : {}) });
   if (!sent.ok) throw new ResidentLinkError(`The email to ${first} didn't send. Try again.`);
   await markResidentLinkEmailed(link.token, now);
   return { ...link, emailedAt: now };

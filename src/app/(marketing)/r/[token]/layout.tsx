@@ -28,7 +28,7 @@ export default async function ResidentLayout({ children, params }: LayoutProps<"
   const { token } = await params;
   const link = await resolveResidentLink(token);
   if (!link) notFound();
-  if (link.state === "ended") return <Ended />;
+  if (link.state === "ended") return <Ended why={link.why} />;
   const scope = residentScope(token);
   return (
     <ToastProvider>

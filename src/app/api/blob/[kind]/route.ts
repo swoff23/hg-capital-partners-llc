@@ -11,6 +11,7 @@ import { prisma } from "@/lib/db";
 import { logError } from "@/lib/log";
 import { getPortalPrincipal } from "@/lib/portal/session";
 import { resolveResidentLink } from "@/lib/residents/links";
+import { endedMessage } from "@/lib/residents/steps";
 import { UPLOADS_FULL, residentUploadsFull } from "@/lib/residents/requests";
 import { newTaskTokenRefusal } from "@/lib/tasks/new-task-uploads";
 import { contractorUploadRefusal } from "@/lib/tasks/service";
@@ -198,7 +199,7 @@ const KINDS: Record<string, UploadKind> = {
       const token = residentTokenOf(payload.owner);
       const link = token ? await resolveResidentLink(token) : null;
       if (!link || link.state !== "live" || link.ctx.linkId !== linkId) {
-        throw new UploadRefusal("This ticket has been closed. Questions? Text us in our group chat.", true);
+        throw new UploadRefusal(endedMessage(link?.state === "ended" ? link.why : "gone"), true);
       }
       // A day's worth per link, so a leaked link can't fill the store (requests.ts UPLOADS_PER_DAY).
       if (await residentUploadsFull(linkId)) throw new UploadRefusal(UPLOADS_FULL, true);

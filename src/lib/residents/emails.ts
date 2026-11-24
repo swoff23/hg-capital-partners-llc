@@ -1,23 +1,31 @@
+import { BRAND } from "@/lib/brand";
 import { fmtDay, type Ymd } from "@/lib/dates";
+import { renderPlainEmail } from "@/lib/email/render";
 import { shortAddress } from "@/lib/normalize";
 import { homeLabel } from "@/lib/tenants/status";
 import { renderResidentEmail, type EmailStep } from "./email-layout";
 
 /**
- * The emails a resident gets (docs/specs/maintenance-requests.md, section 5),
- * in the resident layout (email-layout.ts; drawing 15 B): "What's new" and its
- * headline, their three steps, a line, the button, then "Your request" as
- * labeled rows. Pure: the callers send them (links, the submit action,
- * updates.ts). Every one ends with where questions go, since replies aren't
- * read.
+ * The emails a resident gets (docs/specs/maintenance-requests.md, section 5;
+ * the form email, docs/specs/tenant-welcome-email.md), in the resident layout
+ * (email-layout.ts; drawing 15 B): "What's new" and its headline, their three
+ * steps, a line, the button, then "Your request" as labeled rows. Pure: the
+ * callers send them (links, the submit action, updates.ts, the move-in form)
+ * with each one's `fromName`, and give each its own reply address
+ * (reply-address.ts) so a reply reaches the app. Every one still ends with
+ * where questions go: the group chat.
  */
 
 export const GROUP_CHAT_LINE = "Questions? Text us in our group chat.";
+
+/** Every email to a resident is from "HG Capital" (tenant-welcome-email.md, Q4), never "via". */
+export const RESIDENT_FROM = BRAND.app;
 
 export interface ResidentEmail {
   subject: string;
   text: string;
   html: string;
+  fromName: string;
 }
 
 /** The step a resident sees (section 3.4). Review stays Scheduled until it's Done. */
@@ -56,17 +64,29 @@ function requestBlock(r: RequestFacts) {
   return { title: r.whatsWrong, where: r.home, facts };
 }
 
-/** Their link, from the tenant sheet or the launch-day send, and again from Email me my link. No news, so no steps or request. */
-export function linkEmail(input: { firstName: string; home: string; url: string }): ResidentEmail {
+/**
+ * Their maintenance request form (docs/specs/tenant-welcome-email.md, Q1 and Q3), from the tenant sheet, the
+ * launch-day send and Email me my link: one email for every send, so it's still true whenever they find it. The
+ * button opens the form itself. A new tenant (newTenant: move-in in the last 30 days or still ahead) is welcomed;
+ * a link sent to replace one that no longer works says so, whoever they are.
+ */
+export function linkEmail(input: { firstName: string; home: string; url: string; replaced?: boolean; welcome?: boolean }): ResidentEmail {
+  // Short and sweet (Connor, Nov 24): one line, the button, the emergency line. The request copy says what happens next.
+  const first = input.replaced ? "Your old link no longer works. Use this one from now on." : "Use it for all maintenance requests.";
+  const headline = input.replaced
+    ? `Hi ${input.firstName}, here's your new maintenance request form.`
+    : input.welcome
+      ? `Welcome, ${input.firstName}. Here's your maintenance request form.`
+      : `Hi ${input.firstName}, here's your maintenance request form.`;
   const r = renderResidentEmail({
-    preview: `From now on, send repairs for ${input.home} here.`,
+    preview: first,
     kicker: null,
-    headline: `Hi ${input.firstName}, here's your maintenance request link`,
-    lines: [`From now on, send repairs for ${input.home} here. You'll see when each one is scheduled and done.`, "Save it to your home screen."],
+    headline,
+    lines: [first],
     button: { label: "Report a problem", url: input.url },
     footnote: "Emergency? Text us in our group chat.",
   });
-  return { subject: "Your maintenance request link", ...r };
+  return { subject: `Your ${input.replaced ? "new " : ""}maintenance request form for ${input.home}`, fromName: RESIDENT_FROM, ...r };
 }
 
 /** Their copy of what they sent (section 3.3): Received, and what happens next. */
@@ -82,7 +102,7 @@ export function requestCopyEmail(input: RequestFacts & { firstName: string; url:
     request: requestBlock(input),
     footnote: GROUP_CHAT_LINE,
   });
-  return { subject: `Your request: ${input.whatsWrong}`, ...r };
+  return { subject: `Your request: ${input.whatsWrong}`, fromName: RESIDENT_FROM, ...r };
 }
 
 /** One update: scheduled, moved, done or closed. */
@@ -126,5 +146,22 @@ export function updateEmail(
     request: requestBlock(input),
     footnote: GROUP_CHAT_LINE,
   });
-  return { subject, ...r };
+  return { subject, fromName: RESIDENT_FROM, ...r };
+}
+
+/**
+ * The move-in report's copy to whoever sent it (PUBLIC-046), in the one plain layout. Only the report's own lines go,
+ * nothing from the app. The footnote names "HG Capital" and stays one line at 320 for every date (183px of 230 on
+ * the widest, "May 30"); "through the HG Capital residents page" wrapped on every phone.
+ */
+export function moveInCopyEmail(input: { name: string; firstName: string; where: string; lines: readonly string[]; today: Ymd; appUrl: string }): ResidentEmail {
+  const r = renderPlainEmail({
+    line: `Thanks, ${input.firstName || input.name}. Here's a copy of the move-in report you sent for ${input.where}.`,
+    items: input.lines.map((l) => l.trim()).filter(Boolean),
+    closing: "We'll follow up if anything needs attention.",
+    buttonLabel: "Moving in",
+    buttonUrl: `${input.appUrl}/residents/moving-in`,
+    footnote: `Sent to ${BRAND.app} on ${fmtDay(input.today, { year: "auto", now: input.today })}.`,
+  });
+  return { subject: `Your move-in report for ${input.where}`, fromName: RESIDENT_FROM, ...r };
 }

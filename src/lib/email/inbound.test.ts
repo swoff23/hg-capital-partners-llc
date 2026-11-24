@@ -10,14 +10,17 @@ import {
   htmlToText,
   isAutoReply,
   linkedFile,
+  residentForwardHeadline,
   postedFilesLine,
   replyAddress,
   replyBody,
   replyToken,
+  residentReplyWords,
   singleAddress,
   threadTaskId,
   verifyWebhook,
 } from "./inbound";
+import { updateEmail } from "@/lib/residents/emails";
 
 const secretBytes = crypto.randomBytes(24);
 const secret = `whsec_${secretBytes.toString("base64")}`;
@@ -159,3 +162,57 @@ test("the forward to the partners names the contractor in full and says why it d
   assert.equal(forwardFilesLine(0, 1), "Their file didn't fit in this email.");
 });
 
+
+test("a tenant's reply that can't post reaches the partners with why, the tenant by full name (tenant-welcome-email.md, Q2)", () => {
+  assert.equal(residentForwardHeadline("Dana Lee", "no-request"), "Dana Lee replied by email. It isn't about a request.");
+  assert.equal(residentForwardHeadline("Dana Lee", "closed"), "Dana Lee replied after this closed.");
+  assert.equal(residentForwardHeadline("Dana Lee", "moved-out"), "Dana Lee replied after moving out.");
+  assert.equal(residentForwardHeadline("Dana Lee", "files"), "Dana Lee replied with files that can't go on the request.");
+});
+
+test("a resident email's reply address is the same r+ shape, so the one parser finds its token", () => {
+  const token = "a".repeat(43);
+  assert.equal(replyToken([`HG Capital <${replyAddress(token, "HG Capital <jobs@mail.hg.test>")}>`]), token);
+});
+
+test("quotes in Spanish, French and Portuguese mail apps are cut like English ones", () => {
+  assert.equal(replyBody("Gracias\n\nEl lun, 23 nov 2026 a las 9:31, HG Capital (<jobs@mail.hg.test>) escribió:\nScheduled"), "Gracias");
+  assert.equal(replyBody("Gracias\n\nEnviado desde mi Galaxy\n\nstuff"), "Gracias");
+  assert.equal(replyBody("Gracias\n\n-------- Mensaje original --------\nstuff"), "Gracias");
+  assert.equal(replyBody("Gracias\n\nDe: HG Capital <jobs@mail.hg.test>\nEnviado: lunes\nstuff"), "Gracias");
+  assert.equal(replyBody("Merci\n\nLe lun. 23 nov. 2026 à 09:31, HG Capital <jobs@mail.hg.test> a\u00a0écrit\u00a0:\nstuff"), "Merci");
+  assert.equal(replyBody("Obrigado\n\nEm seg., 23 de nov. de 2026, HG Capital escreveu:\nstuff"), "Obrigado");
+  // Words that only look like one stay.
+  assert.equal(replyBody("El grifo sigue goteando.\nDe nada."), "El grifo sigue goteando.\nDe nada.");
+});
+
+test("a tenant's reply never posts their form link, whatever quoted our email (tenant-welcome-email.md, Q2)", () => {
+  const ours = { appUrl: "https://hgcapitalpartners.com", addresses: ["jobs@mail.hgcapitalpartners.com"] };
+  const token = "Ab3_".repeat(10) + "xyz";
+  const update = updateEmail({
+    whatsWrong: "Kitchen sink leaks", home: "56 Tamarack St · Upper", details: null, letUsIn: true, pets: null, petsNote: null,
+    url: `https://hgcapitalpartners.com/r/${token}/req1`, closedNote: null, today: "2026-11-21", moved: false, step: "scheduled", day: "2026-11-25",
+  });
+  assert.ok(update.text.includes(`/r/${token}/`), "the update email carries the form link");
+  // A quote header replyBody doesn't know (a made-up language), without ">" on its lines: the words stop at our email.
+  const quoted = (header: string) => `Gracias, estaré en casa.\n\n${header}\n${update.text}`;
+  for (const header of [
+    "------ Ursprüngliche Nachricht ------\nVon: HG Capital <jobs@mail.hgcapitalpartners.com>\nBetreff: Scheduled",
+    "------ Исходное сообщение ------\nОт: HG Capital\nТема: Scheduled",
+  ]) {
+    const words = residentReplyWords(replyBody(quoted(header)), ours);
+    assert.ok(!words.includes(token) && !/\/r\/[A-Za-z0-9_-]{32,}/.test(words), header);
+    assert.ok(words.startsWith("Gracias, estaré en casa."), words);
+    assert.ok(!words.includes("hgcapitalpartners.com"), words);
+  }
+  // A link or reply address on another host, or pasted mid-sentence, is taken out; their words stay.
+  assert.equal(residentReplyWords(`The link https://preview.vercel.app/r/${token}/new is broken`, ours), "The link is broken");
+  assert.equal(residentReplyWords(`Write to r+${token}@mail.other.test please`, ours), "Write to please");
+  // Wrapped inside another link (Outlook's Safe Links), percent-encoded, on a host that isn't ours.
+  assert.equal(residentReplyWords(`See https://nam12.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpreview.vercel.app%2Fr%2F${token}%2Freq1&data=x ok`, ours), "See ok");
+  assert.equal(residentReplyWords(`mailto:r%2B${token}%40mail.other.test ok`, ours), "ok");
+  // On our own host the words stop there, whatever the wrapping.
+  assert.equal(residentReplyWords(`Thanks\nhttps://nam12.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.hgcapitalpartners.com%2Fr%2F${token}\nmore`, ours), "Thanks");
+  assert.equal(residentReplyWords("Sink still drips.\nThanks", ours), "Sink still drips.\nThanks");
+  assert.equal(residentReplyWords("", ours), "");
+});

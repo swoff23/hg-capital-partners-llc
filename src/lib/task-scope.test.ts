@@ -208,6 +208,7 @@ test("every file that reaches tasks through another model or in raw SQL is on a 
   const RAW = /\b(FROM|JOIN|UPDATE|INTO)\s+"Task/;
   const KNOWN: Record<string, string> = {
     "app/api/files/[kind]/[id]/route.ts": "a resident's file reads its task's request for the lease; a resident's request task is never a draft (createTask refuses one for anyone but a partner)",
+    "lib/email/reply-sender.ts": "a tenant's reply reads its request's task status by id (tenant-welcome-email.md); a resident's request task is never a draft",
     "lib/missing/queries.ts": "the task behind a Make task item, of items openMakeTaskItemsWhere returned (open tasks only)",
     "lib/notifications/outbox.ts": "the send run reads each row's task, and closes a row for a draft unsent (content.ts dueRowVerdict)",
     "lib/portal/job-links.ts": "a link reads its task's status, and opens only an active job",

@@ -1470,9 +1470,10 @@ model Tenant {
   leases    LeaseTenant[]
 
   // Maintenance requests (docs/specs/maintenance-requests.md).
-  links    ResidentLink[]
-  requests ResidentRequest[]
-  uploads  TaskAttachment[]  @relation("AttachmentUploadedByTenant")
+  links          ResidentLink[]
+  requests       ResidentRequest[]
+  replyAddresses ResidentReplyAddress[]
+  uploads        TaskAttachment[]       @relation("AttachmentUploadedByTenant")
 
   @@index([fullName])
 }
@@ -1508,8 +1509,9 @@ model Lease {
   files           LeaseFile[]
 
   // Maintenance requests (docs/specs/maintenance-requests.md).
-  residentLinks ResidentLink[]
-  requests      ResidentRequest[]
+  residentLinks          ResidentLink[]
+  requests               ResidentRequest[]
+  residentReplyAddresses ResidentReplyAddress[]
 
   @@index([propertyId, unitId])
 }
@@ -1714,28 +1716,50 @@ model ResidentLink {
 // page (the task's title and notes are staff's to edit), the answers the task
 // has no field for, and the step their last email told them.
 model ResidentRequest {
-  id                   String    @id @default(cuid())
-  task                 Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  taskId               String    @unique
-  lease                Lease     @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  id                   String                 @id @default(cuid())
+  task                 Task                   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId               String                 @unique
+  lease                Lease                  @relation(fields: [leaseId], references: [id], onDelete: Cascade)
   leaseId              String
-  tenant               Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  tenant               Tenant?                @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   tenantId             String?
   tenantName           String // kept for labels if the tenant row goes
   whatsWrong           String
-  details              String?   @db.Text
+  details              String?                @db.Text
   letUsIn              Boolean
   pets                 Boolean?
   petsNote             String?
   closedNote           String?
   canceledByResidentAt DateTime?
   // The step and day the resident was last emailed about ("received" until the first change).
-  notifiedStep         String    @default("received")
+  notifiedStep         String                 @default("received")
   notifiedDay          DateTime?
-  createdAt            DateTime  @default(now())
+  createdAt            DateTime               @default(now())
+  replyAddresses       ResidentReplyAddress[]
 
   @@index([leaseId])
   @@index([notifiedStep])
+}
+
+// The Reply-To on one email to a resident (docs/specs/tenant-welcome-email.md, Q2): r+<token>@ on the sending domain,
+// the token stored only as its hash, as job links are. Its own token, never the form link's, so a reply address
+// (which travels in To and CC lines and address books) can't open the form. requestId names the request the email
+// was about; null on the form email, which is about none. A reply posts on that request as the resident's own
+// addition, or goes to both partners (src/lib/email/reply-sender.ts).
+model ResidentReplyAddress {
+  id        String           @id @default(cuid())
+  tokenHash String           @unique
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId  String
+  lease     Lease            @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  leaseId   String
+  request   ResidentRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  requestId String?
+  createdAt DateTime         @default(now())
+
+  @@index([tenantId])
+  @@index([leaseId])
+  @@index([requestId])
 }
 
 // A photo or video a resident uploaded from their link, checked with head()

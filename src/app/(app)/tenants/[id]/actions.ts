@@ -232,7 +232,8 @@ export async function newRequestLink(tenantId: string, leaseId: string, email: b
   return withResult("newRequestLink", async () => {
     await requireUser();
     const made = await residentLinks.newResidentLink(id.parse(tenantId), id.parse(leaseId));
-    return linkView(email ? await emailResidentLink(tenantId, leaseId) : made);
+    // The new-link words: "Your old link no longer works. Use this one from now on." (tenant-welcome-email.md, Q1).
+    return linkView(email ? await emailResidentLink(tenantId, leaseId, new Date(), { replaced: true }) : made);
   });
 }
 
