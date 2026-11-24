@@ -109,17 +109,26 @@ const RING_ROOM = 4;
  * Nov 20, docs/specs/tasks-from-claude.md section 9). The tab you're on is
  * brought into view. The divider is the nav's, and the scrolling row sits a
  * pixel over it so the selected underline still covers it.
+ *
+ * `bar` sets the tabs in a page's top bar instead (the contractor portal's
+ * Jobs and Invoices, docs/specs/contractor-top-nav.md): no divider of their
+ * own, the nav runs the bar's height, and the row's pixel of overlap puts the
+ * underline on the bar's bottom edge. The bar's flex row must stretch the
+ * nav (`self-stretch` on the nav's own row), and the label sits on the bar's
+ * center line, as the monogram and the avatar do.
  */
 export function TopTabs({
   tabs,
   base,
   label,
   keep = [],
+  bar = false,
 }: {
   tabs: { href: string; label: string }[];
   base: string;
   label: string;
   keep?: string[];
+  bar?: boolean;
 }) {
   const pathname = usePathname();
   const params = useSearchParams();
@@ -145,7 +154,7 @@ export function TopTabs({
     reveal(row.current?.querySelector<HTMLElement>('[aria-current="page"]'));
   }, [pathname]);
   return (
-    <nav aria-label={label} className="border-b border-border">
+    <nav aria-label={label} className={bar ? "flex self-stretch" : "border-b border-border"}>
       {/* A scroller clips on every side, so the row keeps 4px of room for a tab's focus ring and gives it back in
           margins: the tabs and the divider sit where they did, a pixel of overlap included. The scrollbar is
           hidden with the pair the task page's chip row uses; a global rule beats no-scrollbar. */}
@@ -167,7 +176,9 @@ export function TopTabs({
                 // 8px sides below sm, so Settings' three tabs keep one line at 320. A fixed
                 // 14 / 20 at every size: text-label grows to 16 on touch (section 9).
                 // eslint-disable-next-line hg/raw-type -- the tab size is fixed
-                "flex shrink-0 items-center whitespace-nowrap border-b-2 border-transparent px-2 py-2 text-sm font-medium text-fg-2 transition-colors hover:text-foreground sm:px-3",
+                "flex shrink-0 items-center whitespace-nowrap border-b-2 border-transparent px-2 text-sm font-medium text-fg-2 transition-colors hover:text-foreground sm:px-3",
+                // In a bar the tab runs the bar's height plus the edge's pixel; 1px on top puts the label on the bar's center line.
+                bar ? "pt-px" : "py-2",
                 "aria-[current=page]:border-primary aria-[current=page]:text-foreground",
                 // Tapped before its page was prefetched: the picked look at once (LeaveLink's data-pending).
                 "data-pending:border-primary data-pending:text-foreground",

@@ -1,15 +1,15 @@
 import { Block, LoadingScreen, rowWidth } from "@/components/skeleton";
-import { JobHeader } from "../jobs/[id]/_components/job-header";
+import { AccountPlaceholder, PortalHeader } from "../_components/portal-header";
 
 /**
- * Your invoices while it loads (docs/specs/performance.md 4.3), on the page's own boxes: the header with My jobs
- * draws at once; the title, the address line and the rows (number and, on a phone, the total over the stage and job; from 480 the total and stage in columns) are --muted
+ * Your invoices while it loads (docs/specs/performance.md 4.3), on the page's own boxes: the bar with its tabs
+ * draws at once, the account button a --muted block; the title, the address line and the rows (number and, on a phone, the total over the stage and job; from 480 the total and stage in columns) are --muted
  * blocks. Nothing here reads the session or an invoice.
  */
 export default function YourInvoicesLoading() {
   return (
     <LoadingScreen>
-      <JobHeader wide />
+      <PortalHeader account={<AccountPlaceholder />} />
       <main className="mx-auto max-w-400 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <Block text="text-title" className="w-40" />
         <div className="mt-1">

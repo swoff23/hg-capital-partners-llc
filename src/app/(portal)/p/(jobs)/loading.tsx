@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
-import { Monogram } from "@/components/monogram";
 import { Block, LoadingScreen, rowWidth } from "@/components/skeleton";
-import { BRAND } from "@/lib/brand";
+import { AccountPlaceholder, PortalHeader } from "../_components/portal-header";
 
 /** A switch's track while it loads, shaped by its words, as SegmentedControl's md size draws it. */
 function SwitchFrame({ labels }: { labels: ReactNode[] }) {
@@ -29,8 +28,8 @@ const GROUPS = [
 ];
 
 /**
- * My jobs while it loads (docs/specs/performance.md 4.3): the bar's monogram
- * and the wordmark draw at once; the account button, the greeting (it carries the
+ * My jobs while it loads (docs/specs/performance.md 4.3): the bar's monogram,
+ * the wordmark and the Jobs and Invoices tabs draw at once; the account button, the greeting (it carries the
  * contractor's name), the two switches and 4 job rows (photo, title, address
  * and date) are --muted blocks on the page's own boxes. Nothing here reads
  * the session or a job.
@@ -38,18 +37,7 @@ const GROUPS = [
 export default function MyJobsLoading() {
   return (
     <LoadingScreen>
-      <header className="border-b border-border bg-canvas">
-        <div className="mx-auto flex h-14 max-w-400 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <span className="flex shrink-0 items-center gap-2 text-label font-semibold text-foreground">
-            <Monogram size={32} />
-            {BRAND.portal}
-          </span>
-          <span className="-mr-1.5 flex h-11 w-11 items-center justify-center">
-            {/* A contractor's avatar: a 32px rounded square. */}
-            <Block className="size-8 rounded-sm" />
-          </span>
-        </div>
-      </header>
+      <PortalHeader account={<AccountPlaceholder />} />
 
       <main className="mx-auto max-w-400 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <div className="mb-4">
