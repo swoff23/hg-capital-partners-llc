@@ -51,9 +51,15 @@ test("a reply token counts only on our own domain", () => {
 test("a reply no job takes goes on to invoices@ when it went there too", () => {
   const both = [`r+${TOKEN}@mail.hg.com`, "invoices@mail.hg.com"];
   assert.equal(fallbackInbox({ outcome: "ignored", reason: "no job" }, both, DOMAIN), "invoices");
-  assert.equal(fallbackInbox({ outcome: "ignored", reason: "no access" }, both, DOMAIN), "invoices");
+  // Forwarded to the partners for a job the sender can't post on: the bill still lands in Invoices.
+  assert.equal(fallbackInbox({ outcome: "forwarded", why: "off-task" }, both, DOMAIN), "invoices");
+  assert.equal(fallbackInbox({ outcome: "forwarded", why: "old-link" }, both, DOMAIN), "invoices");
+  assert.equal(fallbackInbox({ outcome: "forwarded", why: "login-off" }, both, DOMAIN), "invoices");
+  assert.equal(fallbackInbox({ outcome: "forwarded", why: "no-job" }, [`r+${TOKEN}@mail.hg.com`, "Invoices <invoices@mail.hg.com>"], DOMAIN), "invoices");
   // The reply path's answer stands when it took the email, or turned it down for any other reason.
-  assert.equal(fallbackInbox({ outcome: "forwarded" }, both, DOMAIN), null);
+  assert.equal(fallbackInbox({ outcome: "forwarded", why: "closed" }, both, DOMAIN), null);
+  assert.equal(fallbackInbox({ outcome: "forwarded", why: "off-task", invoiced: true }, both, DOMAIN), null);
+  assert.equal(fallbackInbox({ outcome: "forwarded", why: "off-task" }, [`r+${TOKEN}@mail.hg.com`], DOMAIN), null);
   assert.equal(fallbackInbox({ outcome: "ignored", reason: "automatic reply" }, both, DOMAIN), null);
   assert.equal(fallbackInbox({ outcome: "ignored", reason: "already posted" }, both, DOMAIN), null);
   // Without invoices@ on our domain there is nowhere else to go.

@@ -22,6 +22,7 @@ import { OutcomeLine, ReviewSlot, type ReviewDecision, type ReviewProof } from "
 import { StatusControl, WaitingReason } from "./status-control";
 import { StatusRunProvider } from "./status-run";
 import { TaskMediaSection } from "./task-media";
+import { UseAsInvoiceProvider } from "./use-as-invoice";
 
 export interface TaskPageViewProps {
   task: {
@@ -217,18 +218,21 @@ export function TaskPageView(p: TaskPageViewProps) {
 
             <TaskInvoices invoices={p.invoices} today={p.today} />
 
-            <TaskMediaSection
-              taskId={task.id}
-              media={p.media}
-              files={p.files}
-              atFinish={p.atFinish}
-              // For "Set as property photo" in the viewer (uploads 2.10).
-              property={propertyOf(p.properties, p.values.propertyId)}
-            />
+            {/* A draft's files make no invoice until it's added (files.ts), so their ⋯ leaves Use as invoice out. */}
+            <UseAsInvoiceProvider on={!p.draft}>
+              <TaskMediaSection
+                taskId={task.id}
+                media={p.media}
+                files={p.files}
+                atFinish={p.atFinish}
+                // For "Set as property photo" in the viewer (uploads 2.10).
+                property={propertyOf(p.properties, p.values.propertyId)}
+              />
 
-            <Section title="Activity">
-              <TaskActivity taskId={task.id} notes={task.description} rows={p.rows} now={p.now} newSince={p.newSince} />
-            </Section>
+              <Section title="Activity">
+                <TaskActivity taskId={task.id} notes={task.description} rows={p.rows} now={p.now} newSince={p.newSince} />
+              </Section>
+            </UseAsInvoiceProvider>
 
             {/* Without a login the composer says the contractor needs one ("Zack needs a login to see this"): no reply reaches them yet. */}
             <Composer

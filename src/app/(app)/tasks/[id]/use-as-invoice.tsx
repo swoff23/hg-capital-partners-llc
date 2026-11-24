@@ -1,11 +1,19 @@
 "use client";
-import { useCallback, useRef } from "react";
+import { createContext, useCallback, useContext, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ReceiptText } from "lucide-react";
 import type { LightboxMenuItem } from "@/components/lightbox";
 import { useToast } from "@/components/toast";
 import { callAction } from "@/lib/action-result";
 import { makeInvoiceFromFile } from "./invoice-actions";
+
+/** Off on a draft from Claude, as New invoice is in the ⋯ (header.tsx): a draft's files make no invoice (files.ts). */
+const UseAsInvoiceOn = createContext(true);
+
+/** Set by the task page (view.tsx) around its photos, files and activity: `on` is false while the task is a draft. */
+export function UseAsInvoiceProvider({ on, children }: { on: boolean; children: ReactNode }) {
+  return <UseAsInvoiceOn.Provider value={on}>{children}</UseAsInvoiceOn.Provider>;
+}
 
 /**
  * "Use as invoice" for a job's file menus (docs/contractor-invoices-plan.md 4.4): `FilesList`'s `menuItems` for a
@@ -17,6 +25,7 @@ export function useUseAsInvoice() {
   const router = useRouter();
   const { toast, dismiss } = useToast();
   const busy = useRef(false);
+  const on = useContext(UseAsInvoiceOn);
 
   const start = useCallback(
     async (attachmentId: string) => {
@@ -47,8 +56,8 @@ export function useUseAsInvoice() {
 
   return {
     /** A photo's or document's viewer ⋯ (never a video). */
-    forMedia: (it: { id: string; kind: "IMAGE" | "VIDEO" | "FILE" }) => (it.kind === "VIDEO" ? [] : item(it.id)),
+    forMedia: (it: { id: string; kind: "IMAGE" | "VIDEO" | "FILE" }) => (!on || it.kind === "VIDEO" ? [] : item(it.id)),
     /** A document's row ⋯ and viewer ⋯ in FilesList. */
-    forFile: (f: { id: string }) => item(f.id),
+    forFile: (f: { id: string }) => (on ? item(f.id) : []),
   };
 }

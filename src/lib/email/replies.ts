@@ -31,6 +31,7 @@ import {
   replyAddress,
   replyBody,
   replyToken,
+  type CantPost,
 } from "./inbound";
 import { downloadAttachment, fetchReceivedAttachments, fetchReceivedEmail, recipientsOf, sortFile, type ReceivedAttachment, type ReceivedEmail } from "./received";
 import { routeReply, type ReplyRoute } from "./reply-sender";
@@ -83,7 +84,7 @@ const FORWARD_ATTACH_MAX = 28 * 1024 * 1024;
 
 export type ReplyOutcome =
   | { outcome: "posted"; taskId: string; files: number; skipped: number }
-  | { outcome: "forwarded"; taskId: string | null; invoiced?: true }
+  | { outcome: "forwarded"; taskId: string | null; why: CantPost; invoiced?: true }
   | { outcome: "ignored"; reason: string };
 
 /** Our own addresses, bare: a fresh email to one of these from a contractor reaches the partners. */
@@ -364,6 +365,8 @@ async function forwardReply(input: {
     if (!res.ok && res.status !== 409) logError("email:reply-forward-note", new Error(res.error ?? "send failed"), { taskId: task?.id ?? null });
   }
   if (invoiceFailed) throw invoiceFailed;
-  if (!input.written && attach.length === 0) return invoiced ? { outcome: "forwarded", taskId: task?.id ?? null, invoiced: true } : { outcome: "ignored", reason: line ? "only files too big" : "empty" };
-  return invoiced ? { outcome: "forwarded", taskId: task?.id ?? null, invoiced: true } : { outcome: "forwarded", taskId: task?.id ?? null };
+  // Why it couldn't post rides along: the router sends an off-task or no-job forward on to invoices@ too (inboxes.ts).
+  const forwarded = { outcome: "forwarded", taskId: task?.id ?? null, why: route.why } as const;
+  if (!input.written && attach.length === 0) return invoiced ? { ...forwarded, invoiced: true } : { outcome: "ignored", reason: line ? "only files too big" : "empty" };
+  return invoiced ? { ...forwarded, invoiced: true } : forwarded;
 }

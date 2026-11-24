@@ -83,3 +83,10 @@ test("Settings > Claude: Connect stays focusable while it connects, focus return
   assert.match(rows, /flex min-h-8 items-center[^"]*pointer-coarse:min-h-11/);
   assert.match(rows, /toast\(\{ message: r\.error \}\);\s*\/\/[^\n]*\n\s*router\.refresh\(\);/);
 });
+
+test("a draft's photos and files carry no Use as invoice: the page turns it off and the hook then adds nothing", () => {
+  assert.match(read("[id]", "view.tsx"), /<UseAsInvoiceProvider on=\{!p\.draft\}>/);
+  const hook = read("[id]", "use-as-invoice.tsx");
+  assert.match(hook, /forMedia: .*=> \(!on \|\| it\.kind === "VIDEO" \? \[\] : item\(it\.id\)\)/);
+  assert.match(hook, /forFile: .*=> \(on \? item\(f\.id\) : \[\]\)/);
+});

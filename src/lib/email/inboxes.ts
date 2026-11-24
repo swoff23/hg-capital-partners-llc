@@ -8,7 +8,7 @@ import { replyToken } from "./inbound";
  *
  *  - an `r+<token>@` reply address on our domain goes to job replies (src/lib/email/replies.ts), whatever else it was
  *    sent to: the token is the job's own secret, and a Done job's reply with a bill makes its invoice there (4.2). When
- *    no job takes it (an expired token, say) and invoices@ was on it too, it goes on to the invoice inbox
+ *    no job takes it (an expired or retired token, a job taken off them) and invoices@ was on it too, it goes on to the invoice inbox
  *    (fallbackInbox), so a bill is never dropped there;
  *  - a named inbox's address on our domain (`invoices@`) goes to that inbox's handler;
  *  - anything else (`jobs@`, a mail app that ignored Reply-To) goes to job replies as it always has.
@@ -68,15 +68,16 @@ export function inboxFor(recipients: readonly string[], domain: string | null): 
   return namedInboxFor(recipients, domain) ?? "reply";
 }
 
-/** Reasons the reply path gives for an email it found no job for: a token no job resolves, or a job they can't open. */
-const NO_JOB_REASONS = new Set(["no job", "no access"]);
-
 /**
- * Where an email the reply path turned down goes next: a named inbox it also went to, when the reply path found no
- * job for it (an expired or revoked reply token on a Reply-all that added invoices@), so the bill still lands. Null
+ * Where an email the reply path took no job for goes next: a named inbox it also went to, so the bill still lands.
+ * The reply path takes no job for it when it turns it down ("no job": a token no job resolves), or forwards it to the
+ * partners for a job the sender can't post on (a link Remove access retired, a job taken off them, their login off,
+ * a job since deleted). A Done job's forward ("closed") stands: the reply path makes that invoice itself (4.2). Null
  * when the reply path's answer stands.
  */
-export function fallbackInbox(outcome: { outcome: string; reason?: string }, recipients: readonly string[], domain: string | null): NamedInbox | null {
-  if (outcome.outcome !== "ignored" || !NO_JOB_REASONS.has(outcome.reason ?? "")) return null;
+export function fallbackInbox(outcome: { outcome: string; reason?: string; why?: string; invoiced?: true }, recipients: readonly string[], domain: string | null): NamedInbox | null {
+  const noJob = outcome.outcome === "ignored" && outcome.reason === "no job";
+  const cantPost = outcome.outcome === "forwarded" && !outcome.invoiced && !!outcome.why && outcome.why !== "closed";
+  if (!noJob && !cantPost) return null;
   return namedInboxFor(recipients, domain);
 }
