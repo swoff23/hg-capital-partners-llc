@@ -270,7 +270,6 @@ export function NewInvoice({
 
       <ActionBar
         placement="app"
-        error={blocker ? <p className="truncate text-meta text-muted-foreground lg:text-right">{blocker}</p> : undefined}
         primary={
           <Button className={actionBarButton} pending={run.pending} disabled={!!blocker} onClick={approve}>
             Approve
