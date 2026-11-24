@@ -1,6 +1,6 @@
 "use client";
 import { useTransition } from "react";
-import { FolderOpen, LogOut } from "lucide-react";
+import { FolderOpen, LogOut, ReceiptText } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import { Avatar } from "@/components/avatar";
 import { useLeaveGuard } from "@/components/leave-guard";
@@ -11,8 +11,8 @@ import { signOutPortal } from "../actions";
 
 /**
  * The contractor's initials, opening a menu with their name over their
- * email, so they can see which account they're in, "Your details and files"
- * for someone who set up their own account, and Sign out. Sign out
+ * email, so they can see which account they're in, "Your invoices" (docs/contractor-invoices-plan.md,
+ * M14) for everyone, "Your details and files" for someone who set up their own account, and Sign out. Sign out
  * asks first while photos are still uploading (`useLeaveGuard({ signOut: true })`).
  */
 export function AccountMenu({ name, email, setupLink = false }: { name: string; email: string; setupLink?: boolean }) {
@@ -44,6 +44,9 @@ export function AccountMenu({ name, email, setupLink = false }: { name: string; 
       <Menu aria-label="Account">
         <MenuHeader title={name} detail={email !== name ? email : undefined} />
         <MenuSeparator />
+        <MenuItem icon={<ReceiptText aria-hidden="true" />} href="/p/invoices">
+          Your invoices
+        </MenuItem>
         {/* Only for contractors who came in by an invite or the sign-up link: their details and files, to update any time. */}
         {setupLink && (
           <MenuItem icon={<FolderOpen aria-hidden="true" />} href="/p/setup">

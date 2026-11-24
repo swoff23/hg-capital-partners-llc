@@ -481,8 +481,37 @@ export function undoWindowOpen(postedAt: Date | string, now: Date): boolean {
  * (src/lib/portal/job-emails.ts); with their Job emails switch off, the next
  * word from HG is here in the portal.
  */
-export function payoffLine(to: string, getsEmail: boolean): string {
+export function payoffLine(to: string, getsEmail: boolean, what: "update" | "invoice" = "update"): string {
+  if (what === "invoice") {
+    // The invoice card above already shows it arrived; only the next step is said.
+    return getsEmail ? "You'll get an email when it's paid." : "Check back here to see when it's paid.";
+  }
   return getsEmail ? `Sent to ${to}. You'll get an email if anything else is needed.` : `Sent to ${to}. Check back here if anything else is needed.`;
+}
+
+/**
+ * Whether the job page's bar offers Send invoice (docs/contractor-invoices-plan.md, 4.1; drawing 09, B1): once the
+ * work is finished, In review or Done. To do, Scheduled, Waiting and In progress jobs never do, and a canceled one
+ * has no bar.
+ */
+export function mayOfferSendInvoice(status: TaskStatus): boolean {
+  return status === "REVIEW" || status === "DONE";
+}
+
+/** What Send invoice's button in its sheet shows, and the one line under it saying why it's off. */
+export type SendInvoiceState = { enabled: boolean; busy: boolean; line: string | null };
+
+/**
+ * The sheet's primary: on once a file is up, off while one is still going up, failed or held for a signal (the
+ * tray says which, with Retry) and with no file at all, where the line says what to add. The label never changes.
+ */
+export function sendInvoiceButton(s: { pending: number; waiting: number; failed: number; sending: boolean; uploaded: number }): SendInvoiceState {
+  if (s.sending) return { enabled: false, busy: true, line: null };
+  if (s.pending > 0) return { enabled: false, busy: false, line: finishingLabel(s.pending) };
+  if (s.failed > 0 || s.waiting > 0) return { enabled: false, busy: false, line: null };
+  // No file yet: Add file sits beside the button, so no line repeats it.
+  if (s.uploaded === 0) return { enabled: false, busy: false, line: null };
+  return { enabled: true, busy: false, line: null };
 }
 
 /** What the toast says after a batch posts: "3 photos posted", "1 video posted", "2 files posted". */

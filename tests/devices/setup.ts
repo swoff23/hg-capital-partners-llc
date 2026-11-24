@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { todayYmdEastern, ymdToDate } from "../../src/lib/dates";
 import { hashPassword } from "../../src/lib/password";
@@ -6,6 +7,9 @@ import { addDaysYmd } from "../../src/lib/quick-dates";
 import { signSessionToken } from "../../src/lib/session-token";
 import * as core from "../../src/lib/tasks/core";
 import * as draws from "../../src/lib/draws/core";
+import * as invoices from "../../src/lib/invoices/core";
+import type { InvoiceFileMeta } from "../../src/lib/invoices/core";
+import { forgetInvoiceEmails } from "../../src/lib/invoices/notify";
 import { rentableUnitLabels } from "../../src/lib/property-types";
 import * as waitlist from "../../src/lib/waitlist/core";
 import { readSignUp } from "../../src/lib/waitlist/fields";
@@ -208,6 +212,85 @@ async function seedRehabFixture(db: PrismaClient): Promise<void> {
   await draws.setDraftAmount(db, lines[1].id, 6000);
 }
 
+/** A made-up PDF record for a fixture invoice. No blob is behind it, so nothing here ever fetches it. */
+function fixtureInvoiceFile(folder: string, name: string): InvoiceFileMeta {
+  return {
+    url: `https://fixture.private.blob.vercel-storage.com/${folder}${name}.pdf`,
+    pathname: `${folder}${name}.pdf`,
+    filename: `${name.replace(/-/g, " ")}.pdf`,
+    size: 48_000,
+    contentType: "application/pdf",
+    sha256: crypto.createHash("sha256").update(`${folder}${name}`).digest("hex"),
+  };
+}
+
+/**
+ * Invoices when the local DB has none (docs/contractor-invoices-plan.md), so /invoices, /invoices/new,
+ * /invoices/[id] and the portal's /p/invoices render with real rows: To review with a Possible duplicate, one
+ * emailed with nobody matched ("Who's this from?"), one To pay, one Paid, and a portal invoice for the fixture
+ * contractor on a Done job of theirs. Written through src/lib/invoices/core.ts like any invoice, by a staff actor
+ * labeled "Device check" and the email's system actor; the partners' and the contractor's queued email lines are
+ * then taken off, so running this sends nothing. A DB that already has an invoice is left alone.
+ */
+async function seedInvoiceFixtures(db: PrismaClient, portalContactId: string): Promise<void> {
+  if ((await db.invoice.count()) > 0) return;
+  assertLocalDb();
+  const partner = await db.user.findFirst({ where: { passwordHash: { not: null } }, orderBy: { createdAt: "asc" }, select: { id: true } });
+  if (!partner) return;
+  const staff: invoices.Staff = { kind: "staff", userId: partner.id, label: "Device check" };
+  const today = todayYmdEastern();
+  const other = await db.contact.findFirst({ where: { active: true, archivedAt: null, id: { not: portalContactId } }, orderBy: { createdAt: "asc" }, select: { id: true } });
+  const contactId = other?.id ?? portalContactId;
+
+  const ids: string[] = [];
+  const staffInvoice = async (input: invoices.StaffInvoiceInput) => {
+    const { id } = await invoices.createStaffInvoice(db, input, staff, today);
+    ids.push(id);
+    return id;
+  };
+
+  // To review, with a Possible duplicate: the same contractor and number twice.
+  await staffInvoice({ contactId, invoiceNumber: "1043", totalCents: 128_500, note: "Fixture for npm run test:devices." });
+  await staffInvoice({ contactId, invoiceNumber: "#1043", totalCents: 128_500 });
+  // To review, emailed, with nobody matched: "Who's this from?".
+  const email = await db.inboundEmail.create({
+    data: {
+      resendId: `device-check-${crypto.randomUUID()}`,
+      localPart: "invoices",
+      from: "pat@outlawcarpentry.hg.localhost",
+      fromLine: "Pat Outlaw <pat@outlawcarpentry.hg.localhost>",
+      subject: "Invoice for the porch rail",
+      receivedAt: new Date(),
+      text: "Hi, the invoice for the porch rail is attached. Total is $640. Thanks, Pat",
+    },
+  });
+  ids.push((await invoices.createEmailInvoice(db, { inboundEmailId: email.id, contactId: null, files: [] }, invoices.systemActor("pat@outlawcarpentry.hg.localhost"))).id);
+  // To pay, and Paid.
+  const toPay = await staffInvoice({ contactId, invoiceNumber: "2210", totalCents: 54_000 });
+  await invoices.approveInvoice(db, toPay, staff);
+  const paid = await staffInvoice({ contactId, invoiceNumber: "2188", totalCents: 91_250 });
+  await invoices.approveInvoice(db, paid, staff);
+  await invoices.markPaid(db, paid, { paidOn: today, method: "CHECK", note: "1042" }, staff);
+
+  // A portal invoice on a Done job the fixture contractor has access to: a second job, so the first stays In progress.
+  const job = await db.$transaction(async (tx) => {
+    const task = await core.createTask(tx, { title: "Porch rail repair", dueDate: addDaysYmd(today, -2), assignee: { contactId: portalContactId } }, FIXTURE_WRITER);
+    await core.setStatus(tx, task.id, "DONE", FIXTURE_WRITER);
+    return task;
+  });
+  const contractor: invoices.Contractor = { kind: "contractor", contactId: portalContactId, label: PORTAL_FIXTURE.name };
+  const sent = await invoices.createPortalInvoice(
+    db,
+    { taskId: job.id, invoiceNumber: "PR-7", totalCents: 64_000, files: [fixtureInvoiceFile(`invoice-sends/${job.id}/${portalContactId}/`, "porch-rail-invoice")] },
+    contractor,
+    today,
+  );
+  ids.push(sent.id);
+
+  // The email lines the writes above queued for partners and the contractor: nothing about a fixture is ever sent.
+  await forgetInvoiceEmails(db, ids);
+}
+
 /** The sign-ups on the dated fixture listing: hg.localhost addresses, one with a phone. */
 const COMING_SOON_SIGN_UPS = [
   { firstName: "Dana", email: "device-check-dana@hg.localhost", phone: "716-555-0142" },
@@ -289,6 +372,7 @@ export default async function setup() {
     await seedSignupLink(db);
     await seedRehabFixture(db);
     await seedComingSoonFixture(db);
+    await seedInvoiceFixtures(db, portal.contactId);
 
     const samples: Record<string, string> = {};
     for (const [key, find] of Object.entries(SAMPLE_PARAMS)) {

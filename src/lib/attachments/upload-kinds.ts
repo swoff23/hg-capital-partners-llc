@@ -1,3 +1,4 @@
+import { invoiceUploadFolder, readInvoiceSendParent } from "./limits";
 import { uploadSlug } from "./media";
 import { taskUploadPath, type UploadRole } from "./paths";
 import type { FileKind } from "./content-types";
@@ -18,6 +19,8 @@ import type { FileKind } from "./content-types";
  *   portal-contact-upload  a contractor, their W-9 or insurance { contactId, docKind, fileKind }
  *   contact-upload         staff, a contractor's W-9 or insurance { contactId, docKind, fileKind }
  *   lease-upload           staff, a lease's signed term     { leaseId, termId, fileKind }
+ *   invoice-upload         staff, an invoice's files        { invoiceId, fileKind }
+ *   portal-invoice-upload  a contractor's Send invoice      { taskId, fileKind }, parentId "<taskId>:<contactId>"
  *
  * A contact document's parentId is "<contactId>:<docKind>" (contactDocParent), so the W-9 and the insurance are
  * two targets in the queue, each with its own folder. A signed lease's is "<leaseId>:<termId>" (leaseDocParent), so
@@ -33,12 +36,14 @@ export const UPLOAD_KINDS = [
   "portal-contact-upload",
   "contact-upload",
   "lease-upload",
+  "invoice-upload",
+  "portal-invoice-upload",
 ] as const;
 
 export type UploadKind = (typeof UPLOAD_KINDS)[number];
 
 /** The clientPayload key naming the row each kind uploads to, which the token route checks. */
-export const UPLOAD_KIND_PARENT: Record<UploadKind, "taskId" | "propertyId" | "contactId" | "leaseId"> = {
+export const UPLOAD_KIND_PARENT: Record<UploadKind, "taskId" | "propertyId" | "contactId" | "leaseId" | "invoiceId"> = {
   "task-upload": "taskId",
   "portal-task-upload": "taskId",
   "property-upload": "propertyId",
@@ -48,6 +53,9 @@ export const UPLOAD_KIND_PARENT: Record<UploadKind, "taskId" | "propertyId" | "c
   "portal-contact-upload": "contactId",
   "contact-upload": "contactId",
   "lease-upload": "leaseId",
+  "invoice-upload": "invoiceId",
+  // The job it's sent from: the invoice doesn't exist until the send (docs/contractor-invoices-plan.md, 5.2).
+  "portal-invoice-upload": "taskId",
 };
 
 /** Listing and property photos are public Blob (the public site and PhotoThumb read them); everything else is private, the lockbox photo included. */
@@ -61,6 +69,8 @@ export const UPLOAD_KIND_ACCESS: Record<UploadKind, "private" | "public"> = {
   "portal-contact-upload": "private",
   "contact-upload": "private",
   "lease-upload": "private",
+  "invoice-upload": "private",
+  "portal-invoice-upload": "private",
 };
 
 /**
@@ -84,6 +94,9 @@ export const UPLOAD_KIND_ALLOWED: Record<UploadKind, readonly FileKind[]> = {
   "contact-upload": ["image", "file"],
   // A signed lease: the PDF, or a phone photo of the pages.
   "lease-upload": ["image", "file"],
+  // An invoice: a PDF or a photo of it (limits.ts INVOICE_FILE_RULES narrows documents to PDF).
+  "invoice-upload": ["image", "file"],
+  "portal-invoice-upload": ["image", "file"],
 };
 
 /** The kinds whose record step keeps a thumbnail and a video poster (TaskAttachment.thumbPathname, posterPathname). */
@@ -98,6 +111,8 @@ export const UPLOAD_KIND_PREVIEWS: Record<UploadKind, boolean> = {
   "portal-contact-upload": false,
   "contact-upload": false,
   "lease-upload": false,
+  "invoice-upload": false,
+  "portal-invoice-upload": false,
 };
 
 export function isUploadKind(kind: unknown): kind is UploadKind {
@@ -121,6 +136,8 @@ export function uploadTargetKey(kind: UploadKind, parentId: string): string {
     "portal-contact-upload": "portal-contact",
     "contact-upload": "contact-doc",
     "lease-upload": "lease-doc",
+    "invoice-upload": "invoice",
+    "portal-invoice-upload": "portal-invoice",
   };
   return `${prefix[kind]}:${parentId}`;
 }
@@ -139,6 +156,10 @@ export function uploadTargetHref(kind: UploadKind, parentId: string): string {
       return `/contractors/${encodeURIComponent(readContactDocParent(parentId)?.contactId ?? "")}`;
     case "lease-upload":
       return `/tenants/${encodeURIComponent(readLeaseDocParent(parentId)?.leaseId ?? "")}`;
+    case "invoice-upload":
+      return `/invoices/${id}`;
+    case "portal-invoice-upload":
+      return `/p/jobs/${encodeURIComponent(readInvoiceSendParent(parentId)?.taskId ?? "")}`;
     default:
       return `/properties/${id}`;
   }
@@ -203,6 +224,13 @@ export function uploadRequest(
       const parent = readLeaseDocParent(parentId);
       const leaseId = parent?.leaseId ?? "";
       return { pathname: `leases/${leaseId}/${slug}`, clientPayload: owned({ leaseId, termId: parent?.termId ?? "", fileKind: file.fileKind }) };
+    }
+    case "invoice-upload":
+      return { pathname: `${invoiceUploadFolder(kind, parentId) ?? "invoices/"}${slug}`, clientPayload: owned({ invoiceId: parentId, fileKind: file.fileKind }) };
+    case "portal-invoice-upload": {
+      // parentId is "<taskId>:<contactId>" (limits.ts invoiceSendParent); the token route checks the contractor is who's signed in.
+      const taskId = readInvoiceSendParent(parentId)?.taskId ?? "";
+      return { pathname: `${invoiceUploadFolder(kind, parentId) ?? "invoice-sends/"}${slug}`, clientPayload: owned({ taskId, fileKind: file.fileKind }) };
     }
   }
 }

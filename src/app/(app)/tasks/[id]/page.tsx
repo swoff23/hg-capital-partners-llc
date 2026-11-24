@@ -4,6 +4,7 @@ import type { TaskStatus } from "@prisma/client";
 import { isActionRender } from "@/lib/action-render";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { invoicesForTask } from "@/lib/invoices/queries";
 import { logError } from "@/lib/log";
 import { recordView } from "@/lib/recent-views";
 import { daysUntil, fmtDay, toYmd, todayYmdEastern } from "@/lib/dates";
@@ -140,7 +141,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
     .slice(-40)
     .map((e) => e.id);
 
-  const [{ users, contractors, recent }, home, repeatSlot, contractorSeen, linked, people, emailStates, recordNames] =
+  const [{ users, contractors, recent }, home, repeatSlot, contractorSeen, linked, people, emailStates, recordNames, invoices] =
     await Promise.all([
       // Recent: the people this viewer assigned last, for the assignee picker.
       assigneeOptions([task.assigneeContactId], user.id),
@@ -167,6 +168,8 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
       contactId && emailed.length ? emailStatesIn(prisma, task.id, contactId, emailed) : new Map(),
       // Who and where the lines name, archived or not: the pickers' lists above leave archived records out.
       activityRecordNames(activityRecordIds(task.events)),
+      // The job's invoices for its Invoices section, a canceled job's included.
+      invoicesForTask(task.id),
     ]);
 
   const today = todayYmdEastern(now);
@@ -335,6 +338,7 @@ export default async function TaskPage({ params, searchParams }: PageProps<"/tas
       review={review}
       decision={decision}
       checklist={task.checklist}
+      invoices={invoices}
       media={media}
       files={files}
       atFinish={atFinish}

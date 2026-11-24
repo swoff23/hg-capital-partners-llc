@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import { REPLY_MAX, fromAddress, htmlToText, isAutoReply, replyAddress, replyBody, replyToken, singleAddress, threadTaskId, verifyWebhook } from "./inbound";
+import { REPLY_MAX, fromAddress, htmlToText, isAutoReply, isOutOfOfficeReply, replyAddress, replyBody, replyToken, singleAddress, threadTaskId, verifyWebhook } from "./inbound";
 
 const secretBytes = crypto.randomBytes(24);
 const secret = `whsec_${secretBytes.toString("base64")}`;
@@ -91,4 +91,16 @@ test("an @ the address pattern can't place makes the line more than one address"
   assert.equal(singleAddress('"a b"@evil.com, <pieter@hg.com>'), false);
   assert.equal(singleAddress("attacker(c)@evil.com, <pieter@hg.com>"), false);
   assert.equal(singleAddress("attacker @evil.com, <pieter@hg.com>"), false);
+});
+
+test("the invoice inbox drops only true automatic replies, never a billing tool's invoice", () => {
+  assert.equal(isOutOfOfficeReply({ "auto-submitted": "auto-replied" }, "Invoice 1043"), true);
+  assert.equal(isOutOfOfficeReply({ "x-autoreply": "yes" }, "Invoice 1043"), true);
+  assert.equal(isOutOfOfficeReply({}, "Out of office: back Monday"), true);
+  assert.equal(isOutOfOfficeReply({}, "Undeliverable: Invoice 1043"), true);
+  // QuickBooks, Square and Jobber send their invoices like this, and a Gmail filter's forward keeps the headers.
+  assert.equal(isOutOfOfficeReply({ "auto-submitted": "auto-generated" }, "Invoice 1043 from Zack's Plumbing"), false);
+  assert.equal(isOutOfOfficeReply({ precedence: "bulk" }, "Invoice 1043"), false);
+  assert.equal(isOutOfOfficeReply({ "x-auto-response-suppress": "All" }, "Invoice 1043"), false);
+  assert.equal(isOutOfOfficeReply({ "auto-submitted": "no" }, "Invoice 1043"), false);
 });

@@ -1,7 +1,7 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { isFinalRefusal } from "@/lib/attachments/access";
-import { contactUploadLimits, leaseUploadLimits, propertyUploadLimits, uploadLimits } from "@/lib/attachments/limits";
+import { contactUploadLimits, invoiceSendParent, invoiceUploadLimits, leaseUploadLimits, propertyUploadLimits, uploadLimits } from "@/lib/attachments/limits";
 import { appScope, ownerRefusal, portalScope } from "@/lib/attachments/queue-owner";
 import { UploadRefusal, tokenFailure } from "@/lib/attachments/token-failure";
 import { blobToken, noStoreMessage } from "@/lib/attachments/blob-stores";
@@ -9,6 +9,7 @@ import { UPLOAD_KIND_ACCESS, UPLOAD_KIND_ALLOWED, type UploadKind as UploadKindK
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { logError } from "@/lib/log";
+import { sendRefusal } from "@/lib/invoices/core";
 import { getPortalPrincipal } from "@/lib/portal/session";
 import { contractorUploadRefusal } from "@/lib/tasks/service";
 
@@ -29,6 +30,8 @@ import { contractorUploadRefusal } from "@/lib/tasks/service";
  *   /api/blob/portal-contact-upload  { contactId, docKind, fileKind }   contractor, their own W-9 or insurance
  *   /api/blob/contact-upload         { contactId, docKind, fileKind }   staff, a contractor's W-9 or insurance
  *   /api/blob/lease-upload           { leaseId, termId, fileKind }      staff, a lease's signed term
+ *   /api/blob/invoice-upload         { invoiceId, fileKind }            staff, a To review invoice's PDF or photo
+ *   /api/blob/portal-invoice-upload  { taskId, fileKind }               contractor, Send invoice on a job they can send from
  *
  * The keys are lib/attachments/upload-kinds.ts UPLOAD_KINDS, which the
  * uploaders send; the table below is typed against that list, so a kind
@@ -70,7 +73,7 @@ interface UploadKind {
   /** Who may mint a token for this kind. */
   principal: Uploader["kind"];
   /** clientPayload key naming the parent row. */
-  idKey: "taskId" | "propertyId" | "contactId" | "leaseId";
+  idKey: "taskId" | "propertyId" | "contactId" | "leaseId" | "invoiceId";
   /** Throws with a message the uploader can act on, or returns the token's limits. */
   authorize: (id: string, pathname: string, payload: Record<string, unknown>, who: Uploader) => Promise<Limits>;
 }
@@ -178,6 +181,35 @@ const KINDS: Record<string, UploadKind> = {
       const limits = leaseUploadLimits(leaseId, pathname, payload.fileKind);
       if (typeof limits === "string") throw new UploadRefusal(limits);
       if (!(await prisma.lease.findUnique({ where: { id: leaseId }, select: { id: true } }))) throw new UploadRefusal("Not found", true);
+      return limits;
+    },
+  },
+  "invoice-upload": {
+    principal: "staff",
+    idKey: "invoiceId",
+    // Add the invoice file (docs/contractor-invoices-plan.md, 6 item 2): a PDF or a photo, onto an invoice still in To
+    // review. To pay and Paid are read-only, so their files wait for Back to review.
+    authorize: async (invoiceId, pathname, payload) => {
+      const limits = invoiceUploadLimits("invoice-upload", invoiceId, pathname, payload.fileKind);
+      if (typeof limits === "string") throw new UploadRefusal(limits);
+      const inv = await prisma.invoice.findUnique({ where: { id: invoiceId }, select: { stage: true } });
+      if (!inv) throw new UploadRefusal("Not found", true);
+      if (inv.stage !== "REVIEW") throw new UploadRefusal("Move it back to To review to add a file.", true);
+      return limits;
+    },
+  },
+  "portal-invoice-upload": {
+    principal: "contractor",
+    idKey: "taskId",
+    // Send invoice (4.1): from a full sign-in, on a job with live access, once it's In review or Done. The files wait
+    // in invoice-sends/<taskId>/<contactId>/ until the send records them on the new invoice (invoices/files.ts). The
+    // folder is the signed-in contractor's own, so no one else on the job can stage into it or claim from it.
+    authorize: async (taskId, pathname, payload, who) => {
+      if (who.kind !== "contractor") throw new UploadRefusal("Not found");
+      const limits = invoiceUploadLimits("portal-invoice-upload", invoiceSendParent(taskId, who.contactId), pathname, payload.fileKind);
+      if (typeof limits === "string") throw new UploadRefusal(limits);
+      const refusal = await sendRefusal(prisma, taskId, who);
+      if (refusal) throw new UploadRefusal(refusal, true);
       return limits;
     },
   },

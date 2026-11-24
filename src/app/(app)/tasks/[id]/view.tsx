@@ -6,12 +6,14 @@ import type { MediaItem } from "@/components/media-grid";
 import { ComposerDropZone, PendingSendsProvider } from "@/components/composer";
 import { Section } from "@/components/ui";
 import type { Ymd } from "@/lib/dates";
+import type { TaskInvoiceRow } from "@/lib/invoices/queries";
 import type { JobEmailState } from "@/lib/portal/job-emails";
 import { TaskActivity, type ActivityRow } from "./activity";
 import { Checklist, type ChecklistRow } from "./checklist";
 import { Composer, type ComposerDraft } from "./composer";
 import { TaskFields, type PropertyOption, type TaskFieldValues, type TaskLockbox, type TaskTenants } from "./fields";
 import { MoreMenu, TitleField } from "./header";
+import { TaskInvoices } from "./invoices";
 import { NotesField } from "./notes";
 import { ReviewSlot, type ReviewDecision, type ReviewProof } from "./review-banner";
 import { StatusControl, WaitingReason } from "./status-control";
@@ -62,6 +64,8 @@ export interface TaskPageViewProps {
   /** An email's Send back (`?do=send-back`, docs/specs/contractor-job-emails.md 8): the banner opens its sheet once. */
   openSendBack?: boolean;
   checklist: ChecklistRow[];
+  /** The job's invoices, Not an invoice left out, oldest first (lib/invoices/queries.ts invoicesForTask). */
+  invoices: TaskInvoiceRow[];
   media: MediaItem[];
   files: FileLink[];
   /** The ids in `media` sent with the latest Mark done (lib/tasks/media.ts taskMedia). */
@@ -81,7 +85,7 @@ export interface TaskPageViewProps {
  * The task page's layout (docs/asana-migration-plan.md §6, D31 "page with
  * side rail"). A record page: it caps at 1200px with a 320px rail
  * (docs/brand-guidelines.md, section 5). Main column: Tasks and the status
- * over the title, review banner, notes, then flat sections for the checklist, photos and
+ * over the title, review banner, notes, then flat sections for the checklist, invoices (only when the job has one), photos and
  * files, and activity, and the composer. The fields sit in a sticky Details
  * rail from lg up and a chip row under the title below that; one grid,
  * rearranged by its template areas.
@@ -118,7 +122,7 @@ export function TaskPageView(p: TaskPageViewProps) {
             />
           </div>
           <div className="[grid-area:more]">
-            <MoreMenu taskId={task.id} title={task.title} />
+            <MoreMenu taskId={task.id} title={task.title} canceled={task.status === "CANCELED"} />
           </div>
           <div className="min-w-0 [grid-area:title]">
             <TitleField taskId={task.id} title={task.title} closed={!p.active} />
@@ -173,6 +177,8 @@ export function TaskPageView(p: TaskPageViewProps) {
             </div>
 
             <Checklist taskId={task.id} items={p.checklist} />
+
+            <TaskInvoices invoices={p.invoices} today={p.today} />
 
             <TaskMediaSection
               taskId={task.id}

@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { Client } from "pg";
+import { forgetInvoiceEmails } from "@/lib/invoices/notify";
 
 /**
  * The one key every database test locks while it runs: a session lock in the
@@ -21,8 +22,8 @@ const TURN_LOCK = 20261120;
  * A test makes its users, contractors, properties, deals and task templates
  * through here, which records each id. `remove` deletes those rows and what
  * hangs off them: their tasks (a task's events, emails, files and links go with
- * it), their security events, and by cascade their logins, reset links and
- * email rows. It touches nothing else, so a test can share its database with a
+ * it), their invoices and stored emails (and the queued email lines about them), their security events, and by cascade
+ * their logins, reset links and email rows. It touches nothing else, so a test can share its database with a
  * running app.
  *
  * Database tests also take turns on a database (`takeTurn`). `npm test` runs
@@ -51,6 +52,8 @@ export function scratchRows(client: () => PrismaClient) {
   const propertyIds: string[] = [];
   const dealIds: string[] = [];
   const templateIds: string[] = [];
+  const emailIds: string[] = [];
+  const invoiceIds: string[] = [];
   let turn: Client | null = null;
 
   async function removeRows(): Promise<void> {
@@ -74,6 +77,31 @@ export function scratchRows(client: () => PrismaClient) {
       where: { OR: [{ userId: { in: userIds } }, { contactId: { in: contactIds } }, { taskId: { in: taskIds } }] },
     });
     await prisma.task.deleteMany({ where: { id: { in: taskIds } } });
+    // Invoices outlive their contractors and partners (SetNull), so they go first, and so do the partners' queued
+    // email lines about them (notify.ts): taken off the bundle rows, and a row left empty deleted, so nothing about
+    // them is ever sent. Their files, history and links cascade.
+    const invoices = (
+      await prisma.invoice.findMany({
+        where: {
+          OR: [
+            { id: { in: invoiceIds } },
+            { contactId: { in: contactIds } },
+            { createdByContactId: { in: contactIds } },
+            { createdByUserId: { in: userIds } },
+            { approvedByUserId: { in: userIds } },
+            { paidByUserId: { in: userIds } },
+            { inboundEmailId: { in: emailIds } },
+            { events: { some: { OR: [{ actorUserId: { in: userIds } }, { actorContactId: { in: contactIds } }] } } },
+          ],
+        },
+        select: { id: true },
+      })
+    ).map((i) => i.id);
+    if (invoices.length > 0) {
+      await forgetInvoiceEmails(prisma, invoices);
+      await prisma.invoice.deleteMany({ where: { id: { in: invoices } } });
+    }
+    await prisma.inboundEmail.deleteMany({ where: { id: { in: emailIds } } });
     // Deals before properties, properties before the users who last saved them.
     await prisma.deal.deleteMany({ where: { id: { in: dealIds } } });
     await prisma.property.deleteMany({ where: { id: { in: propertyIds } } });
@@ -119,6 +147,17 @@ export function scratchRows(client: () => PrismaClient) {
       const row = await client().taskTemplate.create({ data });
       templateIds.push(row.id);
       return row;
+    },
+    /** A stored email a test made; its invoice goes with it. */
+    async inboundEmail(data: Prisma.InboundEmailCreateArgs["data"]) {
+      const row = await client().inboundEmail.create({ data });
+      emailIds.push(row.id);
+      return row;
+    },
+    /** An invoice a test made through src/lib/invoices/core.ts that none of its contractors, partners or emails reach. */
+    invoice(id: string): string {
+      invoiceIds.push(id);
+      return id;
     },
     /** Deletes every row made through here and what hangs off it, then ends this file's turn. Safe when nothing was made. */
     async remove(): Promise<void> {

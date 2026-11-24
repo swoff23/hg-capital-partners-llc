@@ -172,7 +172,7 @@ test("a batch post is marked as one, and its Undo is core's (fixes 1, 2, 3 and 1
   assert.doesNotMatch(batch, /^import "server-only";/m, "kept apart from the session so job-batch.test.ts can run it");
 });
 
-test("raw SQL on the email outbox lives only in core.ts and the send run", () => {
+test("raw SQL on the email outbox lives only in core.ts, the invoice emails' queue and the send run", () => {
   const files: string[] = [];
   const walk = (dir: string) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -183,7 +183,8 @@ test("raw SQL on the email outbox lives only in core.ts and the send run", () =>
   };
   walk(SRC);
   const naming = files.filter((f) => readFileSync(f, "utf8").includes('"NotificationOutbox"')).map((f) => relative(SRC, f));
-  assert.deepEqual(naming.sort(), ["lib/notifications/outbox.ts", "lib/tasks/core.ts"]);
+  // invoices/notify.ts queues the invoice emails (docs/contractor-invoices-plan.md, 5.3), rows with no task.
+  assert.deepEqual(naming.sort(), ["lib/invoices/notify.ts", "lib/notifications/outbox.ts", "lib/tasks/core.ts"]);
 });
 
 test("the portal's record step locks the job before it reads the job's status, so a close that lands first is seen", () => {

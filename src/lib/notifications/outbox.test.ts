@@ -56,13 +56,15 @@ test("every write to a claimed row is an updateMany by id, so a row deleteTask's
   assert.doesNotMatch(code, /notificationOutbox\.update\(/, "no update that needs the row to be there");
   const drain = code.slice(code.indexOf("export async function drainDue"));
   const writes = drain.match(/notificationOutbox\.updateMany\(\{\s*where: \{ [^}]*\}/g) ?? [];
-  // the task gone at the claim, nothing to send, sent, refused for Resend's limits, failed: each by the row's id alone.
-  assert.equal(writes.length, 5);
-  for (const w of writes) assert.match(w, /where: \{ id: row\.id \}$/);
+  // The task gone at the claim, nothing to send, an invoice row's wait and its read after the claim, and in the shared
+  // settle step sent, refused for Resend's limits and failed: each by the row's id alone (an unclaimed invoice row's
+  // wait also only while it's unsent).
+  assert.equal(writes.length, 7);
+  for (const w of writes) assert.match(w, /where: \{ id: (row\.id|rowId)(, sentAt: null)? \}$/);
   // A count of 0 is not an error: nothing reads it, and the loop goes on to the next row.
   assert.doesNotMatch(drain, /const \{ count \} = await prisma\.notificationOutbox\.updateMany/);
   // The sent count is the email that went out, whether or not its row is still there.
-  assert.match(drain, /if \(res\.ok\) \{\s*await prisma\.notificationOutbox\.updateMany\(\{ where: \{ id: row\.id \}, data: \{ sentAt: new Date\(\), lastError: null \} \}\);\s*result\.sent\+\+;/);
+  assert.match(drain, /if \(res\.ok\) \{\s*await prisma\.notificationOutbox\.updateMany\(\{ where: \{ id: rowId \}, data: \{ sentAt: new Date\(\), lastError: null \} \}\);\s*result\.sent\+\+;/);
 });
 
 // docs/specs/contractor-email-switch.md: a line still waiting when Job emails goes off is dropped by the run.
@@ -70,4 +72,22 @@ test("the drain reads the contractor's Job emails switch with the row and closes
   assert.match(code, /portalAccount: \{ select: \{ email: true, status: true, jobEmails: true \} \}/);
   // deliveryFor's refusal (content.test.ts: "emails off") is the row's lastError, so nothing reads it as emailed.
   assert.match(code, /await closeUnsent\(row\.id, now, !row\.task \? "no task" : delivery\.ok \? "no recipient" : delivery\.reason\)/);
+});
+
+// docs/contractor-invoices-plan.md, 5.3: invoice rows carry no task, so they take their own branch before the task
+// rows' "no task" close, and never read a task or a TaskAccess row.
+test("an invoice row takes its own branch before the task checks, and is read again after its claim", () => {
+  const drain = code.slice(code.indexOf("export async function drainDue"));
+  const branch = drain.indexOf("if (isInvoiceRow(row))");
+  assert.ok(branch > 0 && branch < drain.indexOf("const contractorHasAccess"), "the invoice branch comes before the task checks");
+  const body = drain.slice(branch, drain.indexOf("const contractorHasAccess"));
+  assert.doesNotMatch(body, /task\.findUnique|taskAccess|deliveryFor/);
+  const claimAt = body.indexOf("await claim(row.id, now)");
+  assert.ok(claimAt > 0 && body.indexOf("invoiceEmailFor(prisma, { ...row, items: claimed.items }") > claimAt, "re-read after the claim");
+  // No reply token on a Paid email (M15).
+  assert.doesNotMatch(body, /replyTo|mintJobLink/);
+  // A skip planned before the claim closes only while the row holds the items it was planned from, so a bundle line
+  // or a re-pay queued since stays open (invoices/notify.ts closeUnclaimedInvoiceRow; notify.pg.test.ts runs it).
+  assert.doesNotMatch(body, /closeUnsent\(/);
+  assert.match(body, /closeUnclaimedInvoiceRow\(prisma, row, now, plan\.reason\)/);
 });

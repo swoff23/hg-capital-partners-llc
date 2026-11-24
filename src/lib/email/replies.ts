@@ -1,11 +1,14 @@
 import "server-only";
 import { put } from "@vercel/blob";
-import { UPLOAD_RULES, fileKindForType, uploadContentType, type FileKind } from "@/lib/attachments/content-types";
+import type { FileKind } from "@/lib/attachments/content-types";
 import { taskUploadPath } from "@/lib/attachments/paths";
+import { FieldError } from "@/lib/action-result";
 import { prisma } from "@/lib/db";
 import { MAX_FILES_PER_POST } from "@/lib/portal/job-view";
 import { escapeLike } from "@/lib/search";
-import { getEnv, type EmailEnv } from "@/lib/env";
+import { getEnv } from "@/lib/env";
+import { replyMakesInvoice, invoiceAttachments } from "@/lib/invoices/inbound";
+import { fileReplyInvoice } from "@/lib/invoices/inbox";
 import { logError } from "@/lib/log";
 import { jobLinkUrl } from "@/lib/portal/job-link-paths";
 import { mintJobLink, resolveJobLink } from "@/lib/portal/job-links";
@@ -13,7 +16,8 @@ import { jobSubject, jobWhere } from "@/lib/notifications/content";
 import { isActiveStatus } from "@/lib/task-scope";
 import * as core from "@/lib/tasks/core";
 import { renderPlainEmail } from "./render";
-import { fromAddress, htmlToText, isAutoReply, replyBody, replyToken, singleAddress, threadTaskId } from "./inbound";
+import { closedReplyItems, fromAddress, htmlToText, isAutoReply, replyBody, replyToken, singleAddress, threadTaskId } from "./inbound";
+import { downloadAttachment, fetchReceivedAttachments, fetchReceivedEmail, recipientsOf, sortFile, type ReceivedAttachment, type ReceivedEmail } from "./received";
 import { sendEmail } from "./send";
 
 /**
@@ -29,7 +33,10 @@ import { sendEmail } from "./send";
  *  2. From another address: it still posts as the person the email went to,
  *     with "From mike@gmail.com" on its last line so everyone sees who sent it.
  *  3. On a closed job: not posted (closed jobs are read-only); it goes to both
- *     partners as an email with its files.
+ *     partners as an email with its files. On a Done job, a PDF or a photo
+ *     also makes a To review invoice linked to the job, from the contractor
+ *     the reply went to, and the forward says so (contractor-invoices-plan.md
+ *     4.2; src/lib/invoices/inbound.ts). A Canceled job's reply makes none.
  *  4. A video too big for email (left out, or sent as an iCloud or Drive
  *     link): the rest posts, and one short email to the contractor's own
  *     login (never to an unproven sender: it carries a link that opens the
@@ -42,54 +49,19 @@ import { sendEmail } from "./send";
  * (by the email's id) and stops before uploading anything again.
  */
 
-const RESEND_API = "https://api.resend.com";
-
-/** An inline picture under this size is a signature's logo, not a photo of the job. */
-const SIGNATURE_IMAGE_MAX = 30_000;
-
 /** Links a phone puts in place of a file too big to attach: iCloud Mail Drop and Google Drive. */
 const LINKED_FILE = /https:\/\/(?:www\.icloud\.com\/attachment\/|drive\.google\.com\/(?:file|open))/i;
 
-interface ReceivedEmail {
-  id: string;
-  from: string;
-  to: string[] | null;
-  cc: string[] | null;
-  received_for: string[] | null;
-  subject: string | null;
-  text: string | null;
-  html: string | null;
-  headers: Record<string, string> | null;
-  /** Resend's checks of the sender: "pass", "fail", "gray", "processing_failed" or "unknown". Null on old emails. */
-  authentication: { spf?: string; dkim?: string; dmarc?: string } | null;
-}
-
-interface ReceivedAttachment {
-  id: string;
-  filename: string | null;
-  size: number;
-  content_type: string | null;
-  content_disposition: string | null;
-  content_id: string | null;
-  download_url: string;
-}
-
 export type ReplyOutcome =
   | { outcome: "posted"; taskId: string; files: number; skipped: number }
-  | { outcome: "forwarded"; taskId: string }
+  | { outcome: "forwarded"; taskId: string; invoiced?: true }
   | { outcome: "ignored"; reason: string };
-
-async function resendGet<T>(config: EmailEnv, path: string): Promise<T> {
-  const res = await fetch(`${RESEND_API}${path}`, { headers: { Authorization: `Bearer ${config.apiKey}` }, signal: AbortSignal.timeout(15_000) });
-  if (!res.ok) throw new Error(`Resend ${res.status} on ${path}`);
-  return (await res.json()) as T;
-}
 
 const bare = fromAddress;
 
 /** Who a reply posts as: the person its email went to, by its reply address, or (sent to plain jobs@) by the sender. */
 async function replier(email: ReceivedEmail, from: string): Promise<{ taskId: string; p: core.Principal; loginEmail: string } | null> {
-  const token = replyToken([...(email.to ?? []), ...(email.received_for ?? []), ...(email.cc ?? [])]);
+  const token = replyToken(recipientsOf(email));
   if (token) {
     const link = await resolveJobLink(token);
     if (!link || link.kind !== "REPLY") return null;
@@ -127,24 +99,15 @@ async function principalFor(
   return { taskId, p: { kind: "contractor", contactId: contact.id, label: contact.fullName, onlyTaskId: taskId }, loginEmail: contact.portalAccount.email.toLowerCase() };
 }
 
-/** What a file is, and whether it may post: photos, videos and documents, within each kind's size cap. */
-function sortFile(a: ReceivedAttachment): { kind: FileKind; type: string } | { tooBig: true } | null {
-  // The name's extension when the mail app sent a generic type (application/octet-stream, image/jpg), as uploads do.
-  const type = uploadContentType(a.filename ?? "", a.content_type) ?? "";
-  const kind = fileKindForType(type);
-  if (!kind) return null;
-  const rule = UPLOAD_RULES[kind];
-  if (!rule.contentTypes.includes(type)) return null;
-  if (a.content_disposition === "inline" && a.content_id && kind === "image" && a.size < SIGNATURE_IMAGE_MAX) return null;
-  if (a.size > rule.maxBytes) return { tooBig: true };
-  return { kind, type };
-}
-
-export async function handleReceivedEmail(emailId: string): Promise<ReplyOutcome> {
+/**
+ * A reply, read from Resend once by the router (src/lib/email/router.ts), which passes it in; read here when it
+ * didn't.
+ */
+export async function handleReceivedEmail(emailId: string, received?: ReceivedEmail): Promise<ReplyOutcome> {
   const env = getEnv();
   const config = env.email;
   if (!config) return { outcome: "ignored", reason: "email off" };
-  const email = await resendGet<ReceivedEmail>(config, `/emails/receiving/${encodeURIComponent(emailId)}`);
+  const email = received ?? (await fetchReceivedEmail(config, emailId));
   const from = bare(email.from ?? "");
   if (isAutoReply(email.headers ?? {}, email.subject)) return { outcome: "ignored", reason: "automatic reply" };
   const who = await replier(email, from);
@@ -158,7 +121,7 @@ export async function handleReceivedEmail(emailId: string): Promise<ReplyOutcome
 
   const written = replyBody(email.text?.trim() ? email.text : htmlToText(email.html ?? ""));
   const words = from && from !== who.loginEmail ? [written, `From ${from}`].filter(Boolean).join("\n\n") : written;
-  const list = await resendGet<{ data: ReceivedAttachment[] }>(config, `/emails/receiving/${encodeURIComponent(emailId)}/attachments?limit=100`);
+  const list = { data: await fetchReceivedAttachments(config, emailId) };
   const sorted = list.data.map((a) => ({ a, s: sortFile(a) }));
   // As many as one post from the job page takes (MAX_FILES_PER_POST); the rest are left out, as a portal post refuses them.
   const allowed = sorted.filter((x): x is { a: ReceivedAttachment; s: { kind: FileKind; type: string } } => !!x.s && !("tooBig" in x.s));
@@ -178,8 +141,33 @@ export async function handleReceivedEmail(emailId: string): Promise<ReplyOutcome
     }
     // Rule 3: a closed job is read-only, so the reply reaches the partners as an email instead.
     if (!isActiveStatus(task.status)) {
-      await forwardToPartners({ emailId, taskId, title: task.title, who: p.label, words, files: files.map((f) => f.a) });
-      return { outcome: "forwarded", taskId };
+      // On a Done job, a bill attached also lands in Invoices to review, before the forward that says so. Once per
+      // email: a retry finds the invoice its first delivery made, and the forward's keys send it once.
+      const bill = invoiceAttachments(list.data);
+      let invoiced = false;
+      let invoiceFailed: unknown = null;
+      if (replyMakesInvoice(task.status, bill)) {
+        try {
+          await fileReplyInvoice(config, {
+            email,
+            localPart: replyToken(recipientsOf(email)) ? "r" : "jobs",
+            taskId,
+            files: bill,
+            by: { kind: "contractor", contactId: p.contactId, label: p.label },
+          });
+          invoiced = true;
+        } catch (err) {
+          // The forward never waits on the invoice: it goes now, without the line, whatever went wrong. A rule's
+          // refusal (the job was canceled a moment ago, say) ends there, since no retry would change it. Anything else
+          // (Blob or the database down) fails the webhook after the forward, so Resend delivers it again for the
+          // invoice; the forward's idempotency keys keep the partners from getting it twice.
+          logError("email:reply-invoice", err, { taskId });
+          if (!(err instanceof FieldError)) invoiceFailed = err;
+        }
+      }
+      await forwardToPartners({ emailId, taskId, title: task.title, who: p.label, words, files: files.map((f) => f.a), invoiced });
+      if (invoiceFailed) throw invoiceFailed;
+      return invoiced ? { outcome: "forwarded", taskId, invoiced: true } : { outcome: "forwarded", taskId };
     }
   }
 
@@ -190,9 +178,7 @@ export async function handleReceivedEmail(emailId: string): Promise<ReplyOutcome
   // alongside this one posts nothing twice. Its blobs, if it lost the race, are only unreferenced copies.
   const uploaded: core.AttachmentMeta[] = [];
   for (const { a, s: sorted } of files) {
-    const res = await fetch(a.download_url, { signal: AbortSignal.timeout(60_000) });
-    if (!res.ok) throw new Error(`Couldn't download ${a.filename ?? a.id}: ${res.status}`);
-    const bytes = Buffer.from(await res.arrayBuffer());
+    const bytes = await downloadAttachment(a);
     const filename = a.filename?.trim() || `email-${a.id}`;
     const blob = await put(taskUploadPath(taskId, filename, "orig", sorted.type), bytes, { access: "private", token, contentType: sorted.type, addRandomSuffix: true });
     uploaded.push({ url: blob.url, pathname: blob.pathname, filename, size: bytes.length, contentType: sorted.type });
@@ -230,14 +216,14 @@ export async function handleReceivedEmail(emailId: string): Promise<ReplyOutcome
 
 /** A reply on a closed job, to both partners, with its files attached by Resend from their download links. */
 async function forwardToPartners(
-  input: { emailId: string; taskId: string; title: string; who: string; words: string; files: ReceivedAttachment[] },
+  input: { emailId: string; taskId: string; title: string; who: string; words: string; files: ReceivedAttachment[]; invoiced?: boolean },
 ): Promise<void> {
   const partners = await prisma.user.findMany({ where: { passwordHash: { not: null } }, select: { id: true, email: true }, orderBy: { id: "asc" } });
   const first = input.who.split(/\s+/)[0] || input.who;
   const url = `${getEnv().appUrl}/tasks/${input.taskId}`;
   const rendered = renderPlainEmail({
     line: `${first} replied on a closed job: ${input.title}`,
-    items: input.words ? [input.words] : [],
+    items: closedReplyItems(input.words, !!input.invoiced),
     buttonLabel: "Open task",
     buttonUrl: url,
     footnote: input.files.length ? `${input.files.length === 1 ? "Their file is" : `Their ${input.files.length} files are`} attached.` : undefined,

@@ -328,7 +328,7 @@ export function MediaUploadTray({
   slots?: number;
   filled?: number;
   onSlot?: () => void;
-  /** Recorded files drawn before the ones in flight, in the same grid (the Mark done sheet's). */
+  /** Recorded files drawn before the ones in flight, in the same tray (the Mark done sheet's slots; Send invoice's files, with no slots). */
   leading?: ReactNode;
   disabled?: boolean;
   label?: string;
@@ -339,7 +339,7 @@ export function MediaUploadTray({
   const coarse = useCoarsePointer();
   const grid = layout === "grid";
   const slotted = grid && slots !== undefined;
-  if (uploads.length === 0 && !slotted) return null;
+  if (uploads.length === 0 && !slotted && !leading) return null;
   const empty = slotted ? Math.max(0, slots - filled - uploads.filter((u) => u.status !== "invalid").length) : 0;
   const open = onSlot ?? (coarse ? uploader.takePhoto : uploader.chooseFiles);
   const slotClass =
@@ -347,7 +347,7 @@ export function MediaUploadTray({
   return (
     <div className={cn("space-y-1.5", className)}>
       <ul aria-label={label} className={grid ? "grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-2" : "flex flex-wrap gap-2"}>
-        {slotted && leading}
+        {leading}
         {uploads.map((u) => (
           <UploadTile key={u.key} upload={u} grid={grid} onFill={onFill} onRetry={() => retry(u.key)} onRemove={() => remove(u.key)} />
         ))}

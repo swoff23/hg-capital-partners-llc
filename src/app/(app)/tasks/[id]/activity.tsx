@@ -16,6 +16,7 @@ import { callAction, conflictToastMessage } from "@/lib/action-result";
 import { sendRefusal } from "@/lib/composer-draft";
 import { collapseStretches, foldStart, firstNewIndex, linkedUpdateId, stretchSummary, type Stretched } from "@/lib/tasks/activity";
 import { cn } from "@/lib/utils";
+import { useUseAsInvoice } from "./use-as-invoice";
 import { deleteTaskComment, editTaskComment, restoreTaskComment, updateTask } from "./actions";
 import type { ActivityRow, CommentFields, LineFields } from "./activity-rows";
 
@@ -352,10 +353,11 @@ function ViewPrevious({ onPress }: { onPress: () => void }) {
 }
 
 function Attachments({ line }: { line: LineFields }) {
+  const asInvoice = useUseAsInvoice();
   return (
     <>
-      {line.media.length > 0 && <MediaGrid items={line.media} variant="strip" inCard className="mt-1.5" />}
-      <FilesList files={line.files} className="mt-1.5" />
+      {line.media.length > 0 && <MediaGrid items={line.media} variant="strip" inCard className="mt-1.5" menuItems={asInvoice.forMedia} />}
+      <FilesList files={line.files} className="mt-1.5" menuItems={asInvoice.forFile} />
     </>
   );
 }
@@ -364,6 +366,7 @@ function Attachments({ line }: { line: LineFields }) {
 
 function DecisionRowView({ row }: { row: Extract<ActivityRow, { type: "decision" }> }) {
   const note = row.note;
+  const asInvoice = useUseAsInvoice();
   return (
     <ActivityItem id={`update-${row.id}`} marker={row.status ? { status: row.status as TaskStatus } : "dot"}>
       <p className="text-meta text-muted-foreground">
@@ -386,8 +389,8 @@ function DecisionRowView({ row }: { row: Extract<ActivityRow, { type: "decision"
               <CommentBody segments={note.segments} />
             </p>
           )}
-          {note.media.length > 0 && <MediaGrid items={note.media} variant="strip" inCard className={cn(note.segments && "mt-2")} />}
-          {note.files.length > 0 && <FilesList files={note.files} onFill={note.internal} className="mt-2" />}
+          {note.media.length > 0 && <MediaGrid items={note.media} variant="strip" inCard className={cn(note.segments && "mt-2")} menuItems={asInvoice.forMedia} />}
+          {note.files.length > 0 && <FilesList files={note.files} onFill={note.internal} className="mt-2" menuItems={asInvoice.forFile} />}
         </div>
       )}
       {row.delivery && <DeliveryLine className="mt-1" state={row.delivery.state} to={row.delivery.to} at={row.delivery.at} />}
@@ -441,6 +444,7 @@ function CommentRowView({
   onFocused: () => void;
 }) {
   const { toast } = useToast();
+  const asInvoice = useUseAsInvoice();
   // The card has taken focus (CommentCard's focusOnMount runs first); the page lets go of the request.
   useEffect(() => {
     if (focus) onFocused();
@@ -510,8 +514,8 @@ function CommentRowView({
           />
         ) : undefined
       }
-      media={c.media.length > 0 ? <MediaGrid items={c.media} variant="strip" inCard /> : null}
-      files={c.files.length > 0 ? <FilesList files={c.files} onFill={c.internal} /> : null}
+      media={c.media.length > 0 ? <MediaGrid items={c.media} variant="strip" inCard menuItems={asInvoice.forMedia} /> : null}
+      files={c.files.length > 0 ? <FilesList files={c.files} onFill={c.internal} menuItems={asInvoice.forFile} /> : null}
       removedFiles={c.removedFiles}
       focusOnMount={focus}
       footer={delivery ? <DeliveryLine state={delivery.state} to={delivery.to} at={delivery.at} /> : undefined}

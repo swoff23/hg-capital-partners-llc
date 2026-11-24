@@ -182,3 +182,26 @@ export function isAutoReply(headers: Readonly<Record<string, string | undefined>
   if (/^(bulk|list|junk|auto_reply)$/.test(h("precedence"))) return true;
   return /^(auto(matic)? ?reply|out of (the )?office|away|vacation|undeliverable|delivery status notification)\b/i.test((subject ?? "").replace(/^(re|fw|fwd):\s*/i, ""));
 }
+
+/**
+ * An automatic reply to an email, and nothing more: an out-of-office or vacation notice, or a delivery report. For
+ * the invoice inbox (docs/contractor-invoices-plan.md, 4.3), where isAutoReply is too wide: billing tools (QuickBooks,
+ * Square, Jobber) send real invoices as `Auto-Submitted: auto-generated` or `Precedence: bulk`, and a partner's Gmail
+ * filter that forwards bills keeps those headers. Only RFC 3834's `auto-replied`, the auto-responder headers and the
+ * out-of-office or undeliverable subjects count.
+ */
+export function isOutOfOfficeReply(headers: Readonly<Record<string, string | undefined>>, subject: string | null | undefined): boolean {
+  const h = (name: string) => (headers[name] ?? headers[name.toLowerCase()] ?? "").toLowerCase();
+  if (h("auto-submitted").startsWith("auto-replied")) return true;
+  if (h("x-autoreply") || h("x-autorespond")) return true;
+  if (h("precedence") === "auto_reply") return true;
+  return /^(auto(matic)? ?reply|out of (the )?office|away|vacation|undeliverable|delivery status notification)\b/i.test((subject ?? "").replace(/^(re|fw|fwd):\s*/i, ""));
+}
+
+/** The line a closed job's forward adds when the reply also made an invoice (docs/contractor-invoices-plan.md, 4.2). */
+export const ADDED_TO_INVOICES = "Added to Invoices to review";
+
+/** A closed job's forward to the partners: what the contractor wrote, then ADDED_TO_INVOICES when it made an invoice. */
+export function closedReplyItems(words: string, invoiced: boolean): string[] {
+  return [...(words ? [words] : []), ...(invoiced ? [ADDED_TO_INVOICES] : [])];
+}

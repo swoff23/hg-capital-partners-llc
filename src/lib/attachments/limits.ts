@@ -181,3 +181,82 @@ export function pixelHint(n: number | null | undefined): number | null {
 export function durationHint(n: number | null | undefined): number | null {
   return mediaHint(n, 24 * 3600);
 }
+
+/**
+ * An invoice's file (docs/contractor-invoices-plan.md, 5.2): a PDF or a photo, never a video or another document.
+ * The same caps as any photo or document (UPLOAD_RULES); only the document types narrow to PDF.
+ */
+export const INVOICE_FILE_RULES: Record<"image" | "file", UploadRule> = {
+  image: UPLOAD_RULES.image,
+  file: { contentTypes: ["application/pdf"], maxBytes: UPLOAD_RULES.file.maxBytes },
+};
+
+/** The invoice upload kinds' token routes. */
+export type InvoiceUploadKind = "invoice-upload" | "portal-invoice-upload";
+
+/**
+ * The parent of a contractor's Send invoice uploads: the job and the contractor, "<taskId>:<contactId>". The folder
+ * names the uploader as well as the job, so one contractor on a job can't record another's staged file (M14: an
+ * invoice file is private to its contractor). The token route builds it from the signed-in contractor, never from
+ * the browser's payload.
+ */
+export function invoiceSendParent(taskId: string, contactId: string): string {
+  return `${taskId}:${contactId}`;
+}
+
+export function readInvoiceSendParent(parentId: string): { taskId: string; contactId: string } | null {
+  const m = /^([A-Za-z0-9_-]{1,64}):([A-Za-z0-9_-]{1,64})$/.exec(parentId);
+  return m ? { taskId: m[1], contactId: m[2] } : null;
+}
+
+/** An invoice's own folder, invoices/<invoiceId>/: a partner's upload, Use as invoice's copy, an email's files. */
+export function invoiceFolder(invoiceId: string): string {
+  return `invoices/${invoiceId}/`;
+}
+
+/**
+ * Where each invoice kind's files go, or null for a parent that isn't one. A partner's upload is the invoice's own
+ * folder (invoiceFolder). A contractor's Send invoice uploads before the invoice exists, so its files wait in
+ * invoice-sends/<taskId>/<contactId>/ (invoiceSendParent) until the send records them on the new invoice. Use as
+ * invoice copies a job's file into invoices/<invoiceId>/ too (invoices/files.ts), so every invoice file is its own copy.
+ */
+export function invoiceUploadFolder(kind: InvoiceUploadKind, parentId: string): string | null {
+  if (kind === "invoice-upload") return PROPERTY_ID.test(parentId) ? invoiceFolder(parentId) : null;
+  const p = readInvoiceSendParent(parentId);
+  return p ? `invoice-sends/${p.taskId}/${p.contactId}/` : null;
+}
+
+/**
+ * The token limits for an invoice upload, or why it's refused: the path is the kind's folder for this parent
+ * (invoiceUploadFolder) with a safe name, and `fileKind` is "image" or "file", held to INVOICE_FILE_RULES. A name
+ * with an extension must name a type that rule allows, so "bill.docx" is refused before any bytes move.
+ */
+export function invoiceUploadLimits(kind: InvoiceUploadKind, parentId: string, pathname: string, fileKind?: unknown): TokenLimits | string {
+  const folder = invoiceUploadFolder(kind, parentId);
+  if (!folder) return "That upload path isn't allowed.";
+  const name = pathname.slice(pathname.lastIndexOf("/") + 1);
+  if (pathname !== `${folder}${name}` || !SLUG.test(name) || !/[A-Za-z0-9]/.test(name)) return "That upload path isn't allowed.";
+  if (fileKind !== "file" && fileKind !== "image") return "Add a PDF or a photo of the invoice.";
+  const rule = INVOICE_FILE_RULES[fileKind];
+  if (nameExtension(name) !== null) {
+    const type = contentTypeForName(name);
+    if (!type || !rule.contentTypes.includes(type)) return "Add a PDF or a photo of the invoice.";
+  }
+  return { maximumSizeInBytes: rule.maxBytes, allowedContentTypes: [...rule.contentTypes] };
+}
+
+/** Whether a stored invoice blob sits where `invoiceUploadLimits` put it (Blob adds a random suffix). */
+export function storedInvoiceUploadPath(kind: InvoiceUploadKind, pathname: string, parentId: string): boolean {
+  const prefix = invoiceUploadFolder(kind, parentId);
+  if (!prefix) return false;
+  const rest = pathname.slice(prefix.length);
+  return pathname.startsWith(prefix) && /^[A-Za-z0-9._-]{1,160}$/.test(rest) && /[A-Za-z0-9]/.test(rest);
+}
+
+/** Which invoice rule a stored blob's type falls under, or null for anything else (a video, a Word file). */
+export function invoiceFileKind(contentType: string | null | undefined): "image" | "file" | null {
+  const t = (contentType ?? "").split(";")[0].trim().toLowerCase();
+  if (INVOICE_FILE_RULES.image.contentTypes.includes(t)) return "image";
+  if (INVOICE_FILE_RULES.file.contentTypes.includes(t)) return "file";
+  return null;
+}

@@ -48,6 +48,7 @@ const WITHOUT = new Set([
   "(app)/deals/[...missing]",
   "(app)/draws/[...missing]",
   "(app)/financials/[...missing]",
+  "(app)/invoices/[...missing]",
   "(app)/missing/[...missing]",
   "(app)/properties/[...missing]",
   "(app)/settings/[...missing]",

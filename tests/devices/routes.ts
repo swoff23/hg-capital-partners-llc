@@ -20,6 +20,11 @@ export const SAMPLE_PARAMS: Record<string, FindRow> = {
   "deals/[id]": (db) => db.deal.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
   // A rehab (docs/specs/rehab-draws.md): an open one, the first made. setup.ts seeds one when the local DB has none.
   "draws/[id]": (db) => db.rehab.findFirst({ where: { doneAt: null }, select: { id: true }, orderBy: { createdAt: "asc" } }),
+  // An invoice (docs/contractor-invoices-plan.md): one that is To review and flagged a Possible duplicate when there is
+  // one, else the first made. setup.ts seeds a set when the local DB has none.
+  "invoices/[id]": async (db) =>
+    (await db.invoice.findFirst({ where: { stage: "REVIEW", duplicateOfId: { not: null } }, select: { id: true }, orderBy: { createdAt: "asc" } })) ??
+    db.invoice.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
   // A lease page (docs/specs/tenants.md 6): the one with the most tenants on it, so a household of several and a
   // long name or two are checked on a phone. Each machine's own import, or a lease made with New lease.
   "tenants/[id]": async (db) => {

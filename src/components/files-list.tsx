@@ -3,7 +3,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { Download, Ellipsis, ExternalLink, FileImage, FileSpreadsheet, FileText, Lock, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import type { MediaItem } from "@/components/lightbox";
+import type { LightboxMenuItem, MediaItem } from "@/components/lightbox";
 import { LazyLightbox } from "@/components/lightbox-lazy";
 import { useViewerLink } from "@/components/viewer-link";
 import { Menu, MenuItem, MenuTrigger } from "@/components/menu";
@@ -56,7 +56,9 @@ export type FileLink = {
  * `byline` and `menu` are on for a record's own list (when it has `onDelete`
  * or `onRename`) and off in Activity rows, where the comment already names
  * who and when; pass either to say otherwise (the portal's list has Open and
- * Download and no handlers). `onFill` hovers in `--accent` on a `--muted`
+ * Download and no handlers). `menuItems` adds a record's own actions on a
+ * document ("Use as invoice"): after Rename in the row's ⋯ and in the
+ * viewer's ⋯, never on a link. `onFill` hovers in `--accent` on a `--muted`
  * ground (an internal comment).
  */
 export function FilesList({
@@ -69,6 +71,7 @@ export function FilesList({
   menu: showMenuProp,
   uploader,
   link,
+  menuItems,
 }: {
   files: FileLink[];
   className?: string;
@@ -86,6 +89,8 @@ export function FilesList({
   uploader?: MediaUploaderApi;
   /** Push `?file=<id>` when the viewer opens. On for a record's own list. */
   link?: boolean;
+  /** Extra actions for a document, in its row's ⋯ and the viewer's ⋯. Called only for documents, never a link. */
+  menuItems?: (file: FileLink) => readonly LightboxMenuItem[];
 }) {
   const coarse = useCoarsePointer();
   const showMenu = showMenuProp ?? (!!onDelete || !!onRename);
@@ -111,6 +116,7 @@ export function FilesList({
       })),
     [docs, names],
   );
+  const docsById = useMemo(() => new Map(docs.map((f) => [f.id, f])), [docs]);
   const hrefs = useMemo(() => new Map(docs.map((f) => [f.id, f.href])), [docs]);
   const viewer = useViewerLink(items, link ?? showMenu);
 
@@ -232,6 +238,12 @@ export function FilesList({
                         Rename
                       </MenuItem>
                     )}
+                    {f.kind === "FILE" &&
+                      menuItems?.(f).map((a) => (
+                        <MenuItem key={a.id} id={a.id} icon={a.icon} onAction={a.onAction}>
+                          {a.label}
+                        </MenuItem>
+                      ))}
                     {onDelete && (
                       <MenuItem id="delete" variant="destructive" icon={<Trash2 />} onAction={() => setTarget(f)}>
                         Delete
@@ -259,6 +271,7 @@ export function FilesList({
           onDelete={onDelete}
           onRename={onRename}
           canEdit={!!onRename}
+          menuItems={menuItems ? (item) => (docsById.get(item.id) ? menuItems(docsById.get(item.id)!) : []) : undefined}
         />
       )}
       {target && onDelete && (

@@ -25,7 +25,8 @@ export type NeedsYouKind =
   | "sync-lost"
   | "signup"
   | "baselane"
-  | "draw";
+  | "draw"
+  | "invoice";
 
 /** The rows that carry buttons beside them (contractor onboarding, docs/specs/contractor-onboarding.md 4.5). */
 export type NeedsYouActions = "signup" | "baselane";
@@ -340,14 +341,56 @@ export function drawItems(rehabs: readonly DrawRehab[], today: Ymd): NeedsYouIte
   return stuck.sort((a, b) => b.days - a.days || a.item.title.localeCompare(b.item.title)).map((s) => s.item);
 }
 
+// ---------------------------------------------------------------------------
+// Contractor invoices
+// ---------------------------------------------------------------------------
+
 /**
- * The list in order: key dates and lease ends (late first, then soonest), draws that need us, new sign-ups,
+ * The one invoices row (docs/contractor-invoices-plan.md, M12 and 6.1 item 9): how many wait in To review and who
+ * sent them, opening that view. Null with none. `contractors` are the names of those with a contractor on them,
+ * oldest invoice first and each once; `senders` is everyone who sent one, an unmatched address included, so
+ * "and N more" counts the senders we can't name. No dollar figure and no date: an emailed invoice has no total
+ * until someone types it, so a sum would read low. Snooze comes when snooze and dismiss does.
+ */
+export function invoicesItem(count: number, senders: number, contractors: readonly string[]): NeedsYouItem | null {
+  if (count <= 0) return null;
+  const names = contractors.slice(0, 2);
+  const more = Math.max(0, senders - names.length);
+  const parts = [...names, ...(more > 0 && names.length > 0 ? [`${more} more`] : [])];
+  const detail =
+    names.length === 0
+      ? senders > 1
+        ? `${senders} unknown senders`
+        : senders === 1
+          ? "Unknown sender"
+          : "No contractor yet"
+      : parts.length === 1
+        ? parts[0]
+        : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  return {
+    key: "invoices",
+    kind: "invoice",
+    href: "/invoices?view=review",
+    title: `${count.toLocaleString("en-US")} ${count === 1 ? "invoice" : "invoices"} to review`,
+    state: "Review",
+    detail,
+    amount: null,
+    pastDue: null,
+    dateLabel: null,
+    late: false,
+    date: null,
+  };
+}
+
+/**
+ * The list in order: key dates and lease ends (late first, then soonest), draws that need us, invoices to review, new sign-ups,
  * Baselane links to send, the Missing info row, this year's CapEx, then QuickBooks.
  */
 export function needsYouList(parts: {
   keyDates: NeedsYouItem[];
   leaseEnds?: NeedsYouItem[];
   draws?: NeedsYouItem[];
+  invoices?: NeedsYouItem | null;
   signups?: NeedsYouItem[];
   baselane?: NeedsYouItem[];
   missing?: NeedsYouItem | null;
@@ -360,6 +403,7 @@ export function needsYouList(parts: {
   return [
     ...dated,
     ...(parts.draws ?? []),
+    ...(parts.invoices ? [parts.invoices] : []),
     ...(parts.signups ?? []),
     ...(parts.baselane ?? []),
     ...(parts.missing ? [parts.missing] : []),

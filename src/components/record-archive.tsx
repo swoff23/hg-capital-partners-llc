@@ -31,9 +31,11 @@ type ArchiveAction = (id: string, archived: boolean) => Promise<ActionResult>;
  * Archive or restore, with the toast and its Undo. One toast per record, so a
  * quick Undo replaces it. `succeeded` runs when the change went through.
  */
-function useArchive(kind: ArchiveKind, id: string, action: ArchiveAction) {
+function useArchive(kind: ArchiveKind | undefined, id: string, action: ArchiveAction | undefined) {
   const { run, pending, toast } = useRun();
   const change = (archived: boolean, succeeded?: () => void) =>
+    kind &&
+    action &&
     run(() => action(id, archived), {
       done: archiveToast(kind, archived),
       key: `archive:${kind}:${id}`,
@@ -46,7 +48,15 @@ function useArchive(kind: ArchiveKind, id: string, action: ArchiveAction) {
 /** A record's own verb in its ⋯ menu, above Copy link: the property's "Add listing". */
 export type RecordMenuAction = { label: string; icon: ReactNode; onAction: () => void };
 
-/** The record's ⋯ menu: the record's own verbs (`actions`), Copy link, then Archive, or Restore while it's archived. */
+/** What takes Archive's place at the end of the menu (an invoice's "Not an invoice"), drawn after the line like Archive was. */
+export type RecordMenuLast = RecordMenuAction & { destructive?: boolean; isDisabled?: boolean };
+
+/**
+ * The record's ⋯ menu: the record's own verbs (`actions`), Copy link, then Archive, or Restore while it's archived.
+ * `last` replaces that last item with the record's own (the invoice page's red "Not an invoice"); `last={null}`
+ * leaves it and its line out (a paid invoice has nothing to clear). A record with its own `last` needs no
+ * `kind` or `action`.
+ */
 export function RecordMoreMenu({
   kind,
   id,
@@ -55,17 +65,20 @@ export function RecordMoreMenu({
   refusal,
   action,
   actions,
+  last,
 }: {
-  kind: ArchiveKind;
+  kind?: ArchiveKind;
   id: string;
   /** The page's path, for Copy link: "/deals/abc". */
   href: string;
   archived: boolean;
   /** Why Archive won't go through yet, named under it ("Reassign their 3 jobs first."). */
   refusal?: string | null;
-  action: ArchiveAction;
+  action?: ArchiveAction;
   /** Verbs of this record that have no place on the page right now, listed first. */
   actions?: RecordMenuAction[];
+  /** In place of Archive and Restore, or null for neither. */
+  last?: RecordMenuLast | null;
 }) {
   const { change, pending, toast } = useArchive(kind, id, action);
 
@@ -96,16 +109,29 @@ export function RecordMoreMenu({
         <MenuItem icon={<Link2 />} onAction={copyLink}>
           Copy link
         </MenuItem>
-        <MenuSeparator />
-        {archived ? (
-          <MenuItem icon={<ArchiveRestore />} isDisabled={pending} onAction={() => change(false)}>
-            Restore
-          </MenuItem>
+        {last === undefined ? (
+          <>
+            <MenuSeparator />
+            {archived ? (
+              <MenuItem icon={<ArchiveRestore />} isDisabled={pending} onAction={() => change(false)}>
+                Restore
+              </MenuItem>
+            ) : (
+              // Still pressable when refused: the server has the last word, and a tap says why in the toast.
+              <MenuItem icon={<Archive />} isDisabled={pending} description={refusal ?? undefined} onAction={() => change(true)}>
+                Archive
+              </MenuItem>
+            )}
+          </>
         ) : (
-          // Still pressable when refused: the server has the last word, and a tap says why in the toast.
-          <MenuItem icon={<Archive />} isDisabled={pending} description={refusal ?? undefined} onAction={() => change(true)}>
-            Archive
-          </MenuItem>
+          last && (
+            <>
+              <MenuSeparator />
+              <MenuItem icon={last.icon} variant={last.destructive ? "destructive" : undefined} isDisabled={last.isDisabled} onAction={last.onAction}>
+                {last.label}
+              </MenuItem>
+            </>
+          )
         )}
       </Menu>
     </MenuTrigger>

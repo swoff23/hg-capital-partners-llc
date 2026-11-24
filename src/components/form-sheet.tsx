@@ -82,6 +82,11 @@ export type FormSheetProps = {
   fullHeight?: boolean;
   /** "public" draws it on the public site's dark tokens. */
   surface?: "app" | "public";
+  /**
+   * Whether focus goes into the first empty field on open (the default). False opens with nothing focused, for a
+   * sheet whose fields are all optional, so a phone's keyboard doesn't jump up (Mark paid).
+   */
+  focusFirstField?: boolean;
   className?: string;
   children: ReactNode;
 };
@@ -144,6 +149,7 @@ export function FormSheet({
   size,
   fullHeight,
   surface,
+  focusFirstField = true,
   className,
   children,
 }: FormSheetProps) {
@@ -281,7 +287,7 @@ export function FormSheet({
           </div>
         }
       >
-        <FormBody formId={formId} formRef={formRef} isOpen={isOpen} onSubmit={submit} onKeyDown={onKeyDown}>
+        <FormBody formId={formId} formRef={formRef} isOpen={isOpen} focusFirst={focusFirstField} onSubmit={submit} onKeyDown={onKeyDown}>
           {children}
         </FormBody>
       </Sheet>
@@ -315,6 +321,7 @@ function FormBody({
   formId,
   formRef: ref,
   isOpen,
+  focusFirst,
   onSubmit,
   onKeyDown,
   children,
@@ -322,12 +329,13 @@ function FormBody({
   formId: string;
   formRef: RefObject<HTMLFormElement | null>;
   isOpen: boolean;
+  focusFirst: boolean;
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
   onKeyDown: (e: KeyboardEvent<HTMLFormElement>) => void;
   children: ReactNode;
 }) {
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !focusFirst) return;
     // After the dialog's own focus move, which lands on the dialog itself.
     const frame = requestAnimationFrame(() => {
       const form = ref.current;
@@ -343,7 +351,7 @@ function FormBody({
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [isOpen, ref]);
+  }, [isOpen, focusFirst, ref]);
   return (
     <form ref={ref} id={formId} noValidate onSubmit={onSubmit} onKeyDown={onKeyDown} className="space-y-4 p-4">
       {children}

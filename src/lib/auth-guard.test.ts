@@ -314,7 +314,8 @@ test("'use server' appears only at the top of a file", () => {
 // Portal code boundaries
 // ---------------------------------------------------------------------------
 
-const PORTAL_DIRS = [path.join(SRC, "app", "(portal)"), path.join(SRC, "lib", "portal")];
+// Contractor invoices (docs/contractor-invoices-plan.md, 5.2) serve the portal too, so they keep its boundary.
+const PORTAL_DIRS = [path.join(SRC, "app", "(portal)"), path.join(SRC, "lib", "portal"), path.join(SRC, "lib", "invoices")];
 const portalFiles = PORTAL_DIRS.flatMap((d) => walk(d));
 
 /**
@@ -542,4 +543,17 @@ test("the boundary checks catch what they should", () => {
   assert.equal(routeAllowed("/login/reset/submit"), true);
   assert.ok(ROUTE_FILE.test(path.join("app", "api", "x", "route.tsx")) && ROUTE_FILE.test(path.join("app", "api", "x", "route.js")));
   assert.equal(routePath(path.join(SRC, "app", "api", "files", "[kind]", "[id]", "route.ts")), "/api/files/[kind]/[id]");
+});
+
+// docs/contractor-invoices-plan.md, 4.4: every invoice file is checked where it sits before it's recorded, so the
+// app's one way in to invoices exposes no write that takes a caller's file meta (a url or pathname it names).
+test("invoices/service.ts exposes only the checked file writes", () => {
+  const service = fs.readFileSync(path.join(SRC, "lib", "invoices", "service.ts"), "utf8");
+  assert.doesNotMatch(service, /export async function (createPortalInvoice|addInvoiceFile)\b/);
+  assert.match(service, /export async function sendPortalInvoice\b/);
+  assert.match(service, /export async function recordInvoiceUpload\b/);
+  assert.match(service, /export async function useAsInvoice\b/);
+  // New invoice takes its fields only; Use as invoice's id and file come from files.ts.
+  assert.match(service, /createStaffInvoice\(input: NewInvoiceInput,/);
+  assert.match(service, /export type NewInvoiceInput = Omit<core\.StaffInvoiceInput, "id" \| "files">;/);
 });

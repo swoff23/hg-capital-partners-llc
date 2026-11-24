@@ -7,6 +7,7 @@ import { sendEmail } from "@/lib/email/send";
 import { getEnv } from "@/lib/env";
 import { logError } from "@/lib/log";
 import { SEEABLE_FILE, contractorMaySee } from "@/lib/attachments/access";
+import { closeUnclaimedInvoiceRow, invoiceEmailFor, isInvoiceRow } from "@/lib/invoices/notify";
 import { CODE_MASK, lockboxMasker, readJobAccess } from "@/lib/portal/access-code";
 import { mintJobLink } from "@/lib/portal/job-links";
 import { staffFirstNames } from "@/lib/portal/queries";
@@ -200,6 +201,8 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
     select: {
       id: true,
       taskId: true,
+      // An invoice's Paid email; the partners' invoice bundle has neither this nor a task (invoices/notify.ts).
+      invoiceId: true,
       recipientContactId: true,
       recipientUserId: true,
       // Read before the claim only to see whether it says they're off the job (offItems); what's sent is the claim's.
@@ -239,8 +242,94 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
   // The partners a contractor's reply line names, read once per run.
   let staffNames: string[] | null = null;
 
+  /**
+   * After a send: sent, retried with backoff, or given back when Resend refused for its own limits (and with a
+   * quota refusal, every other due row waits too). Shared by the task rows and the invoice rows.
+   */
+  const settle = async (rowId: string, attempts: number, res: Awaited<ReturnType<typeof sendEmail>>): Promise<void> => {
+    if (res.ok) {
+      await prisma.notificationOutbox.updateMany({ where: { id: rowId }, data: { sentAt: new Date(), lastError: null } });
+      result.sent++;
+      return;
+    }
+    const error = (res.error ?? "send failed").slice(0, 500);
+    const failure = sendFailureKind(res);
+    if (failure !== "error") {
+      // Resend's quota or rate limit, not this email's fault: give the try
+      // back, and leave this row and the rest of the batch for a later run.
+      refused = true;
+      result.held++;
+      const until = refusedRetryAt(failure, new Date());
+      await prisma.notificationOutbox.updateMany({
+        where: { id: rowId },
+        data: { sendAfter: until, attempts: { decrement: 1 }, lastError: error },
+      });
+      if (failure === "quota") {
+        // Everything else due waits too, so each later run doesn't spend a refused call. One statement across
+        // every task's rows: it takes them in id order, as every outbox lock in core.ts does, and passes over
+        // a row a write holds right now (a line queueing, an Undo reading it) instead of waiting on it, so it
+        // never deadlocks against them. A row passed over stays due and waits at the next run's refusal.
+        await pushBackDue(now, until);
+        logError("notifications:resend-quota", new Error("Resend's sending quota is used up; emails wait and retry hourly"), {
+          sentToday: sentBefore + result.sent,
+        });
+      }
+      return;
+    }
+    result.failed++;
+    const next = retryAt(attempts, new Date());
+    await prisma.notificationOutbox.updateMany({
+      where: { id: rowId },
+      data: next ? { sendAfter: next, lastError: error } : { sentAt: new Date(), lastError: `gave up: ${error}` },
+    });
+  };
+
+  /** Spaced under Resend's per-second limit. */
+  const spacedSend = async (msg: Parameters<typeof sendEmail>[0]) => {
+    const wait = lastSendAt + SEND_GAP_MS - Date.now();
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    lastSendAt = Date.now();
+    return sendEmail(msg);
+  };
+
   for (const row of rows) {
     if (Date.now() - started > TIME_BUDGET_MS) break;
+
+    // An invoice email (docs/contractor-invoices-plan.md, 5.3): its own short branch, with no task read and no
+    // TaskAccess check. A Paid email goes for an invoice with no job, or one on a job that sits on a partner.
+    if (isInvoiceRow(row)) {
+      const plan = await invoiceEmailFor(prisma, row, { now, appUrl });
+      if (plan.kind === "skip") {
+        // The plan came from the items this batch read, before any claim: it closes only while the row still holds
+        // them, so a bundle line or a re-pay queued since keeps the row open for the next run.
+        if (await closeUnclaimedInvoiceRow(prisma, row, now, plan.reason)) result.skipped++;
+        continue;
+      }
+      if (plan.kind === "wait") {
+        // Not claimed: only its time moves, to when the Undo window ends.
+        await prisma.notificationOutbox.updateMany({ where: { id: row.id, sentAt: null }, data: { sendAfter: plan.until } });
+        continue;
+      }
+      if (refused || result.sent >= budget) {
+        result.held++;
+        continue;
+      }
+      const claimed = await claim(row.id, now);
+      if (!claimed) continue;
+      // Read again now the row is claimed: undone, re-paid or approved since the batch read says so here.
+      const fresh = await invoiceEmailFor(prisma, { ...row, items: claimed.items }, { now, appUrl });
+      if (fresh.kind !== "send") {
+        await prisma.notificationOutbox.updateMany({
+          where: { id: row.id },
+          data: fresh.kind === "skip" ? { sentAt: now, lastError: fresh.reason } : { sendAfter: fresh.until, attempts: { decrement: 1 } },
+        });
+        if (fresh.kind === "skip") result.skipped++;
+        continue;
+      }
+      // No reply address of its own (M15): a "thanks" goes to the plain reply address.
+      await settle(row.id, claimed.attempts, await spacedSend({ to: fresh.to, subject: fresh.subject, text: fresh.text, html: fresh.html }));
+      continue;
+    }
 
     const contractorHasAccess = !!row.recipientContactId && !!row.task?.access.some((a) => a.contactId === row.recipientContactId);
     // "You're off this job" goes though their access has just ended: it says only that (offItems).
@@ -344,10 +433,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       replyByEmail: !!replyToken,
     });
     const rendered = renderJobEmail(email);
-    const wait = lastSendAt + SEND_GAP_MS - Date.now();
-    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-    lastSendAt = Date.now();
-    const res = await sendEmail({
+    const res = await spacedSend({
       to: delivery.to,
       subject: email.subject,
       text: rendered.text,
@@ -355,42 +441,7 @@ export async function drainDue(now = new Date(), opts: { limit?: number } = {}):
       threadKey: email.threadKey,
       ...(replyToken && replyConfig ? { replyTo: replyAddress(replyToken, replyConfig.from) } : {}),
     });
-
-    if (res.ok) {
-      await prisma.notificationOutbox.updateMany({ where: { id: row.id }, data: { sentAt: new Date(), lastError: null } });
-      result.sent++;
-      continue;
-    }
-    const error = (res.error ?? "send failed").slice(0, 500);
-    const failure = sendFailureKind(res);
-    if (failure !== "error") {
-      // Resend's quota or rate limit, not this email's fault: give the try
-      // back, and leave this row and the rest of the batch for a later run.
-      refused = true;
-      result.held++;
-      const until = refusedRetryAt(failure, new Date());
-      await prisma.notificationOutbox.updateMany({
-        where: { id: row.id },
-        data: { sendAfter: until, attempts: { decrement: 1 }, lastError: error },
-      });
-      if (failure === "quota") {
-        // Everything else due waits too, so each later run doesn't spend a refused call. One statement across
-        // every task's rows: it takes them in id order, as every outbox lock in core.ts does, and passes over
-        // a row a write holds right now (a line queueing, an Undo reading it) instead of waiting on it, so it
-        // never deadlocks against them. A row passed over stays due and waits at the next run's refusal.
-        await pushBackDue(now, until);
-        logError("notifications:resend-quota", new Error("Resend's sending quota is used up; emails wait and retry hourly"), {
-          sentToday: sentBefore + result.sent,
-        });
-      }
-      continue;
-    }
-    result.failed++;
-    const next = retryAt(claimed.attempts, new Date());
-    await prisma.notificationOutbox.updateMany({
-      where: { id: row.id },
-      data: next ? { sendAfter: next, lastError: error } : { sentAt: new Date(), lastError: `gave up: ${error}` },
-    });
+    await settle(row.id, claimed.attempts, res);
   }
 
   if (reachedCapNow(sentBefore, result.sent)) {

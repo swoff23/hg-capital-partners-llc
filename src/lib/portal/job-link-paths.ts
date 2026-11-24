@@ -5,7 +5,7 @@
  */
 
 /** What a button asks the job page to have ready. Nothing acts until the contractor taps on the page. */
-export const JOB_LINK_STEPS = ["done", "photos", "access", "share", "date"] as const;
+export const JOB_LINK_STEPS = ["done", "photos", "access", "share", "date", "invoice"] as const;
 export type JobLinkStep = (typeof JOB_LINK_STEPS)[number];
 
 export function jobLinkStep(value: string | null | undefined): JobLinkStep | null {
@@ -14,9 +14,11 @@ export function jobLinkStep(value: string | null | undefined): JobLinkStep | nul
 
 /**
  * The job page a link opens, `/p/jobs/<id>`, ready for the button's step:
- *  - done, share and date: `?do=` asks the page to open the Mark done sheet,
- *    the crew text or the date (it opens nothing the job can't take, and asks
- *    before acting);
+ *  - done, share, date and invoice: `?do=` asks the page to open the Mark done
+ *    sheet, the crew text, the date or the Send invoice sheet (it opens nothing
+ *    the job can't take, and asks before acting; invoice is where a one-job
+ *    link session's Send invoice comes back to after signing in, section 4.1
+ *    of docs/contractor-invoices-plan.md);
  *  - access: `#access`, which the page takes to Tenants, or to Lockbox when
  *    nobody lives there (hash-scroll.tsx);
  *  - photos: `#updates`, the Updates section with the composer;
@@ -26,7 +28,7 @@ export function jobLinkStep(value: string | null | undefined): JobLinkStep | nul
 export function jobLinkDestination(taskId: string, step: string | null, updateId: string | null = null): string {
   const s = jobLinkStep(step);
   const page = `/p/jobs/${encodeURIComponent(taskId)}`;
-  if (s === "done" || s === "share" || s === "date") return `${page}?do=${s}`;
+  if (s === "done" || s === "share" || s === "date" || s === "invoice") return `${page}?do=${s}`;
   if (s === "access") return `${page}#access`;
   if (s === "photos") return `${page}#updates`;
   return updateId && /^[A-Za-z0-9_-]{1,64}$/.test(updateId) ? `${page}#update-${updateId}` : page;

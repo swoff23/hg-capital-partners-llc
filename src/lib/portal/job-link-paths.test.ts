@@ -6,6 +6,7 @@ test("a link opens the job ready for its button's step, and nothing else gets in
   assert.equal(jobLinkDestination("t1", null), "/p/jobs/t1");
   assert.equal(jobLinkDestination("t1", "done"), "/p/jobs/t1?do=done");
   assert.equal(jobLinkDestination("t1", "share"), "/p/jobs/t1?do=share");
+  assert.equal(jobLinkDestination("t1", "invoice"), "/p/jobs/t1?do=invoice");
   assert.equal(jobLinkDestination("t1", "access"), "/p/jobs/t1#access");
   assert.equal(jobLinkDestination("t1", "photos"), "/p/jobs/t1#updates");
   assert.equal(jobLinkDestination("t1", null, "e7"), "/p/jobs/t1#update-e7");
@@ -13,6 +14,7 @@ test("a link opens the job ready for its button's step, and nothing else gets in
   assert.equal(jobLinkDestination("t1", "approve"), "/p/jobs/t1");
   assert.equal(jobLinkDestination("t1", null, "e7#x?y"), "/p/jobs/t1");
   assert.equal(jobLinkStep("photos"), "photos");
+  assert.equal(jobLinkStep("invoice"), "invoice");
   assert.equal(jobLinkStep(undefined), null);
 });
 

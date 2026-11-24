@@ -10,17 +10,18 @@ import { leaseEndRows, loadMissingInfo } from "@/lib/missing/queries";
 import { ofPriority, placesLine } from "@/lib/missing/checks";
 import { lineFigures, rehabFigures } from "@/lib/draws/figures";
 import { listRehabs } from "@/lib/draws/queries";
-import { baselaneItems, capexItem, drawItems, keyDateItems, missingItem, needsYouList, quickbooksItem, signupItems, type NeedsYouItem } from "./needs-you";
+import { invoicesToReview } from "@/lib/invoices/queries";
+import { baselaneItems, capexItem, drawItems, invoicesItem, keyDateItems, missingItem, needsYouList, quickbooksItem, signupItems, type NeedsYouItem } from "./needs-you";
 
 /**
  * Everything Home's Needs you list reads, in one place: each property's key
  * dates and CapEx inputs, the CapEx rules, the QuickBooks connection, lease
  * ends, the Missing info count (docs/specs/missing-info.md) and the open
- * rehabs' draws (docs/specs/rehab-draws.md). The rules for what shows are
+ * rehabs' draws (docs/specs/rehab-draws.md) and the invoices waiting in To review. The rules for what shows are
  * in ./needs-you.
  */
 export async function needsYou(today: Ymd, now: Date = new Date()): Promise<NeedsYouItem[]> {
-  const [properties, rules, conn, signups, setups, leaseEnds, missing, rehabs] = await Promise.all([
+  const [properties, rules, conn, signups, setups, leaseEnds, missing, rehabs, invoices] = await Promise.all([
     // An archived property leaves Home (lib/archive.ts); its reminder tasks stay on Today.
     prisma.property.findMany({
       where: liveRecord,
@@ -54,6 +55,7 @@ export async function needsYou(today: Ymd, now: Date = new Date()): Promise<Need
     leaseEndRows(today),
     loadMissingInfo(today),
     listRehabs("open"),
+    invoicesToReview(),
   ]);
   const required = ofPriority(missing.gaps, "required");
 
@@ -101,6 +103,7 @@ export async function needsYou(today: Ymd, now: Date = new Date()): Promise<Need
     keyDates: keyDateItems(properties, today, undrawn),
     leaseEnds,
     draws: drawItems(rehabs, today),
+    invoices: invoicesItem(invoices.count, invoices.senders.length, invoices.contractors),
     missing: missingItem(required.length, placesLine(required)),
     signups: signupItems(
       signups.map((s) => ({ id: s.id, fullName: s.fullName, phoneE164: s.phoneE164, email: s.email, trades: tradeLine(s.tradeLinks), createdAt: s.createdAt })),

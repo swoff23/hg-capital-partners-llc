@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Ellipsis, Link2, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Ellipsis, Link2, ReceiptText, Trash2 } from "lucide-react";
 import { Button as AriaButton } from "react-aria-components";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { InlineField } from "@/components/inline-field";
@@ -33,9 +34,10 @@ export function TitleField({ taskId, title, closed }: { taskId: string; title: s
   );
 }
 
-/** "…": Copy link, Delete. */
-export function MoreMenu({ taskId, title }: { taskId: string; title: string }) {
+/** "…": New invoice (for this job), Copy link, Delete. */
+export function MoreMenu({ taskId, title, canceled = false }: { taskId: string; title: string; canceled?: boolean }) {
   const { toast } = useToast();
+  const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [deleting, startDelete] = useTransition();
 
@@ -69,6 +71,13 @@ export function MoreMenu({ taskId, title }: { taskId: string; title: string }) {
           <Ellipsis className="size-4" aria-hidden="true" />
         </AriaButton>
         <Menu>
+          {/* Opens New invoice with this job ticked (docs/contractor-invoices-plan.md 6.1 item 6). */}
+          {/* A canceled job takes no invoice (M7), so the item isn't offered. */}
+          {!canceled && (
+            <MenuItem icon={<ReceiptText />} onAction={() => router.push(`/invoices/new?job=${encodeURIComponent(taskId)}`)}>
+              New invoice
+            </MenuItem>
+          )}
           <MenuItem icon={<Link2 />} onAction={copyLink}>
             Copy link
           </MenuItem>

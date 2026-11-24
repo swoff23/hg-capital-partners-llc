@@ -60,6 +60,7 @@ export const config = {
     "/deals/:path*",
     "/draws/:path*",
     "/financials/:path*",
+    "/invoices/:path*",
     "/missing/:path*",
     "/properties/:path*",
     "/settings/:path*",

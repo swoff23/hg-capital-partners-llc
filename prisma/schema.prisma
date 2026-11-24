@@ -72,6 +72,12 @@ model User {
   qboConnections      QuickbooksConnection[]
   // "Forgot password" links for this partner (docs/specs/staff-password-reset.md).
   passwordResetTokens PasswordResetToken[]
+
+  // Contractor invoices (docs/contractor-invoices-plan.md): the ones this partner entered, approved or marked paid.
+  createdInvoices  Invoice[]      @relation("InvoiceCreatedByUser")
+  approvedInvoices Invoice[]      @relation("InvoiceApprovedBy")
+  paidInvoices     Invoice[]      @relation("InvoicePaidBy")
+  invoiceEvents    InvoiceEvent[] @relation("InvoiceEventActorUser")
 }
 
 // ---------------------------------------------------------------------------
@@ -324,6 +330,11 @@ model Contact {
   portalInvites  PortalInvite[]
   documents      ContactDocument[]
 
+  // Contractor invoices (docs/contractor-invoices-plan.md): theirs, the ones they sent, and their lines in an invoice's history.
+  invoices        Invoice[]      @relation("InvoiceContact")
+  createdInvoices Invoice[]      @relation("InvoiceCreatedByContact")
+  invoiceEvents   InvoiceEvent[] @relation("InvoiceEventActorContact")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -495,6 +506,8 @@ model Task {
   linkSessions  PortalSession[]      @relation("PortalSessionOnlyTask")
   readStates    TaskReadState[]
   notifications NotificationOutbox[]
+  // The invoices tacked onto this job (docs/contractor-invoices-plan.md, M7). Deleting the job keeps them.
+  invoiceLinks  InvoiceTask[]
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -868,6 +881,10 @@ model NotificationOutbox {
   recipientContactId String?
   task               Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   taskId             String?
+  // An invoice's Paid email to its contractor (docs/contractor-invoices-plan.md, 5.3): no task, its own short
+  // branch in the drain. Null on every task email and on the partners' invoice bundle ("u:<id>:invoices").
+  invoice            Invoice?  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId          String?
   items              Json      @default("[]") // [{ kind, actorLabel, summary, at }]
   firstAt            DateTime  @default(now())
   sendAfter          DateTime
@@ -877,6 +894,7 @@ model NotificationOutbox {
   createdAt          DateTime  @default(now())
 
   @@index([sentAt, sendAfter])
+  @@index([invoiceId])
 }
 
 // Documents uploaded to a property — same Vercel Blob pattern as TaskAttachment.
@@ -1543,4 +1561,204 @@ model DrawLine {
 
   @@id([drawId, lineId])
   @@index([lineId])
+}
+
+// ---------------------------------------------------------------------------
+// Contractor invoices (docs/contractor-invoices-plan.md, 5.1). A contractor
+// sends one from a job, replies to a Done job's email with it, or forwards it
+// to invoices@; a partner enters one by hand. It waits in To review, moves to
+// To pay on Approve and to Paid on Mark paid. Money never moves in the app.
+// Every write goes through src/lib/invoices/service.ts (the rules are in
+// core.ts), each with its InvoiceEvent in the same transaction.
+// ---------------------------------------------------------------------------
+enum InvoiceSource {
+  PORTAL // the contractor's Send invoice, signed in
+  REPLY // a reply to a Done job's email, with the bill attached
+  EMAIL // forwarded to invoices@, by a contractor or a partner
+  STAFF // a partner's New invoice, or Use as invoice on a job file
+}
+
+// The stages, in order (M4). Contractors read REVIEW as Received and TO_PAY as Approved.
+enum InvoiceStage {
+  REVIEW
+  TO_PAY
+  PAID
+  NOT_INVOICE // junk, a work photo or a duplicate, cleared by staff: a soft delete (deletedAt)
+}
+
+// How it was paid (M9). CARD stays apart because card payments go on a 1099-K, not a 1099-NEC.
+enum InvoicePayMethod {
+  BASELANE
+  CHECK
+  ZELLE
+  VENMO
+  CASH
+  CARD
+  OTHER
+}
+
+enum InvoiceEventKind {
+  ARRIVED // made, by any way in
+  EDITED // a field or a job link, in To review
+  FILE_ADDED
+  APPROVED
+  REOPENED // Back to review
+  PAID
+  UNDONE // Undo paid
+  NOT_INVOICE
+  RESTORED // the Undo of Not an invoice
+}
+
+// What became of a received email. Generic, so the planned deals@ and draws@ inboxes can use it too.
+enum InboundEmailStatus {
+  RECEIVED // stored, not yet filed
+  FILED // it made its record (an invoice)
+  IGNORED // an automatic reply, or nothing to file
+  OVER_CAP // past the day's limits, so dropped and counted (4.3)
+}
+
+model Invoice {
+  id                      String            @id @default(cuid())
+  // Null until someone knows who sent it ("Who's this from?", M11). A deleted contact leaves the invoice.
+  contact                 Contact?          @relation("InvoiceContact", fields: [contactId], references: [id], onDelete: SetNull)
+  contactId               String?
+  source                  InvoiceSource
+  stage                   InvoiceStage      @default(REVIEW)
+  // As typed, without a leading "#" ("1043", "INV-0042"). Optional.
+  invoiceNumber           String?
+  // For the duplicate check (M10): letters and digits only, lowercased, leading zeros dropped ("inv0042").
+  invoiceNumberNormalized String?
+  // The date on the invoice: UTC midnight of a Buffalo day, the day it arrived unless someone changes it.
+  invoiceDate             DateTime
+  // Always above zero (a CHECK); null until someone types it.
+  total                   Decimal?          @db.Decimal(12, 2)
+  // A note only staff see.
+  note                    String?           @db.Text
+  approvedAt              DateTime?
+  approvedBy              User?             @relation("InvoiceApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  approvedByUserId        String?
+  // The paid date a partner picked (UTC midnight of a Buffalo day), and the instant they marked it: the Paid email
+  // and the portal wait out the Undo window from paidAt. Set exactly while PAID (a CHECK).
+  paidOn                  DateTime?
+  paidAt                  DateTime?
+  payMethod               InvoicePayMethod?
+  // A check number or a short note.
+  paidNote                String?
+  paidBy                  User?             @relation("InvoicePaidBy", fields: [paidByUserId], references: [id], onDelete: SetNull)
+  paidByUserId            String?
+  // Who made it: at most one (a CHECK). Neither on an emailed invoice or a system write, where the email's From or
+  // the ARRIVED event's actor label says who.
+  createdByUser           User?             @relation("InvoiceCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByUserId         String?
+  createdByContact        Contact?          @relation("InvoiceCreatedByContact", fields: [createdByContactId], references: [id], onDelete: SetNull)
+  createdByContactId      String?
+  // The email it came in, for "From the email Zack sent Nov 18" and its words. Unique: one email makes one invoice.
+  inboundEmail            InboundEmail?     @relation(fields: [inboundEmailId], references: [id], onDelete: SetNull)
+  inboundEmailId          String?           @unique
+  // "Possible duplicate" (M10): an older invoice, Paid and Not an invoice ones included, with the same contractor
+  // and number or the very same file. Kept by core.ts whenever a contractor, number or file changes. Warns only.
+  duplicateOf             Invoice?          @relation("InvoiceDuplicate", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicateOfId           String?
+  duplicates              Invoice[]         @relation("InvoiceDuplicate")
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  // Set exactly while NOT_INVOICE (a CHECK): staff cleared it, and Undo brings it back.
+  deletedAt               DateTime?
+
+  tasks         InvoiceTask[]
+  files         InvoiceFile[]
+  events        InvoiceEvent[]
+  notifications NotificationOutbox[]
+
+  @@index([stage, invoiceDate])
+  @@index([stage, paidOn])
+  @@index([contactId, invoiceNumberNormalized])
+  @@index([createdAt])
+  @@index([duplicateOfId])
+}
+
+// A job an invoice is for (M7): any job but a canceled one, whoever it sits on. A job can have several invoices.
+model InvoiceTask {
+  id        String   @id @default(cuid())
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId String
+  // Null once the job is deleted: the link then reads as its kept title, with nowhere to go.
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  taskId    String?
+  // The job's title when it was linked.
+  title     String
+  createdAt DateTime @default(now())
+
+  @@unique([invoiceId, taskId])
+  @@index([taskId])
+}
+
+// An invoice's file: always the invoice's own private Blob copy, so removing a job's file or deleting the job
+// never touches it. Served only through /api/files/invoice/<id>.
+model InvoiceFile {
+  id            String   @id @default(cuid())
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId     String
+  url           String
+  pathname      String   @unique
+  filename      String
+  size          Int
+  contentType   String?
+  // Of the bytes, lowercase hex, for "the exact same file" (M10).
+  sha256        String
+  thumbPathname String? // ~1024px JPEG of an image, for the file card
+  width         Int?
+  height        Int?
+  createdAt     DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([sha256])
+}
+
+// An invoice's history. The actor ids are nullable (an email, the system, a deleted person); the label always says who.
+model InvoiceEvent {
+  id             String           @id @default(cuid())
+  invoice        Invoice          @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  kind           InvoiceEventKind
+  actorUser      User?            @relation("InvoiceEventActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorUserId    String?
+  actorContact   Contact?         @relation("InvoiceEventActorContact", fields: [actorContactId], references: [id], onDelete: SetNull)
+  actorContactId String?
+  // "Connor Swofford", "Zack (Outlaw Carpentry)", "zack@gmail.com". Kept if the person is deleted.
+  actorLabel     String
+  // What changed: { source, files } on ARRIVED; { field, from, to } on EDITED, or { field: "jobs", taskId, added | removed }
+  // for a job; { fileId, filename } on FILE_ADDED; { paidOn, method, note } on PAID; { paidOn, method } on UNDONE;
+  // { from } on NOT_INVOICE; { to } on RESTORED.
+  data           Json             @default("{}")
+  createdAt      DateTime         @default(now())
+
+  @@index([invoiceId, createdAt])
+}
+
+// A received email, stored as it came in (docs/contractor-invoices-plan.md, 4.3). Generic: other inboxes on the
+// same webhook can use it later.
+model InboundEmail {
+  id         String             @id @default(cuid())
+  // Resend's email id, once per email: a webhook Resend retries finds its row.
+  resendId   String             @unique
+  // The part of the address it was sent to before the @: "invoices".
+  localPart  String
+  // The sender's address, lowercased (src/lib/email/inbound.ts fromAddress).
+  from       String
+  // The From header as it came in, which M11 and M12 check for a single address (inbound.ts singleAddress) along
+  // with the DMARC result. Null only on a row stored without it, which then never counts as a partner's forward.
+  fromLine   String?
+  subject    String?
+  receivedAt DateTime
+  // The whole text body, links kept.
+  text       String?            @db.Text
+  // Resend's DMARC check of the From: "pass", "fail", "gray", ... Null when Resend didn't say.
+  dmarc      String?
+  status     InboundEmailStatus @default(RECEIVED)
+  createdAt  DateTime           @default(now())
+  invoice    Invoice?
+
+  @@index([localPart, receivedAt])
+  @@index([from, receivedAt])
 }

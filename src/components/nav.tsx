@@ -5,6 +5,7 @@ import {
   ChartColumn,
   HandCoins,
   House,
+  ReceiptText,
   Settings2,
   SquareCheckBig,
   TrendingUp,
@@ -27,6 +28,7 @@ const LINKS: { href: string; label: string; icon: LucideIcon; list?: ListKey }[]
   { href: "/tenants", label: "Tenants", icon: Users, list: "tenants" },
   { href: "/financials", label: "Financials", icon: ChartColumn },
   { href: "/tasks", label: "Tasks", icon: SquareCheckBig, list: "tasks" },
+  { href: "/invoices", label: "Invoices", icon: ReceiptText },
   { href: "/contractors", label: "Contractors", icon: Wrench, list: "contractors" },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];

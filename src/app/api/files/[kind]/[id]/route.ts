@@ -15,6 +15,7 @@ import { staffReturnPath, withNext } from "@/lib/next-path";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
+import { mayOpenInvoiceFile } from "@/lib/invoices/fields";
 import { logError } from "@/lib/log";
 import { readJobAccess, readLockboxAccess } from "@/lib/portal/access-code";
 import { resolveJobLink } from "@/lib/portal/job-links";
@@ -43,6 +44,9 @@ export const maxDuration = 300;
  *   Never property documents, never the public fallback. And their own W-9
  *   and insurance (`contact`), which staff see too. And a job's lockbox
  *   photo (`lockbox`, by the job), only while its code shows to them.
+ *   And an invoice's files (`invoice`, by the InvoiceFile), only for an
+ *   invoice of theirs they may see (invoices/fields.ts mayOpenInvoiceFile,
+ *   M14), never from a one-job link session (M16).
  *
  * `?v=thumb` / `?v=poster` serve the row's thumbnail or video poster,
  * authorized by the row itself. A LINK row has no bytes here (the UI links
@@ -73,6 +77,9 @@ const KIND_VIEWERS: Record<string, readonly Viewer["kind"][]> = {
   // A lockbox photo or thumbnail in a property's lockbox folder, by its pathname (?p=): staff only, for the Units list
   // and the unit sheet, which shows a photo uploaded before Save.
   "property-lockbox": ["staff"],
+  // An invoice's PDF or photo (docs/contractor-invoices-plan.md, 5.2): staff, and the contractor whose invoice it is
+  // while they may see it. No email link opens one.
+  invoice: ["staff", "contractor"],
 };
 
 interface Served {
@@ -174,6 +181,26 @@ async function lookup(
     // Uploaded to the private store only (contact-documents.ts checks it), so there's no public fallback to try.
     if (!isPrivateStoreUrl(d.url, storeId, d.pathname)) return null;
     return { source: d.url, privatePathname: d.pathname, filename: d.filename, contentType: d.contentType, publicFallback: false };
+  }
+  if (kind === "invoice" && variant !== "poster") {
+    const f = await prisma.invoiceFile.findUnique({
+      where: { id },
+      select: {
+        url: true,
+        pathname: true,
+        filename: true,
+        contentType: true,
+        thumbPathname: true,
+        invoice: { select: { contactId: true, createdByContactId: true, source: true, stage: true } },
+      },
+    });
+    if (!f || !mayOpenInvoiceFile(viewer, f.invoice)) return null;
+    // Always the invoice's own private copy (invoices/files.ts), so there's no public fallback to try.
+    if (!isPrivateStoreUrl(f.url, storeId, f.pathname)) return null;
+    if (variant === "thumb") {
+      return f.thumbPathname ? { source: f.thumbPathname, privatePathname: f.thumbPathname, filename: previewName(f.filename, "thumb", f.thumbPathname), contentType: null, publicFallback: false } : null;
+    }
+    return { source: f.url, privatePathname: f.pathname, filename: f.filename, contentType: f.contentType, publicFallback: false };
   }
   if (kind === "lease" && viewer.kind === "staff" && !viewer.onlyTaskId && !variant) {
     const f = await prisma.leaseFile.findUnique({ where: { id }, select: { url: true, pathname: true, filename: true, contentType: true } });

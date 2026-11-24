@@ -8,6 +8,7 @@ import {
   STALE_SYNC_MS,
   capexItem,
   drawItems,
+  invoicesItem,
   keyDateItems,
   missingItem,
   moreCount,
@@ -307,4 +308,42 @@ test("draw rows sit after the dated rows and before sign-ups", () => {
   const list = needsYouList({ keyDates: dated, draws, capex: null, quickbooks: null });
   assert.deepEqual(list.map((i) => i.kind), ["loan", "draw"]);
   assert.equal(list[1].detail, "No change in 24 days · Sent");
+});
+
+// ---------------------------------------------------------------------------
+// Contractor invoices (docs/contractor-invoices-plan.md, M12 and 6.1 item 9)
+// ---------------------------------------------------------------------------
+
+test("invoices: one row opening To review, with the count as its title and the Review word", () => {
+  assert.equal(invoicesItem(0, 0, []), null);
+  const row = invoicesItem(3, 3, ["Dave Kim", "Zack Reading"])!;
+  assert.equal(row.kind, "invoice");
+  assert.equal(row.href, "/invoices?view=review");
+  assert.equal(row.title, "3 invoices to review");
+  assert.equal(row.state, "Review");
+  assert.equal(row.amount, null);
+  assert.equal(row.dateLabel, null);
+  assert.equal(invoicesItem(1, 1, ["Dave Kim"])!.title, "1 invoice to review");
+});
+
+test("invoices: two names, then 'and N more'; an unmatched sender counts in the more", () => {
+  assert.equal(invoicesItem(1, 1, ["Dave Kim"])!.detail, "Dave Kim");
+  assert.equal(invoicesItem(2, 2, ["Dave Kim", "Zack Reading"])!.detail, "Dave Kim and Zack Reading");
+  // The sample in drawing 08: two contractors and a billing@ address that came in unmatched.
+  assert.equal(invoicesItem(3, 3, ["Dave Kim", "Zack Reading"])!.detail, "Dave Kim, Zack Reading and 1 more");
+  assert.equal(invoicesItem(6, 5, ["Dave Kim", "Zack Reading", "Maria Lopez"])!.detail, "Dave Kim, Zack Reading and 3 more");
+  assert.equal(invoicesItem(3, 3, ["Dave Kim"])!.detail, "Dave Kim and 2 more");
+  // Nobody named: count the senders we can't name; a partner's own unfinished entry has none.
+  assert.equal(invoicesItem(2, 2, [])!.detail, "2 unknown senders");
+  assert.equal(invoicesItem(1, 1, [])!.detail, "Unknown sender");
+  assert.equal(invoicesItem(1, 0, [])!.detail, "No contractor yet");
+});
+
+test("the list puts the invoices row right after stuck draws", () => {
+  const draws = drawItems([{ id: "r1", name: "56 Tamarack", draws: [{ number: 2, stage: "SENT", stageChangedAt: "2026-10-01T15:00:00Z" }] }], TODAY);
+  const invoices = invoicesItem(2, 2, ["Dave Kim", "Zack Reading"]);
+  const signups = signupItems([signup()], []);
+  const capex = capexItem({ fromYear: 2026, perYear: [1000], rows: [{ perYear: [1000] }] });
+  const list = needsYouList({ keyDates: [], draws, invoices, signups, capex, quickbooks: null });
+  assert.deepEqual(list.map((i) => i.kind), ["draw", "invoice", "signup", "capex"]);
 });

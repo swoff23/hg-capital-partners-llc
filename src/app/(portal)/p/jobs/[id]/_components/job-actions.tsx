@@ -25,6 +25,7 @@ import { useCoarsePointer } from "@/components/use-coarse-pointer";
 import { useLeaveWarning } from "@/components/use-leave-warning";
 import { callAction, type ActionResult } from "@/lib/action-result";
 import { personalDraftKey } from "@/lib/composer-draft";
+import type { Ymd } from "@/lib/dates";
 import { JOB_CLOSED } from "@/lib/attachments/access";
 import { taskFileUrl } from "@/lib/attachments/media";
 import {
@@ -54,6 +55,7 @@ import {
 import { recordedUploadsOf, type RecordedUpload } from "@/lib/portal/recorded-uploads";
 import { cn } from "@/lib/utils";
 import { markJobDoneAction, postJobUpdateAction, startJobAction } from "../actions";
+import { SendInvoice } from "./send-invoice";
 import { postJobBatchAction } from "../upload-actions";
 import { postKept, postOrKeepBatch, postRecordedBatch, recordJobFile } from "./record-and-post";
 
@@ -150,6 +152,7 @@ export function JobActions({
   property,
   sentClientIds,
   openMarkDoneOnLoad = false,
+  sendInvoice,
 }: {
   taskId: string;
   /** The signed-in contractor, whose draft the composer keeps. */
@@ -172,6 +175,11 @@ export function JobActions({
    * loads, while Mark done is the job's next step. It only asks; nothing is sent until they tap Mark done in it.
    */
   openMarkDoneOnLoad?: boolean;
+  /**
+   * What the Send invoice sheet needs, for a job in Review: Send invoice takes the place of the disabled "In review"
+   * button (docs/contractor-invoices-plan.md, 4.1; drawing 09, B1).
+   */
+  sendInvoice: { signedIn: boolean; openOnLoad: boolean; today: Ymd };
 }) {
   const { toast } = useToast();
   const owner = useUploadScope();
@@ -628,15 +636,17 @@ export function JobActions({
           }
           primary={
             step === "review" ? (
-              <Button variant="secondary" disabled className={cn(barButton, "text-muted-foreground disabled:opacity-100 max-[360px]:px-2")}>
-                {/* Half the bar on a phone, beside "Add photo/video" for the hour after Mark done: shorter words as the
-                    bar narrows, so the label never truncates ("Waiting for review" needs 166px and has no slack
-                    until 173px, at 390). Max-[390px] is "below 390", so the first two split there and neither shows
-                    twice. */}
-                <span className="truncate min-[390px]:hidden">In review</span>
-                <span className="truncate max-[390px]:hidden sm:hidden">Waiting for review</span>
-                <span className="truncate max-sm:hidden">Waiting for HG Capital to review</span>
-              </Button>
+              <SendInvoice
+                taskId={taskId}
+                contactId={contactId}
+                firstName={firstName}
+                staffNames={staffNames}
+                getsEmail={getsEmail}
+                property={property ?? null}
+                signedIn={sendInvoice.signedIn}
+                openOnLoad={sendInvoice.openOnLoad}
+                today={sendInvoice.today}
+              />
             ) : step === "start" ? (
               <Button className={barButton} disabled={starting} onClick={start}>
                 {starting ? "Starting…" : "Start job"}

@@ -9,6 +9,7 @@ import { Section, buttonClass } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { usePropertyPhoto } from "@/app/(app)/properties/[id]/property-photo";
 import { removeTaskFile, renameTaskFile } from "../upload-actions";
+import { useUseAsInvoice } from "./use-as-invoice";
 
 /**
  * The task page's photos and files (docs/specs/uploads-photos.md 2.4, 2.5 and
@@ -25,7 +26,8 @@ import { removeTaskFile, renameTaskFile } from "../upload-actions";
  * taken off a posted comment leaves "Connor removed quote.pdf" in the activity.
  * On a task tied to a property, the viewer's ⋯ on a photo holds "Set as
  * property photo" (uploads 2.10): the building's front photo from then on,
- * with "Property photo set · Undo".
+ * with "Property photo set · Undo". Photos and documents also carry "Use as invoice" (docs/contractor-invoices-plan.md
+ * 4.4): the row's ⋯ on a document and the viewer's ⋯ on a photo or document, never a video or a link.
  */
 export function TaskMediaSection({
   taskId,
@@ -45,6 +47,7 @@ export function TaskMediaSection({
   property?: { id: string; label: string } | null;
 }) {
   const { toast } = useToast();
+  const asInvoice = useUseAsInvoice();
   if (media.length === 0 && files.length === 0) return null;
 
   const finish = new Set(atFinish);
@@ -98,9 +101,9 @@ export function TaskMediaSection({
         {property ? (
           <PropertyPhotoGrid property={property} items={media} groups={groups} />
         ) : (
-          <MediaGrid items={media} groups={groups} onDelete={removeTaskFile} onRename={renameTaskFile} canEdit link />
+          <MediaGrid items={media} groups={groups} onDelete={removeTaskFile} onRename={renameTaskFile} canEdit link menuItems={asInvoice.forMedia} />
         )}
-        <FilesList files={files} onDelete={removeTaskFile} onRename={renameTaskFile} />
+        <FilesList files={files} onDelete={removeTaskFile} onRename={renameTaskFile} menuItems={asInvoice.forFile} />
       </div>
     </Section>
   );
@@ -117,6 +120,7 @@ function PropertyPhotoGrid({
   groups: MediaGroup[] | undefined;
 }) {
   const photo = usePropertyPhoto({ propertyId: property.id, label: property.label });
+  const asInvoice = useUseAsInvoice();
   return (
     <MediaGrid
       items={items}
@@ -125,11 +129,12 @@ function PropertyPhotoGrid({
       onRename={renameTaskFile}
       canEdit
       link
-      menuItems={(item) =>
-        item.kind === "IMAGE"
+      menuItems={(item) => [
+        ...(item.kind === "IMAGE"
           ? [{ id: "property-photo", label: "Set as property photo", icon: <House />, onAction: () => void photo.fromTaskPhoto(item) }]
-          : []
-      }
+          : []),
+        ...asInvoice.forMedia(item),
+      ]}
     />
   );
 }

@@ -16,12 +16,12 @@ import {
   uploadTargetKey,
 } from "./upload-kinds";
 import { requestedUploadRole } from "./paths";
-import { propertyUploadLimits, uploadLimits } from "./limits";
+import { invoiceSendParent, invoiceUploadLimits, propertyUploadLimits, storedInvoiceUploadPath, uploadLimits } from "./limits";
 
 const T = "cm1abc2def3ghi";
 const P = "cm9prop8erty7";
 
-test("UPLOAD_KINDS: the five token routes the uploads spec names, the lockbox photo, the contractor's documents and signed leases, each with a parent and an access", () => {
+test("UPLOAD_KINDS: the five token routes the uploads spec names, the lockbox photo, the contractor's documents, signed leases and invoices, each with a parent and an access", () => {
   assert.deepEqual(
     [...UPLOAD_KINDS],
     [
@@ -34,6 +34,8 @@ test("UPLOAD_KINDS: the five token routes the uploads spec names, the lockbox ph
       "portal-contact-upload",
       "contact-upload",
       "lease-upload",
+      "invoice-upload",
+      "portal-invoice-upload",
     ],
   );
   for (const k of UPLOAD_KINDS) {
@@ -222,4 +224,32 @@ test("lease-upload: one target per term, all in the lease's folder, a token the 
   assert.equal(typeof leaseUploadLimits("lease1", req.pathname, "video"), "string");
   assert.ok(storedLeaseDocumentPath("leases/lease1/lease-2026-AbC123.pdf", "lease1"));
   assert.ok(!storedLeaseDocumentPath("leases/lease2/lease-2026.pdf", "lease1"));
+});
+
+test("invoice uploads: a partner's go to the invoice's folder, a contractor's to their own folder on the job until the send records them", () => {
+  const pdf = { name: "Invoice 1043.pdf", contentType: "application/pdf", fileKind: "file" as const };
+  const staff = uploadRequest("invoice-upload", "inv1", pdf);
+  assert.equal(staff.pathname, "invoices/inv1/Invoice-1043.pdf");
+  assert.deepEqual(JSON.parse(staff.clientPayload), { invoiceId: "inv1", fileKind: "file" });
+  const portal = uploadRequest("portal-invoice-upload", invoiceSendParent(T, "zack1"), pdf);
+  assert.equal(portal.pathname, `invoice-sends/${T}/zack1/Invoice-1043.pdf`);
+  assert.deepEqual(JSON.parse(portal.clientPayload), { taskId: T, fileKind: "file" });
+  assert.equal(UPLOAD_KIND_ACCESS["invoice-upload"], "private");
+  assert.equal(UPLOAD_KIND_ACCESS["portal-invoice-upload"], "private");
+  assert.deepEqual(UPLOAD_KIND_ALLOWED["portal-invoice-upload"], ["image", "file"]);
+  assert.equal(uploadTargetKey("invoice-upload", "inv1"), "invoice:inv1");
+  assert.equal(uploadTargetHref("invoice-upload", "inv1"), "/invoices/inv1");
+  assert.equal(uploadTargetHref("portal-invoice-upload", invoiceSendParent(T, "zack1")), `/p/jobs/${T}`);
+});
+
+test("a contractor's Send invoice folder names them: another contractor on the same job can't stage into it or claim from it", () => {
+  const mine = invoiceSendParent(T, "zack1");
+  const theirs = invoiceSendParent(T, "mike2");
+  assert.equal(typeof invoiceUploadLimits("portal-invoice-upload", mine, `invoice-sends/${T}/zack1/bill.pdf`, "file"), "object");
+  assert.equal(invoiceUploadLimits("portal-invoice-upload", theirs, `invoice-sends/${T}/zack1/bill.pdf`, "file"), "That upload path isn't allowed.");
+  // The job's folder alone, as the first build had it, is no longer a place a send can come from.
+  assert.equal(invoiceUploadLimits("portal-invoice-upload", mine, `invoice-sends/${T}/bill.pdf`, "file"), "That upload path isn't allowed.");
+  assert.ok(storedInvoiceUploadPath("portal-invoice-upload", `invoice-sends/${T}/zack1/bill-Ab1.pdf`, mine));
+  assert.ok(!storedInvoiceUploadPath("portal-invoice-upload", `invoice-sends/${T}/zack1/bill-Ab1.pdf`, theirs));
+  assert.ok(!storedInvoiceUploadPath("portal-invoice-upload", `invoice-sends/${T}/zack1/bill-Ab1.pdf`, T), "a bare job id isn't a parent");
 });

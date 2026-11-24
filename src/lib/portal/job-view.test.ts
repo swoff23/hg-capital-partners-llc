@@ -48,6 +48,8 @@ import {
   updateTimeLabel,
   type JobCard,
   payoffLine,
+  mayOfferSendInvoice,
+  sendInvoiceButton,
 } from "./job-view";
 
 const TODAY = "2026-10-22"; // a Thursday
@@ -524,4 +526,29 @@ test("the Mark done payoff says what happens next: an email, or a look back here
   assert.equal(payoffLine("Connor and Pieter", true), "Sent to Connor and Pieter. You'll get an email if anything else is needed.");
   assert.equal(payoffLine("Connor and Pieter", false), "Sent to Connor and Pieter. Check back here if anything else is needed.");
   assert.equal(payoffLine("HG", false), "Sent to HG. Check back here if anything else is needed.");
+});
+
+test("the invoice payoff promises an email only to a contractor who gets them", () => {
+  assert.equal(payoffLine("Connor and Pieter", true, "invoice"), "You'll get an email when it's paid.");
+  assert.equal(payoffLine("Connor and Pieter", false, "invoice"), "Check back here to see when it's paid.");
+  // The update's pair is unchanged.
+  assert.equal(payoffLine("HG", true), "Sent to HG. You'll get an email if anything else is needed.");
+});
+
+test("Send invoice is offered once the work is finished, In review or Done, and never before", () => {
+  assert.ok(mayOfferSendInvoice("REVIEW"));
+  assert.ok(mayOfferSendInvoice("DONE"));
+  for (const s of ["OPEN", "SCHEDULED", "WAITING", "IN_PROGRESS", "CANCELED"] as const) assert.ok(!mayOfferSendInvoice(s), s);
+});
+
+test("the Send invoice sheet's button waits for a file and says why while it's off", () => {
+  const idle = { pending: 0, waiting: 0, failed: 0, sending: false, uploaded: 0 };
+  assert.deepEqual(sendInvoiceButton(idle), { enabled: false, busy: false, line: null });
+  assert.deepEqual(sendInvoiceButton({ ...idle, uploaded: 1 }), { enabled: true, busy: false, line: null });
+  assert.deepEqual(sendInvoiceButton({ ...idle, pending: 1 }), { enabled: false, busy: false, line: "Finishing 1 upload…" });
+  assert.deepEqual(sendInvoiceButton({ ...idle, pending: 2, uploaded: 1 }), { enabled: false, busy: false, line: "Finishing 2 uploads…" });
+  // A failed or held file is the tray's line (Retry, No signal), so the button adds none.
+  assert.deepEqual(sendInvoiceButton({ ...idle, failed: 1, uploaded: 1 }), { enabled: false, busy: false, line: null });
+  assert.deepEqual(sendInvoiceButton({ ...idle, waiting: 1 }), { enabled: false, busy: false, line: null });
+  assert.deepEqual(sendInvoiceButton({ ...idle, sending: true, uploaded: 1 }), { enabled: false, busy: true, line: null });
 });
