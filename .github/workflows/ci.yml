@@ -25,6 +25,10 @@ jobs:
       # postinstall runs `prisma generate`; it does not need a database.
       - run: npm ci
 
+      # A known critical security advisory in a package the site ships fails CI. High and moderate ones don't,
+      # so this stays green between fixes; the monthly security report lists those.
+      - run: npm audit --omit=dev --audit-level=critical
+
       # `next typegen` (route types) + `tsc --noEmit`. No database needed.
       - run: npm run typecheck
 
